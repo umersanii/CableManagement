@@ -1,10 +1,14 @@
 package com.cablemanagement.views;
 
+import com.cablemanagement.views.pages.HomeContent;
+import com.cablemanagement.views.pages.SettingsContent;
+import com.cablemanagement.views.pages.ProfileContent;
+import com.cablemanagement.views.pages.RegisterContent;
+
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
+import javafx.scene.control.Button;
 import javafx.scene.layout.*;
-import javafx.scene.text.Font;
 import javafx.scene.Node;
 
 public class home_page {
@@ -21,24 +25,28 @@ public class home_page {
 
         StackPane contentArea = new StackPane();
         contentArea.setPadding(new Insets(20));
-        contentArea.getChildren().add(getHomeContent());
+        contentArea.getChildren().add(HomeContent.get());
 
         // Create full and collapsed versions of buttons
         Button homeBtn = createSidebarButton("🏠", "Home");
         Button settingsBtn = createSidebarButton("⚙️", "Settings");
         Button profileBtn = createSidebarButton("👤", "Profile");
+        Button registerBtn = createSidebarButton("📝", "Register");
+
 
         Button collapseBtn = new Button("⏪");
         collapseBtn.setMaxWidth(Double.MAX_VALUE);
         collapseBtn.getStyleClass().add("collapse-button");
 
-        sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn, collapseBtn);
+        sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn,registerBtn , collapseBtn);
         mainLayout.setLeft(sidebar);
 
         // Button Actions
-        homeBtn.setOnAction(e -> contentArea.getChildren().setAll(getHomeContent()));
-        settingsBtn.setOnAction(e -> contentArea.getChildren().setAll(getSettingsContent()));
-        profileBtn.setOnAction(e -> contentArea.getChildren().setAll(getProfileContent()));
+        homeBtn.setOnAction(e -> contentArea.getChildren().setAll(HomeContent.get()));
+        settingsBtn.setOnAction(e -> contentArea.getChildren().setAll(SettingsContent.get()));
+        profileBtn.setOnAction(e -> contentArea.getChildren().setAll(ProfileContent.get()));
+        registerBtn.setOnAction(e -> contentArea.getChildren().setAll(RegisterContent.get()));
+
 
         collapseBtn.setOnAction(e -> {
             isCollapsed = !isCollapsed;
@@ -47,9 +55,9 @@ public class home_page {
             if (isCollapsed) {
                 sidebar.setPrefWidth(60);
                 sidebar.getChildren().addAll(
-                        createIconOnlyButton("🏠", contentArea, getHomeContent()),
-                        createIconOnlyButton("⚙️", contentArea, getSettingsContent()),
-                        createIconOnlyButton("👤", contentArea, getProfileContent())
+                        createIconOnlyButton("🏠", contentArea, HomeContent.get()),
+                        createIconOnlyButton("⚙️", contentArea, SettingsContent.get()),
+                        createIconOnlyButton("👤", contentArea, ProfileContent.get())
                 );
                 collapseBtn.setText("⏩");
             } else {
@@ -57,7 +65,8 @@ public class home_page {
                 homeBtn.setText("🏠 Home");
                 settingsBtn.setText("⚙️ Settings");
                 profileBtn.setText("👤 Profile");
-                sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn);
+                registerBtn.setText("📝 Register");
+                sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn, registerBtn);
                 collapseBtn.setText("⏪");
             }
 
@@ -67,7 +76,6 @@ public class home_page {
         mainLayout.setCenter(contentArea);
 
         Scene scene = new Scene(mainLayout, 800, 500);
-        // Load external CSS
         scene.getStylesheets().add(home_page.class.getResource("style.css").toExternalForm());
         return scene;
     }
@@ -85,23 +93,5 @@ public class home_page {
         btn.getStyleClass().add("sidebar-button");
         btn.setOnAction(e -> contentArea.getChildren().setAll(targetPage));
         return btn;
-    }
-
-    private static Node getHomeContent() {
-        Label label = new Label("🏠 Home Page");
-        label.setFont(new Font(24));
-        return new StackPane(label);
-    }
-
-    private static Node getSettingsContent() {
-        Label label = new Label("⚙️ Settings Page");
-        label.setFont(new Font(24));
-        return new StackPane(label);
-    }
-
-    private static Node getProfileContent() {
-        Label label = new Label("👤 Profile Page");
-        label.setFont(new Font(24));
-        return new StackPane(label);
     }
 }
