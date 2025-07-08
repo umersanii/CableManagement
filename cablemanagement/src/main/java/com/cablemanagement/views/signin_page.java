@@ -1,6 +1,6 @@
-package com.cablemanagement.views.common;
+package com.cablemanagement.views;
 
-import com.cablemanagement.views.home_page;
+import com.cablemanagement.config;
 
 import javafx.application.Application;
 import javafx.geometry.Insets;
@@ -29,11 +29,23 @@ public class signin_page extends Application {
             String username = usernameField.getText();
             String password = passwordField.getText();
 
-            if ("admin".equals(username) && "1234".equals(password)) {
-                // Switch to home page
-                primaryStage.setScene(home_page.getHomeScene());
-            } else {
-                showAlert(Alert.AlertType.ERROR, "Login Failed", "Invalid credentials!");
+            // if ("admin".equals(username) && "1234".equals(password)) {
+            //     // Switch to home page
+            //     primaryStage.setScene(home_page.getHomeScene());
+            // } else {
+            //     showAlert(Alert.AlertType.ERROR, "Login Failed", "Invalid credentials!");
+            // }
+            if(config.database.isConnected())
+            {
+                if(config.database.SignIn(username, password)){
+                    primaryStage.setScene(home_page.getHomeScene());
+                }
+                else {
+                    showAlert(Alert.AlertType.ERROR, "Login Failed", "Invalid credentials!");
+                }
+            }
+            else {
+                showAlert(Alert.AlertType.ERROR, "Login Failed", "Unable to connect to database!");
             }
         });
 

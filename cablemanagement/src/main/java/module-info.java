@@ -3,8 +3,10 @@ module com.cablemanagement {
     requires javafx.fxml;
 
     opens com.cablemanagement to javafx.fxml;
-    opens com.cablemanagement.views.common to javafx.fxml, javafx.graphics;
+    opens com.cablemanagement.views to javafx.fxml, javafx.graphics;
     
     exports com.cablemanagement;
-    exports com.cablemanagement.views.common;
+    exports com.cablemanagement.views;
+
+    exports com.cablemanagement.database;
 }
