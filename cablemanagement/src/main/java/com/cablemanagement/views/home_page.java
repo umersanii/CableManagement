@@ -4,6 +4,8 @@ import com.cablemanagement.views.pages.HomeContent;
 import com.cablemanagement.views.pages.SettingsContent;
 import com.cablemanagement.views.pages.ProfileContent;
 import com.cablemanagement.views.pages.RegisterContent;
+import com.cablemanagement.views.pages.RawStock;
+import com.cablemanagement.views.pages.ProductionStock;
 
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
@@ -32,13 +34,14 @@ public class home_page {
         Button settingsBtn = createSidebarButton("⚙️", "Settings");
         Button profileBtn = createSidebarButton("👤", "Profile");
         Button registerBtn = createSidebarButton("📝", "Register");
-
+        Button rawStockBtn = createSidebarButton("📦", "Raw Stock");
+        Button productionStockBtn = createSidebarButton("🏭", "Production Stock");
 
         Button collapseBtn = new Button("⏪");
         collapseBtn.setMaxWidth(Double.MAX_VALUE);
         collapseBtn.getStyleClass().add("collapse-button");
 
-        sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn,registerBtn , collapseBtn);
+        sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn, registerBtn, rawStockBtn, productionStockBtn, collapseBtn);
         mainLayout.setLeft(sidebar);
 
         // Button Actions
@@ -46,7 +49,8 @@ public class home_page {
         settingsBtn.setOnAction(e -> contentArea.getChildren().setAll(SettingsContent.get()));
         profileBtn.setOnAction(e -> contentArea.getChildren().setAll(ProfileContent.get()));
         registerBtn.setOnAction(e -> contentArea.getChildren().setAll(RegisterContent.get()));
-
+        rawStockBtn.setOnAction(e -> contentArea.getChildren().setAll(RawStock.get()));
+        productionStockBtn.setOnAction(e -> contentArea.getChildren().setAll(ProductionStock.get()));
 
         collapseBtn.setOnAction(e -> {
             isCollapsed = !isCollapsed;
@@ -57,7 +61,10 @@ public class home_page {
                 sidebar.getChildren().addAll(
                         createIconOnlyButton("🏠", contentArea, HomeContent.get()),
                         createIconOnlyButton("⚙️", contentArea, SettingsContent.get()),
-                        createIconOnlyButton("👤", contentArea, ProfileContent.get())
+                        createIconOnlyButton("👤", contentArea, ProfileContent.get()),
+                        createIconOnlyButton("📝", contentArea, RegisterContent.get()),
+                        createIconOnlyButton("📦", contentArea, RawStock.get()),
+                        createIconOnlyButton("🏭", contentArea, ProductionStock.get())
                 );
                 collapseBtn.setText("⏩");
             } else {
@@ -66,7 +73,9 @@ public class home_page {
                 settingsBtn.setText("⚙️ Settings");
                 profileBtn.setText("👤 Profile");
                 registerBtn.setText("📝 Register");
-                sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn, registerBtn);
+                rawStockBtn.setText("📦 Raw Stock");
+                productionStockBtn.setText("🏭 Production Stock");
+                sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn, registerBtn, rawStockBtn, productionStockBtn);
                 collapseBtn.setText("⏪");
             }
 
