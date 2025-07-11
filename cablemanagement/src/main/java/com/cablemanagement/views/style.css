@@ -168,3 +168,57 @@
     -fx-text-fill: #34495e;
     -fx-padding: 0 0 3 0;
 }
+
+/* ----------------  ---------------- */
+/* Form styling */
+.form-container {
+    -fx-padding: 20;
+    -fx-spacing: 15;
+}
+
+.form-heading {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-padding: 0 0 10 0;
+}
+
+.form-subheading {
+    -fx-font-weight: bold;
+    -fx-padding: 10 0 5 0;
+}
+
+.form-row {
+    -fx-alignment: center-left;
+}
+
+.form-label {
+    -fx-min-width: 120;
+}
+
+.form-input {
+    -fx-min-width: 200;
+}
+
+/* Button styling */
+.register-button {
+    -fx-padding: 8 15;
+    -fx-font-weight: bold;
+}
+
+.action-button {
+    -fx-padding: 5 10;
+}
+
+.form-submit {
+    -fx-padding: 10 15;
+    -fx-font-weight: bold;
+    -fx-background-color: #2e8b57;
+    -fx-text-fill: white;
+}
+
+/* ListView styling */
+.category-list {
+    -fx-border-color: #ddd;
+    -fx-border-radius: 5;
+    -fx-padding: 5;
+}
