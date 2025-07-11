@@ -7,6 +7,8 @@ import com.cablemanagement.views.pages.RegisterContent;
 import com.cablemanagement.views.pages.RawStock;
 import com.cablemanagement.views.pages.ProductionStock;
 import com.cablemanagement.views.pages.Books;
+import com.cablemanagement.views.pages.BankManagement;
+import com.cablemanagement.views.pages.EmployeeManagement;
 
 
 import javafx.geometry.Insets;
@@ -39,12 +41,14 @@ public class home_page {
         Button rawStockBtn = createSidebarButton("📦", "Raw Stock");
         Button productionStockBtn = createSidebarButton("🏭", "Production Stock");
         Button bookBtn = createSidebarButton("📚", "Book");
+        Button bankManagementBtn = createSidebarButton("🏦", "Bank Management");
+        Button employeeManagementBtn = createSidebarButton("👥", "Employee Management");
 
         Button collapseBtn = new Button("⏪");
         collapseBtn.setMaxWidth(Double.MAX_VALUE);
         collapseBtn.getStyleClass().add("collapse-button");
 
-        sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn, registerBtn, rawStockBtn, productionStockBtn, bookBtn, collapseBtn);
+        sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn, registerBtn, rawStockBtn, productionStockBtn, bookBtn, bankManagementBtn, employeeManagementBtn, collapseBtn);
         mainLayout.setLeft(sidebar);
 
         // Button Actions
@@ -55,6 +59,8 @@ public class home_page {
         rawStockBtn.setOnAction(e -> contentArea.getChildren().setAll(RawStock.get()));
         productionStockBtn.setOnAction(e -> contentArea.getChildren().setAll(ProductionStock.get()));
         bookBtn.setOnAction(e -> contentArea.getChildren().setAll(Books.get()));
+        bankManagementBtn.setOnAction(e -> contentArea.getChildren().setAll(BankManagement.get()));
+        employeeManagementBtn.setOnAction(e -> contentArea.getChildren().setAll(EmployeeManagement.get()));
 
         collapseBtn.setOnAction(e -> {
             isCollapsed = !isCollapsed;
@@ -70,6 +76,8 @@ public class home_page {
                         createIconOnlyButton("📦", contentArea, RawStock.get()),
                         createIconOnlyButton("🏭", contentArea, ProductionStock.get()),
                         createIconOnlyButton("📚", contentArea, Books.get())
+                        , createIconOnlyButton("🏦", contentArea, BankManagement.get())
+                        , createIconOnlyButton("👥", contentArea, EmployeeManagement.get())
                 );
                 collapseBtn.setText("⏩");
             } else {
@@ -81,7 +89,7 @@ public class home_page {
                 rawStockBtn.setText("📦 Raw Stock");
                 productionStockBtn.setText("🏭 Production Stock");
                 bookBtn.setText("📚 Book");
-                sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn, registerBtn, rawStockBtn, productionStockBtn, bookBtn);
+                sidebar.getChildren().addAll(homeBtn, settingsBtn, profileBtn, registerBtn, rawStockBtn, productionStockBtn, bookBtn, bankManagementBtn, employeeManagementBtn);
                 collapseBtn.setText("⏪");
             }
 
