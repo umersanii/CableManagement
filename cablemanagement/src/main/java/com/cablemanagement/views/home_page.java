@@ -55,7 +55,6 @@ public class home_page {
         Button booksBtn = createSidebarButton("📚 Books");
         Button bankMgmtBtn = createSidebarButton("Ⓑ Bank Mgmt");
         Button salesmanBtn = createSidebarButton("☺ Salesman");
-        Button cashInHandBtn = createSidebarButton("💵 Cash In Hand");
         Button employeeMgmtBtn = createSidebarButton("☺ Employees");
         Button reportsBtn = createSidebarButton("📊 Reports");
 
@@ -67,7 +66,7 @@ public class home_page {
         sidebarContent.getChildren().addAll(
             homeBtn, settingsBtn, profileBtn, registerBtn,
             rawStockBtn, productionStockBtn,
-            booksBtn, bankMgmtBtn, salesmanBtn, cashInHandBtn,
+            booksBtn, bankMgmtBtn, salesmanBtn,
             employeeMgmtBtn, reportsBtn,
             collapseBtn
         );
@@ -85,7 +84,6 @@ public class home_page {
         booksBtn.setOnAction(e -> contentArea.getChildren().setAll(BooksContent.get()));
         bankMgmtBtn.setOnAction(e -> contentArea.getChildren().setAll(BankManagementContent.get()));
         salesmanBtn.setOnAction(e -> contentArea.getChildren().setAll(SalesmanContent.get()));
-        cashInHandBtn.setOnAction(e -> contentArea.getChildren().setAll(CashInHandContent.get()));
         employeeMgmtBtn.setOnAction(e -> contentArea.getChildren().setAll(EmployeeManagementContent.get()));
         reportsBtn.setOnAction(e -> contentArea.getChildren().setAll(ReportsContent.get()));
 
@@ -105,7 +103,6 @@ public class home_page {
                     createIconOnlyButton("📚", contentArea, BooksContent.get()),
                     createIconOnlyButton("Ⓑ", contentArea, BankManagementContent.get()),
                     createIconOnlyButton("☺", contentArea, SalesmanContent.get()),
-                    createIconOnlyButton("💵", contentArea, CashInHandContent.get()),
                     createIconOnlyButton("☺", contentArea, EmployeeManagementContent.get()),
                     createIconOnlyButton("📊", contentArea, ReportsContent.get())
                 );
@@ -121,14 +118,13 @@ public class home_page {
                 booksBtn.setText("📚 Books");
                 bankMgmtBtn.setText("Ⓑ Bank Mgmt");
                 salesmanBtn.setText("☺ Salesman");
-                cashInHandBtn.setText("💵 Cash In Hand");
                 employeeMgmtBtn.setText("☺ Employees");
                 reportsBtn.setText("📊 Reports");
 
                 sidebarContent.getChildren().addAll(
                     homeBtn, settingsBtn, profileBtn, registerBtn,
                     rawStockBtn, productionStockBtn,
-                    booksBtn, bankMgmtBtn, salesmanBtn, cashInHandBtn,
+                    booksBtn, bankMgmtBtn, salesmanBtn,
                     employeeMgmtBtn, reportsBtn
                 );
                 collapseBtn.setText("⏪");

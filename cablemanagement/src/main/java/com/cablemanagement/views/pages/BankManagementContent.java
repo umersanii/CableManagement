@@ -7,6 +7,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import com.cablemanagement.model.Bank;
 
@@ -33,6 +34,8 @@ public class BankManagementContent {
 
         addButton(buttonBar, "Manage Banks", () -> contentArea.getChildren().setAll(viewManageBanks()));
         addButton(buttonBar, "Bank Transactions", () -> contentArea.getChildren().setAll(viewTransactionSection()));
+        addButton(buttonBar, "View Cash In Hand", () -> contentArea.getChildren().setAll(viewCashInHand()));
+        addButton(buttonBar, "View Cash Ledger", () -> contentArea.getChildren().setAll(viewCashLedger()));
 
         mainLayout.setTop(scrollPane);
         mainLayout.setCenter(contentArea);
@@ -271,6 +274,37 @@ public class BankManagementContent {
                 new Label("Amount to Convert:"), amountField,
                 submit
         );
+        return box;
+    }
+
+    private static VBox viewCashInHand() {
+        VBox box = createSection("Cash In Hand", "Shows the total available cash.");
+
+        Label amount = new Label("Rs. 0.00");
+        amount.getStyleClass().add("amount-label");
+
+        box.getChildren().add(amount);
+        return box;
+    }
+
+    private static VBox viewCashLedger() {
+        VBox box = createSection("Cash Ledger", "Shows the list of all cash transactions.");
+
+        TableView<String> ledgerTable = new TableView<>();
+        ledgerTable.setPrefHeight(250);
+        ledgerTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        TableColumn<String, String> typeCol = new TableColumn<>("Type");
+        typeCol.setCellValueFactory(data -> new ReadOnlyStringWrapper("Deposit"));
+
+        TableColumn<String, String> amountCol = new TableColumn<>("Amount");
+        amountCol.setCellValueFactory(data -> new ReadOnlyStringWrapper("Rs. 500"));
+
+        TableColumn<String, String> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(data -> new ReadOnlyStringWrapper("2025-07-12"));
+
+        ledgerTable.getColumns().addAll(typeCol, amountCol, dateCol);
+        box.getChildren().add(ledgerTable);
         return box;
     }
 
