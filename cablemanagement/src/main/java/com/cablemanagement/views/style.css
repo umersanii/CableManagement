@@ -222,3 +222,21 @@
     -fx-border-radius: 5;
     -fx-padding: 5;
 }
+
+
+/* Custom ScrollPane styling */
+.scroll-pane.custom-scroll > .viewport {
+    -fx-padding: 0;
+}
+
+.scroll-pane.custom-scroll {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.scroll-pane.custom-scroll .scroll-bar:vertical {
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+    -fx-pref-width: 8px; /* keep it narrow */
+    -fx-background-color: transparent;
+}
