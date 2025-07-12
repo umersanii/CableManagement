@@ -178,3 +178,13 @@
     -fx-pref-width: 8px;
     -fx-background-color: transparent;
 }
+
+
+.bordered-box {
+    -fx-border-color: #ddd;
+    -fx-border-width: 0;
+    -fx-background-color: #ffffff;
+    -fx-padding: 15;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+}

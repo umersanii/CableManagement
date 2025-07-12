@@ -17,6 +17,7 @@ public class SalesmanContent {
     public static Node get() {
         VBox mainLayout = new VBox(20);
         mainLayout.setPadding(new Insets(20));
+        mainLayout.getStyleClass().add("bordered-box");
 
         Label heading = new Label("SALESMAN");
         heading.setStyle("-fx-font-size: 24px; -fx-text-fill: #333333;");
