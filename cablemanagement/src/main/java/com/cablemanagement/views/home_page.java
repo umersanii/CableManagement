@@ -1,6 +1,15 @@
 package com.cablemanagement.views;
 
-import com.cablemanagement.views.pages.*;
+import com.cablemanagement.views.pages.HomeContent;
+import com.cablemanagement.views.pages.SettingsContent;
+import com.cablemanagement.views.pages.ProfileContent;
+import com.cablemanagement.views.pages.RegisterContent;
+import com.cablemanagement.views.pages.RawStock;
+import com.cablemanagement.views.pages.ProductionStock;
+import com.cablemanagement.views.pages.Books;
+import com.cablemanagement.views.pages.BankManagement;
+import com.cablemanagement.views.pages.EmployeeManagement;
+import com.cablemanagement.views.pages.ReportsManagement;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
