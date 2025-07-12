@@ -46,7 +46,6 @@ public class home_page {
         // Standard Emoji + Arial Font
         Button homeBtn = createSidebarButton("🏠 Home");
         Button settingsBtn = createSidebarButton("⚙️ Settings");
-        Button profileBtn = createSidebarButton("☺ Profile");
         Button registerBtn = createSidebarButton("✎ Register");
         Button rawStockBtn = createSidebarButton("📦 Raw Stock");
         Button productionStockBtn = createSidebarButton("🏭 Production");
@@ -63,7 +62,7 @@ public class home_page {
         collapseBtn.getStyleClass().add("collapse-button");
 
         sidebarContent.getChildren().addAll(
-            homeBtn, settingsBtn, profileBtn, registerBtn,
+            homeBtn, settingsBtn, registerBtn,
             rawStockBtn, productionStockBtn,
             booksBtn, bankMgmtBtn, salesmanBtn,
             employeeMgmtBtn, reportsBtn,
@@ -76,7 +75,6 @@ public class home_page {
         // Button actions
         homeBtn.setOnAction(e -> contentArea.getChildren().setAll(HomeContent.get()));
         settingsBtn.setOnAction(e -> contentArea.getChildren().setAll(SettingsContent.get()));
-        profileBtn.setOnAction(e -> contentArea.getChildren().setAll(ProfileContent.get()));
         registerBtn.setOnAction(e -> contentArea.getChildren().setAll(RegisterContent.get()));
         rawStockBtn.setOnAction(e -> contentArea.getChildren().setAll(RawStock.get()));
         productionStockBtn.setOnAction(e -> contentArea.getChildren().setAll(ProductionStock.get()));
@@ -110,7 +108,6 @@ public class home_page {
                 scrollPane.setPrefWidth(200);
                 homeBtn.setText("🏠 Home");
                 settingsBtn.setText("⚙️ Settings");
-                profileBtn.setText("☺ Profile");
                 registerBtn.setText("✎ Register");
                 rawStockBtn.setText("📦 Raw Stock");
                 productionStockBtn.setText("🏭 Production");
@@ -121,7 +118,7 @@ public class home_page {
                 reportsBtn.setText("📊 Reports");
 
                 sidebarContent.getChildren().addAll(
-                    homeBtn, settingsBtn, profileBtn, registerBtn,
+                    homeBtn, settingsBtn, registerBtn,
                     rawStockBtn, productionStockBtn,
                     booksBtn, bankMgmtBtn, salesmanBtn,
                     employeeMgmtBtn, reportsBtn
