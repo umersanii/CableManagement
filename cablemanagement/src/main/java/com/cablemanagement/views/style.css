@@ -41,92 +41,25 @@
     -fx-background-color: #16a085;
 }
 
-/* ---------------- REGISTER TOP BUTTONS ---------------- */
+/* ---------------- BUTTONS ---------------- */
 
-.register-button-bar {
-    -fx-background-color: #f0f0f0;
-    -fx-border-color: #ccc;
-    -fx-border-width: 0 0 1px 0;
-}
-
-.register-button {
-    -fx-background-color: #3498db;
+.register-button, .update-button {
+    -fx-background-color: #4CAF50;
     -fx-text-fill: white;
     -fx-font-weight: bold;
-    -fx-padding: 8 16;
-    -fx-font-size: 14px;
-    -fx-background-radius: 6;
-    -fx-cursor: hand;
+    -fx-padding: 8px 16px;
+    -fx-background-radius: 5px;
 }
 
-.register-button:hover {
-    -fx-background-color: #2980b9;
+.register-button:hover, .update-button:hover {
+    -fx-background-color: #45a049;
 }
-
-/* ---------------- FORM LAYOUT ---------------- */
-
-.form-container {
-    -fx-background-color: #ffffff;
-    -fx-border-color: #ddd;
-    -fx-border-width: 1;
-    -fx-border-radius: 8;
-    -fx-background-radius: 8;
-    -fx-padding: 30;
-    -fx-spacing: 15;
-}
-
-.form-heading {
-    -fx-font-size: 22px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #2c3e50;
-    -fx-padding: 0 0 20 0;
-}
-
-.form-subheading {
-    -fx-font-size: 16px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #2c3e50;
-    -fx-padding: 20 0 5 0;
-}
-
-.form-row {
-    -fx-spacing: 10;
-    -fx-padding: 5 0;
-    -fx-alignment: center-left;
-}
-
-/* ---------------- FORM FIELDS ---------------- */
-
-.form-label {
-    -fx-font-weight: bold;
-    -fx-text-fill: #34495e;
-    -fx-min-width: 150;
-}
-
-.form-input, .combo-box {
-    -fx-pref-width: 250;
-    -fx-background-radius: 4;
-    -fx-background-color: white;
-    -fx-border-color: #ccc;
-    -fx-border-radius: 4;
-    -fx-padding: 6 10;
-}
-
-/* Style ComboBox to match TextField */
-.combo-box .arrow-button {
-    -fx-background-color: transparent;
-}
-.combo-box .arrow {
-    -fx-background-color: #2c3e50;
-}
-
-/* ---------------- FORM BUTTON ---------------- */
 
 .form-submit {
     -fx-background-color: #2ecc71;
     -fx-text-fill: white;
     -fx-font-weight: bold;
-    -fx-padding: 8 20;
+    -fx-padding: 10 15;
     -fx-background-radius: 6;
     -fx-cursor: hand;
     -fx-font-size: 14px;
@@ -136,16 +69,85 @@
     -fx-background-color: #27ae60;
 }
 
-/* ---------------- LIST VIEW ---------------- */
+.button {
+    -fx-background-color: #2196F3;
+    -fx-text-fill: white;
+    -fx-background-radius: 5px;
+    -fx-padding: 8px 12px;
+    -fx-font-weight: bold;
+}
+
+.button:hover {
+    -fx-background-color: #1e88e5;
+}
+
+/* ---------------- FORM LAYOUT ---------------- */
+
+.form-container {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e0e0e0;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-padding: 20px;
+    -fx-spacing: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 10, 0, 0, 3);
+}
+
+.form-heading {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+    -fx-padding: 0 0 10 0;
+}
+
+.form-subheading {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #777777;
+    -fx-padding: 10 0 5 0;
+}
+
+.form-row {
+    -fx-spacing: 10;
+    -fx-padding: 5 0;
+    -fx-alignment: center-left;
+}
+
+.form-label, .form-combo-wrap > Label {
+    -fx-font-weight: bold;
+    -fx-text-fill: #34495e;
+    -fx-min-width: 120;
+    -fx-padding: 0 0 3 0;
+}
+
+/* ---------------- FORM FIELDS ---------------- */
+
+.form-input, .text-field, .combo-box {
+    -fx-pref-width: 250;
+    -fx-background-color: #f9f9f9;
+    -fx-border-color: #cccccc;
+    -fx-border-radius: 5px;
+    -fx-background-radius: 5px;
+    -fx-padding: 6px 10px;
+}
+
+.combo-box .arrow-button {
+    -fx-background-color: transparent;
+}
+
+.combo-box .arrow {
+    -fx-background-color: #2c3e50;
+}
+
+/* ---------------- LIST VIEW & TABLE ---------------- */
 
 .category-list {
-    -fx-border-color: #ccc;
+    -fx-border-color: #ddd;
     -fx-background-color: #ffffff;
     -fx-padding: 10;
     -fx-background-radius: 4;
     -fx-border-radius: 4;
 }
-
 
 .table-view {
     -fx-border-color: #ddd;
@@ -159,72 +161,8 @@
     -fx-text-fill: #2c3e50;
 }
 
-.form-combo-wrap {
-    -fx-spacing: 5;
-}
+/* ---------------- SCROLLPANE ---------------- */
 
-.form-combo-wrap > Label {
-    -fx-font-weight: bold;
-    -fx-text-fill: #34495e;
-    -fx-padding: 0 0 3 0;
-}
-
-/* ----------------  ---------------- */
-/* Form styling */
-.form-container {
-    -fx-padding: 20;
-    -fx-spacing: 15;
-}
-
-.form-heading {
-    -fx-font-size: 18px;
-    -fx-font-weight: bold;
-    -fx-padding: 0 0 10 0;
-}
-
-.form-subheading {
-    -fx-font-weight: bold;
-    -fx-padding: 10 0 5 0;
-}
-
-.form-row {
-    -fx-alignment: center-left;
-}
-
-.form-label {
-    -fx-min-width: 120;
-}
-
-.form-input {
-    -fx-min-width: 200;
-}
-
-/* Button styling */
-.register-button {
-    -fx-padding: 8 15;
-    -fx-font-weight: bold;
-}
-
-.action-button {
-    -fx-padding: 5 10;
-}
-
-.form-submit {
-    -fx-padding: 10 15;
-    -fx-font-weight: bold;
-    -fx-background-color: #2e8b57;
-    -fx-text-fill: white;
-}
-
-/* ListView styling */
-.category-list {
-    -fx-border-color: #ddd;
-    -fx-border-radius: 5;
-    -fx-padding: 5;
-}
-
-
-/* Custom ScrollPane styling */
 .scroll-pane.custom-scroll > .viewport {
     -fx-padding: 0;
 }
@@ -237,6 +175,6 @@
 .scroll-pane.custom-scroll .scroll-bar:vertical {
     -fx-padding: 0;
     -fx-background-insets: 0;
-    -fx-pref-width: 8px; /* keep it narrow */
+    -fx-pref-width: 8px;
     -fx-background-color: transparent;
 }
