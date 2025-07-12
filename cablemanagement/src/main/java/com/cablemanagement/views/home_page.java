@@ -8,7 +8,6 @@ import com.cablemanagement.views.pages.ReportsContent;
 import com.cablemanagement.views.pages.RawStock;
 import com.cablemanagement.views.pages.ProductionStock;
 import com.cablemanagement.views.pages.BooksContent;
-import com.cablemanagement.views.pages.CashInHandContent;
 import com.cablemanagement.views.pages.BankManagementContent;
 import com.cablemanagement.views.pages.EmployeeManagementContent;
 import com.cablemanagement.views.pages.SalesmanContent;
