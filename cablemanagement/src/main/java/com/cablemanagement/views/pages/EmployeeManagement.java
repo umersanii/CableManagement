@@ -11,10 +11,15 @@ import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+import com.cablemanagement.database.SQLiteDatabase;
+import com.cablemanagement.database.db;
 
 public class EmployeeManagement {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final db database = new SQLiteDatabase();
 
     public static Node get() {
         BorderPane mainLayout = new BorderPane();
@@ -125,13 +130,8 @@ public class EmployeeManagement {
         table.getColumns().addAll(nameCol, phoneCol, designationCol, salaryTypeCol, salaryCol, statusCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
-        // Sample data - in real app, fetch from database
-        ObservableList<Employee> data = FXCollections.observableArrayList(
-            new Employee(1, "Zahid Khan", "03111222333", "Manager", "monthly", "35000.00", "Active"),
-            new Employee(2, "Faisal Mehmood", "03211234567", "Technician", "daily", "1200.00", "Active"),
-            new Employee(3, "Rashid Ali", "03331234567", "Sales Representative", "hourly", "250.00", "Active")
-        );
-        table.setItems(data);
+        // Load data from database
+        refreshEmployeeTable(table);
 
         // Add context menu for actions
         ContextMenu contextMenu = new ContextMenu();
@@ -580,15 +580,8 @@ public class EmployeeManagement {
         table.getColumns().addAll(nameCol, dateCol, statusCol, hoursCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
-        // Sample data - in real app, fetch from Employee_Attendance table
-        ObservableList<Attendance> data = FXCollections.observableArrayList(
-            new Attendance("Zahid Khan", "2025-07-01", "present", "8"),
-            new Attendance("Zahid Khan", "2025-07-02", "present", "8"),
-            new Attendance("Faisal Mehmood", "2025-07-01", "absent", "0"),
-            new Attendance("Faisal Mehmood", "2025-07-02", "present", "9"),
-            new Attendance("Rashid Ali", "2025-07-01", "present", "7")
-        );
-        table.setItems(data);
+        // Load data from database
+        refreshAttendanceTable(table);
 
         form.getChildren().addAll(heading, dateRangeBox, buttons, table);
 
@@ -596,10 +589,12 @@ public class EmployeeManagement {
             String fromDate = fromDatePicker.getValue().format(DATE_FORMATTER);
             String toDate = toDatePicker.getValue().format(DATE_FORMATTER);
             System.out.println("Filtering attendance from " + fromDate + " to " + toDate);
+            refreshAttendanceTable(table); // Refresh when filtering
         });
 
         refreshBtn.setOnAction(e -> {
             System.out.println("Refreshing attendance report...");
+            refreshAttendanceTable(table);
         });
 
         printBtn.setOnAction(e -> {
@@ -760,6 +755,74 @@ public class EmployeeManagement {
         });
 
         return form;
+    }
+
+    private static void refreshEmployeeTable(TableView<Employee> table) {
+        ObservableList<Employee> data = FXCollections.observableArrayList();
+        List<Object[]> employees = database.getAllEmployees();
+        
+        for (Object[] row : employees) {
+            data.add(new Employee(
+                (Integer) row[0],  // employee_id
+                (String) row[1],   // employee_name
+                (String) row[2],   // phone_number
+                (String) row[3],   // designation_title
+                (String) row[4],   // salary_type
+                String.valueOf(row[5]), // salary_amount
+                (String) row[6]    // status
+            ));
+        }
+        
+        table.setItems(data);
+    }
+
+    private static void refreshAttendanceTable(TableView<Attendance> table) {
+        ObservableList<Attendance> data = FXCollections.observableArrayList();
+        List<Object[]> attendance = database.getAllEmployeeAttendance();
+        
+        for (Object[] row : attendance) {
+            data.add(new Attendance(
+                (String) row[0],   // employee_name
+                (String) row[1],   // attendance_date
+                (String) row[2],   // status
+                String.valueOf(row[3]) // working_hours
+            ));
+        }
+        
+        table.setItems(data);
+    }
+
+    private static void refreshSalaryPaymentTable(TableView<SalaryPayment> table) {
+        ObservableList<SalaryPayment> data = FXCollections.observableArrayList();
+        List<Object[]> payments = database.getAllEmployeeSalaryPayments();
+        
+        for (Object[] row : payments) {
+            data.add(new SalaryPayment(
+                (String) row[0],   // employee_name
+                (String) row[1],   // payment_date
+                String.valueOf(row[2]), // salary_amount
+                (String) row[3]    // description
+            ));
+        }
+        
+        table.setItems(data);
+    }
+
+    private static void refreshEmployeeLoanTable(TableView<EmployeeLoan> table) {
+        ObservableList<EmployeeLoan> data = FXCollections.observableArrayList();
+        List<Object[]> loans = database.getAllEmployeeLoans();
+        
+        for (Object[] row : loans) {
+            data.add(new EmployeeLoan(
+                (String) row[0],   // employee_name
+                (String) row[1],   // loan_date
+                String.valueOf(row[2]), // amount
+                (String) row[3],   // status
+                (String) row[4]    // description
+            ));
+        }
+        
+        table.setItems(data);
     }
 
     // Model classes

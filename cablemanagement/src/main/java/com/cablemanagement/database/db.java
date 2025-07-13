@@ -1,11 +1,11 @@
 package com.cablemanagement.database;
 
 import java.util.List;
-import java.util.function.Supplier;
 
 import com.cablemanagement.model.Brand;
 import com.cablemanagement.model.Customer;
 import com.cablemanagement.model.Manufacturer;
+import com.cablemanagement.model.Supplier;
 
 public interface db {
 
@@ -100,5 +100,69 @@ public interface db {
     boolean insertUnit(String unitName) ;
 
     boolean unitExists(String unitName) ;
+
+    // --------------------------
+    // User Management Operations
+    // --------------------------
+    boolean insertUser(String username, String password, String role);
+    
+    boolean userExists(String username);
+    
+    boolean changePassword(String username, String oldPassword, String newPassword);
+    
+    List<String> getAllUsers();
+
+    // --------------------------
+    // Raw Stock Operations
+    // --------------------------
+    List<Object[]> getAllRawStocks();
+    
+    boolean insertRawStock(String name, String category, String brand, String unit, double openingQty, double purchasePrice, double reorderLevel);
+    
+    List<Object[]> getAllRawPurchaseInvoices();
+    
+    List<Object[]> getAllRawStockUsage();
+
+    // --------------------------
+    // Production Stock Operations  
+    // --------------------------
+    List<Object[]> getAllProductionStocks();
+    
+    List<Object[]> getAllProductionInvoices();
+    
+    List<Object[]> getAllSalesInvoices();
+
+    // --------------------------
+    // Bank Management Operations
+    // --------------------------
+    List<Object[]> getAllBanks();
+    
+    boolean insertBank(String bankName, String accountNumber, String branchName, String accountTitle);
+    
+    List<Object[]> getAllBankTransactions();
+    
+    List<Object[]> getAllCashTransactions();
+    
+    double getCurrentCashBalance();
+
+    // --------------------------
+    // Employee Management Operations
+    // --------------------------
+    List<Object[]> getAllEmployees();
+    
+    boolean insertEmployee(String name, String phone, String cnic, String address, String designation, String salaryType, double salaryAmount);
+    
+    List<Object[]> getAllEmployeeAttendance();
+    
+    List<Object[]> getAllEmployeeSalaryPayments();
+    
+    List<Object[]> getAllEmployeeLoans();
+
+    // --------------------------
+    // Salesman Operations
+    // --------------------------
+    List<Object[]> getAllSalesmen();
+    
+    boolean insertSalesman(String name, String phone, String cnic, String address);
 
 }

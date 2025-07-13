@@ -1,5 +1,6 @@
 package com.cablemanagement.views.pages;
 
+import com.cablemanagement.config;
 import com.cablemanagement.model.Brand;
 import com.cablemanagement.model.Customer;
 import com.cablemanagement.model.Manufacturer;
@@ -9,6 +10,8 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+
+import java.util.List;
 
 public class RegisterContent {
 
@@ -96,17 +99,30 @@ public class RegisterContent {
 
         ListView<String> categoryList = new ListView<>();
         categoryList.getStyleClass().add("category-list");
-
         VBox.setVgrow(categoryList, Priority.ALWAYS);
 
-        // TODO: Fill category from databse
+        // Load existing categories from database
+        if (config.database != null && config.database.isConnected()) {
+            categoryList.getItems().addAll(config.database.getAllCategories());
+        }
 
-        // TODO: Implement Submit action
+        // Submit action - connected to database
         submit.setOnAction(e -> {
             String name = categoryField.getText().trim();
             if (!name.isEmpty()) {
-                categoryList.getItems().add(name);
-                categoryField.clear();
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.insertCategory(name)) {
+                        categoryList.getItems().add(name);
+                        categoryField.clear();
+                        showAlert("Success", "Category added successfully!");
+                    } else {
+                        showAlert("Error", "Failed to add category to database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "Category name cannot be empty!");
             }
         });
 
@@ -134,6 +150,30 @@ public class RegisterContent {
 
         ComboBox<String> tehsilBox = new ComboBox<>();
         tehsilBox.getStyleClass().add("form-input");
+
+        // Load provinces from database
+        if (config.database != null && config.database.isConnected()) {
+            provinceBox.getItems().addAll(config.database.getAllProvinces());
+        }
+
+        // Province selection handler
+        provinceBox.setOnAction(e -> {
+            String selectedProvince = provinceBox.getValue();
+            if (selectedProvince != null && config.database != null && config.database.isConnected()) {
+                districtBox.getItems().clear();
+                tehsilBox.getItems().clear();
+                districtBox.getItems().addAll(config.database.getDistrictsByProvince(selectedProvince));
+            }
+        });
+
+        // District selection handler
+        districtBox.setOnAction(e -> {
+            String selectedDistrict = districtBox.getValue();
+            if (selectedDistrict != null && config.database != null && config.database.isConnected()) {
+                tehsilBox.getItems().clear();
+                tehsilBox.getItems().addAll(config.database.getTehsilsByDistrict(selectedDistrict));
+            }
+        });
 
         // Labels
         Label nameLabel = new Label("Name:");
@@ -187,22 +227,36 @@ public class RegisterContent {
 
         table.getColumns().addAll(nameCol, provinceCol, districtCol, tehsilCol);
         
-        // TODO: Dynamically add data to table 
+        // Load existing manufacturers from database
+        if (config.database != null && config.database.isConnected()) {
+            table.getItems().addAll(config.database.getAllManufacturers());
+        }
 
-        // TODO: Submit Action
+        // Submit Action - connected to database
         submitBtn.setOnAction(e -> {
             String name = nameField.getText().trim();
             String province = provinceBox.getValue();
             String district = districtBox.getValue();
             String tehsil = tehsilBox.getValue();
 
-            if (!name.isEmpty()) {
-                Manufacturer m = new Manufacturer(name, province, district, tehsil);
-                table.getItems().add(m);
-                nameField.clear();
-                provinceBox.getSelectionModel().clearSelection();
-                districtBox.getSelectionModel().clearSelection();
-                tehsilBox.getSelectionModel().clearSelection();
+            if (!name.isEmpty() && province != null && district != null && tehsil != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.insertManufacturer(name, province, district, tehsil)) {
+                        Manufacturer m = new Manufacturer(name, province, district, tehsil);
+                        table.getItems().add(m);
+                        nameField.clear();
+                        provinceBox.getSelectionModel().clearSelection();
+                        districtBox.getSelectionModel().clearSelection();
+                        tehsilBox.getSelectionModel().clearSelection();
+                        showAlert("Success", "Manufacturer added successfully!");
+                    } else {
+                        showAlert("Error", "Failed to add manufacturer to database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "All fields are required!");
             }
         });
 
@@ -238,6 +292,30 @@ public class RegisterContent {
 
         ComboBox<String> tehsilBox = new ComboBox<>();
         tehsilBox.getStyleClass().add("form-input");
+
+        // Load provinces from database for Brand form
+        if (config.database != null && config.database.isConnected()) {
+            provinceBox.getItems().addAll(config.database.getAllProvinces());
+        }
+
+        // Province selection handler for Brand form
+        provinceBox.setOnAction(e -> {
+            String selectedProvince = provinceBox.getValue();
+            if (selectedProvince != null && config.database != null && config.database.isConnected()) {
+                districtBox.getItems().clear();
+                tehsilBox.getItems().clear();
+                districtBox.getItems().addAll(config.database.getDistrictsByProvince(selectedProvince));
+            }
+        });
+
+        // District selection handler for Brand form
+        districtBox.setOnAction(e -> {
+            String selectedDistrict = districtBox.getValue();
+            if (selectedDistrict != null && config.database != null && config.database.isConnected()) {
+                tehsilBox.getItems().clear();
+                tehsilBox.getItems().addAll(config.database.getTehsilsByDistrict(selectedDistrict));
+            }
+        });
 
         // Labels
         Label brandLabel = new Label("Brand Name:");
@@ -289,6 +367,11 @@ public class RegisterContent {
 
         table.getColumns().addAll(brandCol, provinceCol, districtCol, tehsilCol);
 
+        // Load existing brands from database
+        if (config.database != null && config.database.isConnected()) {
+            table.getItems().addAll(config.database.getAllBrands());
+        }
+
         // Submit Action
         submitBtn.setOnAction(e -> {
             String name = brandField.getText().trim();
@@ -296,14 +379,25 @@ public class RegisterContent {
             String district = districtBox.getValue();
             String tehsil = tehsilBox.getValue();
 
-            if (!name.isEmpty()) {
-                Brand brand = new Brand(name, province, district, tehsil);
-                table.getItems().add(brand);
+            if (!name.isEmpty() && province != null && district != null && tehsil != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.insertBrand(name, province, district, tehsil)) {
+                        Brand brand = new Brand(name, province, district, tehsil);
+                        table.getItems().add(brand);
 
-                brandField.clear();
-                provinceBox.getSelectionModel().clearSelection();
-                districtBox.getSelectionModel().clearSelection();
-                tehsilBox.getSelectionModel().clearSelection();
+                        brandField.clear();
+                        provinceBox.getSelectionModel().clearSelection();
+                        districtBox.getSelectionModel().clearSelection();
+                        tehsilBox.getSelectionModel().clearSelection();
+                        showAlert("Success", "Brand added successfully!");
+                    } else {
+                        showAlert("Error", "Failed to add brand to database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "All fields are required!");
             }
         });
 
@@ -343,20 +437,31 @@ public class RegisterContent {
 
         // Province list
         Label listHeading = new Label("Registered Provinces:");
-        listHeading.getStyleClass().add("form-subheading");
-
-        ListView<String> provinceList = new ListView<>();
+        listHeading.getStyleClass().add("form-subheading");        ListView<String> provinceList = new ListView<>();
         provinceList.getStyleClass().add("category-list");
-
         VBox.setVgrow(provinceList, Priority.ALWAYS);
 
-        // TODO: Fetch provinces from database
+        // Load existing provinces from database
+        if (config.database != null && config.database.isConnected()) {
+            provinceList.getItems().addAll(config.database.getAllProvinces());
+        }
 
         submit.setOnAction(e -> {
             String name = provinceField.getText().trim();
             if (!name.isEmpty()) {
-                provinceList.getItems().add(name);
-                provinceField.clear();
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.insertProvince(name)) {
+                        provinceList.getItems().add(name);
+                        provinceField.clear();
+                        showAlert("Success", "Province added successfully!");
+                    } else {
+                        showAlert("Error", "Failed to add province to database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "Province name cannot be empty!");
             }
         });
 
@@ -386,6 +491,11 @@ public class RegisterContent {
         ComboBox<String> provinceBox = new ComboBox<>();
         provinceBox.getStyleClass().add("form-input");
 
+        // Load provinces from database for District form
+        if (config.database != null && config.database.isConnected()) {
+            provinceBox.getItems().addAll(config.database.getAllProvinces());
+        }
+
         // Submit button
         Button submit = new Button("Submit District");
         submit.getStyleClass().add("form-submit");
@@ -407,15 +517,34 @@ public class RegisterContent {
         districtList.getStyleClass().add("category-list");
         VBox.setVgrow(districtList, Priority.ALWAYS);
 
+        // Load existing districts from database
+        if (config.database != null && config.database.isConnected()) {
+            List<String> districts = config.database.getAllDistricts();
+            for (String district : districts) {
+                districtList.getItems().add(district);
+            }
+        }
+
         // Submit action
         submit.setOnAction(e -> {
             String name = nameField.getText().trim();
             String province = provinceBox.getValue();
-            if (!name.isEmpty()) {
-                String display = province != null ? name + " (" + province + ")" : name;
-                districtList.getItems().add(display);
-                nameField.clear();
-                provinceBox.getSelectionModel().clearSelection();
+            if (!name.isEmpty() && province != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.insertDistrict(name, province)) {
+                        String display = name + " (" + province + ")";
+                        districtList.getItems().add(display);
+                        nameField.clear();
+                        provinceBox.getSelectionModel().clearSelection();
+                        showAlert("Success", "District added successfully!");
+                    } else {
+                        showAlert("Error", "Failed to add district to database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "District name and province are required!");
             }
         });
 
@@ -445,6 +574,11 @@ public class RegisterContent {
         ComboBox<String> districtBox = new ComboBox<>();
         districtBox.getStyleClass().add("form-input");
 
+        // Load districts from database for Tehsil form
+        if (config.database != null && config.database.isConnected()) {
+            districtBox.getItems().addAll(config.database.getAllDistricts());
+        }
+
         // Submit button
         Button submit = new Button("Submit Tehsil");
         submit.getStyleClass().add("form-submit");
@@ -466,15 +600,34 @@ public class RegisterContent {
         tehsilList.getStyleClass().add("category-list");
         VBox.setVgrow(tehsilList, Priority.ALWAYS);
 
+        // Load existing tehsils from database
+        if (config.database != null && config.database.isConnected()) {
+            List<String> tehsils = config.database.getAllTehsils();
+            for (String tehsil : tehsils) {
+                tehsilList.getItems().add(tehsil);
+            }
+        }
+
         // Submit action
         submit.setOnAction(e -> {
             String name = nameField.getText().trim();
             String district = districtBox.getValue();
-            if (!name.isEmpty()) {
-                String display = district != null ? name + " (" + district + ")" : name;
-                tehsilList.getItems().add(display);
-                nameField.clear();
-                districtBox.getSelectionModel().clearSelection();
+            if (!name.isEmpty() && district != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.insertTehsil(name, district)) {
+                        String display = name + " (" + district + ")";
+                        tehsilList.getItems().add(display);
+                        nameField.clear();
+                        districtBox.getSelectionModel().clearSelection();
+                        showAlert("Success", "Tehsil added successfully!");
+                    } else {
+                        showAlert("Error", "Failed to add tehsil to database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "Tehsil name and district are required!");
             }
         });
 
@@ -510,11 +663,27 @@ public class RegisterContent {
         unitList.getStyleClass().add("category-list");
         VBox.setVgrow(unitList, Priority.ALWAYS);
 
+        // Load existing units from database
+        if (config.database != null && config.database.isConnected()) {
+            unitList.getItems().addAll(config.database.getAllUnits());
+        }
+
         submit.setOnAction(e -> {
             String name = nameField.getText().trim();
             if (!name.isEmpty()) {
-                unitList.getItems().add(name);
-                nameField.clear();
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.insertUnit(name)) {
+                        unitList.getItems().add(name);
+                        nameField.clear();
+                        showAlert("Success", "Unit added successfully!");
+                    } else {
+                        showAlert("Error", "Failed to add unit to database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "Unit name cannot be empty!");
             }
         });
 
@@ -569,15 +738,31 @@ public class RegisterContent {
 
         table.getColumns().addAll(nameCol, contactCol);
 
+        // Load existing customers from database
+        if (config.database != null && config.database.isConnected()) {
+            table.getItems().addAll(config.database.getAllCustomers());
+        }
+
         // Submit action
         submitBtn.setOnAction(e -> {
             String name = nameField.getText().trim();
             String contact = contactField.getText().trim();
             if (!name.isEmpty()) {
-                Customer customer = new Customer(name, contact);
-                table.getItems().add(customer);
-                nameField.clear();
-                contactField.clear();
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.insertCustomer(name, contact)) {
+                        Customer customer = new Customer(name, contact);
+                        table.getItems().add(customer);
+                        nameField.clear();
+                        contactField.clear();
+                        showAlert("Success", "Customer added successfully!");
+                    } else {
+                        showAlert("Error", "Failed to add customer to database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "Customer name cannot be empty!");
             }
         });
 
@@ -640,15 +825,31 @@ public class RegisterContent {
 
         table.getColumns().addAll(nameCol, contactCol);
 
+        // Load existing suppliers from database
+        if (config.database != null && config.database.isConnected()) {
+            table.getItems().addAll(config.database.getAllSuppliers());
+        }
+
         // Submit action
         submitBtn.setOnAction(e -> {
             String name = nameField.getText().trim();
             String contact = contactField.getText().trim();
             if (!name.isEmpty()) {
-                Supplier supplier = new Supplier(name, contact);
-                table.getItems().add(supplier);
-                nameField.clear();
-                contactField.clear();
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.insertSupplier(name, contact)) {
+                        Supplier supplier = new Supplier(name, contact);
+                        table.getItems().add(supplier);
+                        nameField.clear();
+                        contactField.clear();
+                        showAlert("Success", "Supplier added successfully!");
+                    } else {
+                        showAlert("Error", "Failed to add supplier to database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "Supplier name cannot be empty!");
             }
         });
 
@@ -662,6 +863,14 @@ public class RegisterContent {
         );
 
         return form;
+    }
+
+    private static void showAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
 
 }

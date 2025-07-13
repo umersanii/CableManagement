@@ -7,12 +7,17 @@ import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
+import java.util.List;
+
 import com.cablemanagement.model.Salesman;
+import com.cablemanagement.database.SQLiteDatabase;
+import com.cablemanagement.database.db;
 
 public class SalesmanContent {
 
     private static final ObservableList<Salesman> salesmanList = FXCollections.observableArrayList();
     private static Salesman selectedSalesman = null;
+    private static final db database = new SQLiteDatabase();
 
     public static Node get() {
         VBox mainLayout = new VBox(20);
@@ -49,7 +54,8 @@ public class SalesmanContent {
         col.setHgrow(Priority.ALWAYS);
         formGrid.getColumnConstraints().addAll(col, col);
 
-        // Table
+        // Table - load data from database initially
+        refreshSalesmanTable();
         TableView<Salesman> table = new TableView<>(salesmanList);
         table.setPrefHeight(300);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
@@ -70,11 +76,23 @@ public class SalesmanContent {
             String cnic = cnicField.getText().trim();
             String address = addressField.getText().trim();
 
-            if (name.isEmpty() || contact.isEmpty()) return;
+            if (name.isEmpty() || contact.isEmpty()) {
+                showAlert("Error", "Name and Contact are required!");
+                return;
+            }
 
             if (selectedSalesman == null) {
-                salesmanList.add(new Salesman(name, contact, email, cnic, address));
+                // Add new salesman to database
+                boolean success = database.insertSalesman(name, contact, cnic, address);
+                if (success) {
+                    salesmanList.add(new Salesman(name, contact, email, cnic, address));
+                    showAlert("Success", "Salesman added successfully!");
+                } else {
+                    showAlert("Error", "Failed to add salesman to database!");
+                    return;
+                }
             } else {
+                // Update existing salesman (local update only for now)
                 selectedSalesman.setName(name);
                 selectedSalesman.setContact(contact);
                 selectedSalesman.setEmail(email);
@@ -136,5 +154,28 @@ public class SalesmanContent {
         });
 
         return actionCol;
+    }
+
+    private static void refreshSalesmanTable() {
+        salesmanList.clear();
+        List<Object[]> salesmen = database.getAllSalesmen();
+        
+        for (Object[] row : salesmen) {
+            salesmanList.add(new Salesman(
+                (String) row[1],  // salesman_name
+                (String) row[2],  // phone_number
+                "",               // email (not in database)
+                (String) row[3],  // cnic
+                (String) row[4]   // address
+            ));
+        }
+    }
+
+    private static void showAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
 }

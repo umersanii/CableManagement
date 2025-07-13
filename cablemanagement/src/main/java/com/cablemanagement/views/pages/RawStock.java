@@ -6,14 +6,21 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
+import java.util.List;
+
+import com.cablemanagement.database.SQLiteDatabase;
+import com.cablemanagement.database.db;
+import com.cablemanagement.model.Brand;
 
 public class RawStock {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final db database = new SQLiteDatabase();
 
     public static Node get() {
         BorderPane mainLayout = new BorderPane();
@@ -85,41 +92,118 @@ public class RawStock {
 
         Label heading = createHeading("Register Raw Stock");
 
-        // Input fields matching Raw_Stock table
+        // Input fields matching Raw_Stock table - convert to ComboBoxes for better UX
         TextField nameField = createTextField("Stock Name");
         TextField openingQtyField = createTextField("0", "Opening Quantity");
         TextField purchasePriceField = createTextField("Purchase Price/Unit");
         TextField reorderLevelField = createTextField("0", "Reorder Level");
         
-        // These would be ComboBoxes in real implementation
-        TextField categoryField = createTextField("Category");
-        TextField brandField = createTextField("Brand");
-        TextField unitField = createTextField("Unit");
+        // Use ComboBoxes for better database integration
+        ComboBox<String> categoryCombo = new ComboBox<>();
+        categoryCombo.setPromptText("Select Category");
+        categoryCombo.getItems().addAll(database.getAllCategories());
+        categoryCombo.setPrefWidth(200);
+        
+        ComboBox<String> brandCombo = new ComboBox<>();
+        brandCombo.setPromptText("Select Brand");
+        for (Brand b : database.getAllBrands()) {
+            brandCombo.getItems().add(b.nameProperty().get());
+        }
+        brandCombo.setPrefWidth(200);
+        
+        ComboBox<String> unitCombo = new ComboBox<>();
+        unitCombo.setPromptText("Select Unit");
+        unitCombo.getItems().addAll(database.getAllUnits());
+        unitCombo.setPrefWidth(200);
 
         Button submitBtn = createSubmitButton("Submit Raw Stock");
 
-        Label listHeading = createSubheading("Registered Raw Stock:");
-        ListView<String> stockView = createListView();
+        // Raw Stock Table
+        Label tableHeading = createSubheading("Registered Raw Stock:");
+        TableView<RawStockRecord> stockTable = createRawStockTable();
+        refreshRawStockTable(stockTable);
 
         submitBtn.setOnAction(e -> handleRawStockSubmit(
-            nameField, categoryField, brandField, unitField,
+            nameField, categoryCombo, brandCombo, unitCombo,
             openingQtyField, purchasePriceField, reorderLevelField,
-            stockView
+            stockTable
         ));
 
         form.getChildren().addAll(
             heading, 
             createFormRow("Stock Name:", nameField),
-            createFormRow("Category:", categoryField),
-            createFormRow("Brand:", brandField),
-            createFormRow("Unit:", unitField),
+            createFormRow("Category:", categoryCombo),
+            createFormRow("Brand:", brandCombo),
+            createFormRow("Unit:", unitCombo),
             createFormRow("Opening Quantity:", openingQtyField),
             createFormRow("Purchase Price/Unit:", purchasePriceField),
             createFormRow("Reorder Level:", reorderLevelField),
-            submitBtn, listHeading, stockView
+            submitBtn, tableHeading, stockTable
         );
         
         return form;
+    }
+
+    private static TableView<RawStockRecord> createRawStockTable() {
+        TableView<RawStockRecord> table = new TableView<>();
+        table.setPrefHeight(300);
+        
+        TableColumn<RawStockRecord, Integer> idCol = new TableColumn<>("ID");
+        idCol.setCellValueFactory(new PropertyValueFactory<>("id"));
+        idCol.setPrefWidth(50);
+        
+        TableColumn<RawStockRecord, String> nameCol = new TableColumn<>("Stock Name");
+        nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
+        nameCol.setPrefWidth(150);
+        
+        TableColumn<RawStockRecord, String> categoryCol = new TableColumn<>("Category");
+        categoryCol.setCellValueFactory(new PropertyValueFactory<>("category"));
+        categoryCol.setPrefWidth(100);
+        
+        TableColumn<RawStockRecord, String> brandCol = new TableColumn<>("Brand");
+        brandCol.setCellValueFactory(new PropertyValueFactory<>("brand"));
+        brandCol.setPrefWidth(100);
+        
+        TableColumn<RawStockRecord, String> unitCol = new TableColumn<>("Unit");
+        unitCol.setCellValueFactory(new PropertyValueFactory<>("unit"));
+        unitCol.setPrefWidth(80);
+        
+        TableColumn<RawStockRecord, Double> qtyCol = new TableColumn<>("Opening Qty");
+        qtyCol.setCellValueFactory(new PropertyValueFactory<>("openingQuantity"));
+        qtyCol.setPrefWidth(100);
+        
+        TableColumn<RawStockRecord, Double> priceCol = new TableColumn<>("Purchase Price");
+        priceCol.setCellValueFactory(new PropertyValueFactory<>("purchasePrice"));
+        priceCol.setPrefWidth(120);
+        
+        TableColumn<RawStockRecord, Double> reorderCol = new TableColumn<>("Reorder Level");
+        reorderCol.setCellValueFactory(new PropertyValueFactory<>("reorderLevel"));
+        reorderCol.setPrefWidth(100);
+        
+        table.getColumns().addAll(idCol, nameCol, categoryCol, brandCol, unitCol, qtyCol, priceCol, reorderCol);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        
+        return table;
+    }
+
+    private static void refreshRawStockTable(TableView<RawStockRecord> table) {
+        ObservableList<RawStockRecord> data = FXCollections.observableArrayList();
+        List<Object[]> rawStocks = database.getAllRawStocks();
+        
+        for (Object[] row : rawStocks) {
+            data.add(new RawStockRecord(
+                (Integer) row[0],  // id
+                (String) row[1],   // name
+                (String) row[2],   // category
+                (String) row[3],   // brand
+                (String) row[4],   // unit
+                (Double) row[5],   // opening quantity
+                (Double) row[6],   // purchase price
+                (Double) row[7]    // reorder level
+            ));
+        }
+        
+        table.setItems(data);
     }
 
     private static VBox createRawStockPurchaseInvoiceForm() {
@@ -344,38 +428,53 @@ public class RawStock {
 
     // Form submission handlers
     private static void handleRawStockSubmit(
-        TextField nameField, TextField categoryField, TextField brandField,
-        TextField unitField, TextField openingQtyField, TextField purchasePriceField,
-        TextField reorderLevelField, ListView<String> stockView
+        TextField nameField, ComboBox<String> categoryCombo, ComboBox<String> brandCombo,
+        ComboBox<String> unitCombo, TextField openingQtyField, TextField purchasePriceField,
+        TextField reorderLevelField, TableView<RawStockRecord> stockTable
     ) {
-        if (nameField.getText().trim().isEmpty() || purchasePriceField.getText().trim().isEmpty()) {
-            showAlert(Alert.AlertType.ERROR, "Error", "Name and Purchase Price are required");
+        String name = nameField.getText().trim();
+        String category = categoryCombo.getValue();
+        String brand = brandCombo.getValue();
+        String unit = unitCombo.getValue();
+        String openingQtyText = openingQtyField.getText().trim();
+        String purchasePriceText = purchasePriceField.getText().trim();
+        String reorderLevelText = reorderLevelField.getText().trim();
+
+        if (name.isEmpty() || category == null || brand == null || unit == null || purchasePriceText.isEmpty()) {
+            showAlert(Alert.AlertType.ERROR, "Error", "Name, Category, Brand, Unit, and Purchase Price are required");
             return;
         }
 
         try {
-            String stockEntry = String.format("%s | Cat: %s | Brand: %s | %s %s @ %s | Reorder: %s",
-                nameField.getText().trim(),
-                categoryField.getText().trim(),
-                brandField.getText().trim(),
-                openingQtyField.getText().trim(),
-                unitField.getText().trim(),
-                purchasePriceField.getText().trim(),
-                reorderLevelField.getText().trim());
+            double openingQty = openingQtyText.isEmpty() ? 0.0 : Double.parseDouble(openingQtyText);
+            double purchasePrice = Double.parseDouble(purchasePriceText);
+            double reorderLevel = reorderLevelText.isEmpty() ? 0.0 : Double.parseDouble(reorderLevelText);
             
-            stockView.getItems().add(stockEntry);
+            // Insert into database
+            boolean success = database.insertRawStock(name, category, brand, unit, openingQty, purchasePrice, reorderLevel);
             
-            // Clear fields
-            nameField.clear();
-            categoryField.clear();
-            brandField.clear();
-            unitField.clear();
-            openingQtyField.setText("0");
-            purchasePriceField.clear();
-            reorderLevelField.setText("0");
+            if (success) {
+                showAlert(Alert.AlertType.INFORMATION, "Success", "Raw stock registered successfully!");
+                
+                // Clear fields
+                nameField.clear();
+                categoryCombo.setValue(null);
+                brandCombo.setValue(null);
+                unitCombo.setValue(null);
+                openingQtyField.setText("0");
+                purchasePriceField.clear();
+                reorderLevelField.setText("0");
+                
+                // Refresh table
+                refreshRawStockTable(stockTable);
+            } else {
+                showAlert(Alert.AlertType.ERROR, "Error", "Failed to register raw stock. Please check your entries.");
+            }
 
+        } catch (NumberFormatException ex) {
+            showAlert(Alert.AlertType.ERROR, "Invalid Input", "Please enter valid numbers for quantities and prices");
         } catch (Exception ex) {
-            showAlert(Alert.AlertType.ERROR, "Invalid Input", "Please check your entries");
+            showAlert(Alert.AlertType.ERROR, "Database Error", "Error saving to database: " + ex.getMessage());
         }
     }
 
@@ -499,5 +598,38 @@ public class RawStock {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    // Model class for Raw Stock records
+    public static class RawStockRecord {
+        private final Integer id;
+        private final String name;
+        private final String category;
+        private final String brand;
+        private final String unit;
+        private final Double openingQuantity;
+        private final Double purchasePrice;
+        private final Double reorderLevel;
+
+        public RawStockRecord(Integer id, String name, String category, String brand, String unit,
+                             Double openingQuantity, Double purchasePrice, Double reorderLevel) {
+            this.id = id;
+            this.name = name;
+            this.category = category;
+            this.brand = brand;
+            this.unit = unit;
+            this.openingQuantity = openingQuantity;
+            this.purchasePrice = purchasePrice;
+            this.reorderLevel = reorderLevel;
+        }
+
+        public Integer getId() { return id; }
+        public String getName() { return name; }
+        public String getCategory() { return category; }
+        public String getBrand() { return brand; }
+        public String getUnit() { return unit; }
+        public Double getOpeningQuantity() { return openingQuantity; }
+        public Double getPurchasePrice() { return purchasePrice; }
+        public Double getReorderLevel() { return reorderLevel; }
     }
 }
