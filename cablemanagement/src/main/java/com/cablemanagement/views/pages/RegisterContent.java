@@ -69,8 +69,6 @@ public class RegisterContent {
     }
 
     // --------------------- FORMS ---------------------
-    /// TODO: Integrate with databse
-    /// - Fetch data dynamicly from data base
 
     private static VBox createCategoryForm() {
         VBox form = new VBox(20);
@@ -80,33 +78,33 @@ public class RegisterContent {
         Label heading = new Label("Register Category");
         heading.getStyleClass().add("form-heading");
 
+        // Input Row
         Label categoryLabel = new Label("Category Name:");
-        categoryLabel.getStyleClass().add("form-label");
-
         TextField categoryField = new TextField();
-        categoryField.getStyleClass().add("form-input");
-        
         Button submit = new Button("Submit Category");
-        submit.getStyleClass().add("form-submit");
+        
+        // Delete Button
+        Button deleteSelected = new Button("Delete Selected");
+        deleteSelected.getStyleClass().add("form-delete-button");
 
-        HBox row = new HBox(10, categoryLabel, categoryField, submit);
-        row.setAlignment(Pos.CENTER_LEFT);
-        row.getStyleClass().add("form-row");
+        HBox inputRow = new HBox(10, categoryLabel, categoryField, submit, deleteSelected);
+        inputRow.setAlignment(Pos.CENTER_LEFT);
+        inputRow.getStyleClass().add("form-row");
 
-        // Category list
+        // Category List
         Label listHeading = new Label("Registered Categories:");
-        listHeading.getStyleClass().add("form-subheading");
-
         ListView<String> categoryList = new ListView<>();
+        categoryList.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
         categoryList.getStyleClass().add("category-list");
-        VBox.setVgrow(categoryList, Priority.ALWAYS);
 
-        // Load existing categories from database
+        // Load from DB
         if (config.database != null && config.database.isConnected()) {
             categoryList.getItems().addAll(config.database.getAllCategories());
+        } else {
+            categoryList.getItems().addAll("Fiber Optics", "Coaxial Cables", "Ethernet Cables"); // Fallback mock data
         }
 
-        // Submit action - connected to database
+        // Submit Action
         submit.setOnAction(e -> {
             String name = categoryField.getText().trim();
             if (!name.isEmpty()) {
@@ -114,7 +112,7 @@ public class RegisterContent {
                     if (config.database.insertCategory(name)) {
                         categoryList.getItems().add(name);
                         categoryField.clear();
-                        showAlert("Success", "Category added successfully!");
+                        showAlert("Success", "Category added!");
                     } else {
                         showAlert("Error", "Failed to add category to database!");
                     }
@@ -126,7 +124,26 @@ public class RegisterContent {
             }
         });
 
-        form.getChildren().addAll(heading, row, listHeading, categoryList);
+        // Delete Action
+        deleteSelected.setOnAction(e -> {
+            String selected = categoryList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.deleteCategory(selected)) {
+                        categoryList.getItems().remove(selected);
+                        showAlert("Success", "Category deleted!");
+                    } else {
+                        showAlert("Error", "Failed to delete category from database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "No category selected!");
+            }
+        });
+
+        form.getChildren().addAll(heading, inputRow, listHeading, categoryList);
         return form;
     }
 
@@ -138,7 +155,7 @@ public class RegisterContent {
         Label heading = new Label("Register Manufacturer");
         heading.getStyleClass().add("form-heading");
 
-        // ----- Input Fields -----
+        // Input Fields
         TextField nameField = new TextField();
         nameField.getStyleClass().add("form-input");
 
@@ -184,7 +201,6 @@ public class RegisterContent {
         nameRow.setAlignment(Pos.CENTER_LEFT);
         nameRow.getStyleClass().add("form-row");
 
-        // Group all 3 boxes in one row
         HBox locationRow = new HBox(20);
         locationRow.setAlignment(Pos.CENTER_LEFT);
         locationRow.getStyleClass().add("form-row");
@@ -200,18 +216,25 @@ public class RegisterContent {
 
         locationRow.getChildren().addAll(provinceBoxWrap, districtBoxWrap, tehsilBoxWrap);
 
-        // Submit Button
+        // Submit and Delete Buttons
         Button submitBtn = new Button("Submit Manufacturer");
         submitBtn.getStyleClass().add("form-submit");
+        Button deleteBtn = new Button("Delete Selected");
+        deleteBtn.getStyleClass().add("form-delete-button");
 
-        // ----- Table of Existing Manufacturers -----
+        HBox buttonRow = new HBox(10, submitBtn, deleteBtn);
+        buttonRow.setAlignment(Pos.CENTER_LEFT);
+        buttonRow.getStyleClass().add("form-row");
+
+        // Table of Existing Manufacturers
         Label tableHeading = new Label("Existing Manufacturers:");
         tableHeading.getStyleClass().add("form-subheading");
 
         TableView<Manufacturer> table = new TableView<>();
         table.setPrefHeight(200);
         table.getStyleClass().add("category-list");
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY); // Take max width
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
 
         TableColumn<Manufacturer, String> nameCol = new TableColumn<>("Name");
         nameCol.setCellValueFactory(data -> data.getValue().nameProperty());
@@ -232,7 +255,7 @@ public class RegisterContent {
             table.getItems().addAll(config.database.getAllManufacturers());
         }
 
-        // Submit Action - connected to database
+        // Submit Action
         submitBtn.setOnAction(e -> {
             String name = nameField.getText().trim();
             String province = provinceBox.getValue();
@@ -260,11 +283,30 @@ public class RegisterContent {
             }
         });
 
+        // Delete Action
+        deleteBtn.setOnAction(e -> {
+            Manufacturer selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.deleteManufacturer(selected.nameProperty().get())) {
+                        table.getItems().remove(selected);
+                        showAlert("Success", "Manufacturer deleted successfully!");
+                    } else {
+                        showAlert("Error", "Failed to delete manufacturer from database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "No manufacturer selected!");
+            }
+        });
+
         form.getChildren().addAll(
             heading,
             nameRow,
             locationRow,
-            submitBtn,
+            buttonRow,
             tableHeading,
             table
         );
@@ -280,7 +322,7 @@ public class RegisterContent {
         Label heading = new Label("Register Brand");
         heading.getStyleClass().add("form-heading");
 
-        // ----- Input Fields -----
+        // Input Fields
         TextField brandField = new TextField();
         brandField.getStyleClass().add("form-input");
 
@@ -293,12 +335,12 @@ public class RegisterContent {
         ComboBox<String> tehsilBox = new ComboBox<>();
         tehsilBox.getStyleClass().add("form-input");
 
-        // Load provinces from database for Brand form
+        // Load provinces from database
         if (config.database != null && config.database.isConnected()) {
             provinceBox.getItems().addAll(config.database.getAllProvinces());
         }
 
-        // Province selection handler for Brand form
+        // Province selection handler
         provinceBox.setOnAction(e -> {
             String selectedProvince = provinceBox.getValue();
             if (selectedProvince != null && config.database != null && config.database.isConnected()) {
@@ -308,7 +350,7 @@ public class RegisterContent {
             }
         });
 
-        // District selection handler for Brand form
+        // District selection handler
         districtBox.setOnAction(e -> {
             String selectedDistrict = districtBox.getValue();
             if (selectedDistrict != null && config.database != null && config.database.isConnected()) {
@@ -321,12 +363,11 @@ public class RegisterContent {
         Label brandLabel = new Label("Brand Name:");
         brandLabel.getStyleClass().add("form-label");
 
-        // --- Rows ---
+        // Rows
         HBox brandRow = new HBox(10, brandLabel, brandField);
         brandRow.setAlignment(Pos.CENTER_LEFT);
         brandRow.getStyleClass().add("form-row");
 
-        // Province, District, Tehsil in one row
         VBox provinceWrap = new VBox(new Label("Province:"), provinceBox);
         VBox districtWrap = new VBox(new Label("District:"), districtBox);
         VBox tehsilWrap = new VBox(new Label("Tehsil:"), tehsilBox);
@@ -339,9 +380,15 @@ public class RegisterContent {
         locationRow.setAlignment(Pos.CENTER_LEFT);
         locationRow.getStyleClass().add("form-row");
 
-        // Submit Button
+        // Submit and Delete Buttons
         Button submitBtn = new Button("Submit Brand");
         submitBtn.getStyleClass().add("form-submit");
+        Button deleteBtn = new Button("Delete Selected");
+        deleteBtn.getStyleClass().add("form-delete-button");
+
+        HBox buttonRow = new HBox(10, submitBtn, deleteBtn);
+        buttonRow.setAlignment(Pos.CENTER_LEFT);
+        buttonRow.getStyleClass().add("form-row");
 
         // Table Heading
         Label tableHeading = new Label("Existing Brands:");
@@ -352,6 +399,7 @@ public class RegisterContent {
         table.setPrefHeight(200);
         table.getStyleClass().add("category-list");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
 
         TableColumn<Brand, String> brandCol = new TableColumn<>("Brand Name");
         brandCol.setCellValueFactory(data -> data.getValue().nameProperty());
@@ -384,7 +432,6 @@ public class RegisterContent {
                     if (config.database.insertBrand(name, province, district, tehsil)) {
                         Brand brand = new Brand(name, province, district, tehsil);
                         table.getItems().add(brand);
-
                         brandField.clear();
                         provinceBox.getSelectionModel().clearSelection();
                         districtBox.getSelectionModel().clearSelection();
@@ -401,12 +448,30 @@ public class RegisterContent {
             }
         });
 
-        // Add all elements to the form
+        // Delete Action
+        deleteBtn.setOnAction(e -> {
+            Brand selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.deleteBrand(selected.nameProperty().get())) {
+                        table.getItems().remove(selected);
+                        showAlert("Success", "Brand deleted successfully!");
+                    } else {
+                        showAlert("Error", "Failed to delete brand from database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "No brand selected!");
+            }
+        });
+
         form.getChildren().addAll(
             heading,
             brandRow,
             locationRow,
-            submitBtn,
+            buttonRow,
             tableHeading,
             table
         );
@@ -431,14 +496,19 @@ public class RegisterContent {
         Button submit = new Button("Submit Province");
         submit.getStyleClass().add("form-submit");
 
-        HBox row = new HBox(10, provinceLabel, provinceField, submit);
+        Button deleteBtn = new Button("Delete Selected");
+        deleteBtn.getStyleClass().add("form-delete-button");
+
+        HBox row = new HBox(10, provinceLabel, provinceField, submit, deleteBtn);
         row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("form-row");
 
         // Province list
         Label listHeading = new Label("Registered Provinces:");
-        listHeading.getStyleClass().add("form-subheading");        ListView<String> provinceList = new ListView<>();
+        listHeading.getStyleClass().add("form-subheading");
+        ListView<String> provinceList = new ListView<>();
         provinceList.getStyleClass().add("category-list");
+        provinceList.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
         VBox.setVgrow(provinceList, Priority.ALWAYS);
 
         // Load existing provinces from database
@@ -462,6 +532,25 @@ public class RegisterContent {
                 }
             } else {
                 showAlert("Error", "Province name cannot be empty!");
+            }
+        });
+
+        // Delete Action
+        deleteBtn.setOnAction(e -> {
+            String selected = provinceList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.deleteProvince(selected)) {
+                        provinceList.getItems().remove(selected);
+                        showAlert("Success", "Province deleted successfully!");
+                    } else {
+                        showAlert("Error", "Failed to delete province from database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "No province selected!");
             }
         });
 
@@ -491,18 +580,20 @@ public class RegisterContent {
         ComboBox<String> provinceBox = new ComboBox<>();
         provinceBox.getStyleClass().add("form-input");
 
-        // Load provinces from database for District form
+        // Load provinces from database
         if (config.database != null && config.database.isConnected()) {
             provinceBox.getItems().addAll(config.database.getAllProvinces());
         }
 
-        // Submit button
+        // Submit and Delete Buttons
         Button submit = new Button("Submit District");
         submit.getStyleClass().add("form-submit");
+        Button deleteBtn = new Button("Delete Selected");
+        deleteBtn.getStyleClass().add("form-delete-button");
 
-        // Row for inputs
+        // Rows
         HBox row1 = new HBox(10, nameLabel, nameField);
-        HBox row2 = new HBox(10, provinceLabel, provinceBox, submit);
+        HBox row2 = new HBox(10, provinceLabel, provinceBox, submit, deleteBtn);
 
         for (HBox row : new HBox[]{row1, row2}) {
             row.setAlignment(Pos.CENTER_LEFT);
@@ -515,6 +606,7 @@ public class RegisterContent {
 
         ListView<String> districtList = new ListView<>();
         districtList.getStyleClass().add("category-list");
+        districtList.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
         VBox.setVgrow(districtList, Priority.ALWAYS);
 
         // Load existing districts from database
@@ -548,6 +640,26 @@ public class RegisterContent {
             }
         });
 
+        // Delete Action
+        deleteBtn.setOnAction(e -> {
+            String selected = districtList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    String districtName = selected.split(" \\(")[0]; // Extract name before " (province)"
+                    if (config.database.deleteDistrict(districtName)) {
+                        districtList.getItems().remove(selected);
+                        showAlert("Success", "District deleted successfully!");
+                    } else {
+                        showAlert("Error", "Failed to delete district from database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "No district selected!");
+            }
+        });
+
         form.getChildren().addAll(heading, row1, row2, listHeading, districtList);
         return form;
     }
@@ -574,18 +686,20 @@ public class RegisterContent {
         ComboBox<String> districtBox = new ComboBox<>();
         districtBox.getStyleClass().add("form-input");
 
-        // Load districts from database for Tehsil form
+        // Load districts from database
         if (config.database != null && config.database.isConnected()) {
             districtBox.getItems().addAll(config.database.getAllDistricts());
         }
 
-        // Submit button
+        // Submit and Delete Buttons
         Button submit = new Button("Submit Tehsil");
         submit.getStyleClass().add("form-submit");
+        Button deleteBtn = new Button("Delete Selected");
+        deleteBtn.getStyleClass().add("form-delete-button");
 
         // Input rows
         HBox row1 = new HBox(10, nameLabel, nameField);
-        HBox row2 = new HBox(10, districtLabel, districtBox, submit);
+        HBox row2 = new HBox(10, districtLabel, districtBox, submit, deleteBtn);
 
         for (HBox row : new HBox[]{row1, row2}) {
             row.setAlignment(Pos.CENTER_LEFT);
@@ -598,6 +712,7 @@ public class RegisterContent {
 
         ListView<String> tehsilList = new ListView<>();
         tehsilList.getStyleClass().add("category-list");
+        tehsilList.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
         VBox.setVgrow(tehsilList, Priority.ALWAYS);
 
         // Load existing tehsils from database
@@ -631,6 +746,26 @@ public class RegisterContent {
             }
         });
 
+        // Delete Action
+        deleteBtn.setOnAction(e -> {
+            String selected = tehsilList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    String tehsilName = selected.split(" \\(")[0]; // Extract name before " (district)"
+                    if (config.database.deleteTehsil(tehsilName)) {
+                        tehsilList.getItems().remove(selected);
+                        showAlert("Success", "Tehsil deleted successfully!");
+                    } else {
+                        showAlert("Error", "Failed to delete tehsil from database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "No tehsil selected!");
+            }
+        });
+
         form.getChildren().addAll(heading, row1, row2, listHeading, tehsilList);
         return form;
     }
@@ -652,7 +787,10 @@ public class RegisterContent {
         Button submit = new Button("Submit Unit");
         submit.getStyleClass().add("form-submit");
 
-        HBox row = new HBox(10, nameLabel, nameField, submit);
+        Button deleteBtn = new Button("Delete Selected");
+        deleteBtn.getStyleClass().add("form-delete-button");
+
+        HBox row = new HBox(10, nameLabel, nameField, submit, deleteBtn);
         row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("form-row");
 
@@ -661,6 +799,7 @@ public class RegisterContent {
 
         ListView<String> unitList = new ListView<>();
         unitList.getStyleClass().add("category-list");
+        unitList.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
         VBox.setVgrow(unitList, Priority.ALWAYS);
 
         // Load existing units from database
@@ -684,6 +823,25 @@ public class RegisterContent {
                 }
             } else {
                 showAlert("Error", "Unit name cannot be empty!");
+            }
+        });
+
+        // Delete Action
+        deleteBtn.setOnAction(e -> {
+            String selected = unitList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.deleteUnit(selected)) {
+                        unitList.getItems().remove(selected);
+                        showAlert("Success", "Unit deleted successfully!");
+                    } else {
+                        showAlert("Error", "Failed to delete unit from database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "No unit selected!");
             }
         });
 
@@ -720,6 +878,12 @@ public class RegisterContent {
 
         Button submitBtn = new Button("Submit Customer");
         submitBtn.getStyleClass().add("form-submit");
+        Button deleteBtn = new Button("Delete Selected");
+        deleteBtn.getStyleClass().add("form-delete-button");
+
+        HBox buttonRow = new HBox(10, submitBtn, deleteBtn);
+        buttonRow.setAlignment(Pos.CENTER_LEFT);
+        buttonRow.getStyleClass().add("form-row");
 
         Label tableHeading = new Label("Registered Customers:");
         tableHeading.getStyleClass().add("form-subheading");
@@ -729,6 +893,7 @@ public class RegisterContent {
         table.setPrefHeight(200);
         table.getStyleClass().add("category-list");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
 
         TableColumn<Customer, String> nameCol = new TableColumn<>("Customer Name");
         nameCol.setCellValueFactory(data -> data.getValue().nameProperty());
@@ -766,11 +931,30 @@ public class RegisterContent {
             }
         });
 
+        // Delete Action
+        deleteBtn.setOnAction(e -> {
+            Customer selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.deleteCustomer(selected.nameProperty().get())) {
+                        table.getItems().remove(selected);
+                        showAlert("Success", "Customer deleted successfully!");
+                    } else {
+                        showAlert("Error", "Failed to delete customer from database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "No customer selected!");
+            }
+        });
+
         form.getChildren().addAll(
             heading,
             nameRow,
             contactRow,
-            submitBtn,
+            buttonRow,
             tableHeading,
             table
         );
@@ -807,6 +991,12 @@ public class RegisterContent {
 
         Button submitBtn = new Button("Submit Supplier");
         submitBtn.getStyleClass().add("form-submit");
+        Button deleteBtn = new Button("Delete Selected");
+        deleteBtn.getStyleClass().add("form-delete-button");
+
+        HBox buttonRow = new HBox(10, submitBtn, deleteBtn);
+        buttonRow.setAlignment(Pos.CENTER_LEFT);
+        buttonRow.getStyleClass().add("form-row");
 
         Label tableHeading = new Label("Registered Suppliers:");
         tableHeading.getStyleClass().add("form-subheading");
@@ -816,6 +1006,7 @@ public class RegisterContent {
         table.setPrefHeight(200);
         table.getStyleClass().add("category-list");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
 
         TableColumn<Supplier, String> nameCol = new TableColumn<>("Supplier Name");
         nameCol.setCellValueFactory(data -> data.getValue().nameProperty());
@@ -853,11 +1044,30 @@ public class RegisterContent {
             }
         });
 
+        // Delete Action
+        deleteBtn.setOnAction(e -> {
+            Supplier selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.deleteSupplier(selected.nameProperty().get())) {
+                        table.getItems().remove(selected);
+                        showAlert("Success", "Supplier deleted successfully!");
+                    } else {
+                        showAlert("Error", "Failed to delete supplier from database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "No supplier selected!");
+            }
+        });
+
         form.getChildren().addAll(
             heading,
             nameRow,
             contactRow,
-            submitBtn,
+            buttonRow,
             tableHeading,
             table
         );
@@ -872,5 +1082,4 @@ public class RegisterContent {
         alert.setContentText(message);
         alert.showAndWait();
     }
-
 }

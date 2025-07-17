@@ -1476,4 +1476,59 @@ public class SQLiteDatabase implements db {
         }
         return false;
     }
+
+
+    ///////////////////////////////////////////////////////////////////
+    /// Un sare Functions ki mock implementation
+    /// 
+    /// 
+    /// 
+    /// 
+    
+
+    // Delete Methods
+    @Override
+    public boolean deleteCategory(String categoryName) {
+        return true;
+    }
+
+    @Override
+    public boolean deleteManufacturer(String name) {
+        return true;
+    }
+
+    @Override
+    public boolean deleteBrand(String name) {
+        return true;
+    }
+
+    @Override
+    public boolean deleteProvince(String provinceName) {
+        return true;
+    }
+
+    @Override
+    public boolean deleteDistrict(String districtName) {
+        return true;
+    }
+
+    @Override
+    public boolean deleteTehsil(String tehsilName) {
+        return true;
+    }
+
+    @Override
+    public boolean deleteUnit(String unitName) {
+        return true;
+    }
+
+    @Override
+    public boolean deleteCustomer(String name) {
+        return true;
+    }
+
+    @Override
+    public boolean deleteSupplier(String name) {
+        return true;
+    }
 }

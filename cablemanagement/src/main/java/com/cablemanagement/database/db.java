@@ -9,6 +9,28 @@ import com.cablemanagement.model.Supplier;
 
 public interface db {
 
+
+    ///////////////////////////////////////////////////
+    /// Uncategorized, Errors fix krne k lye dale hain
+    /// Fazal inko implement krna ha
+    /// /////////////////////////////////////////////////
+    /// 
+    
+
+
+    // Add this method to support category deletion
+    public boolean deleteCategory(String categoryName);
+    public boolean deleteManufacturer(String name);
+    public boolean deleteBrand(String name);
+    public boolean deleteProvince(String provinceName);
+    public boolean deleteDistrict(String districtName);
+    public boolean deleteTehsil(String tehsilName);
+    public boolean deleteUnit(String unitName);
+    public boolean deleteCustomer(String name);
+    public boolean deleteSupplier(String name);
+    
+    ///////////////////////////////////////////////////
+
     // Sign In
     String connect(String url, String user, String password);
 
