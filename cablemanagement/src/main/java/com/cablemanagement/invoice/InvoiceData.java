@@ -1,3 +1,5 @@
+package com.cablemanagement.invoice;
+
 import java.util.List;
 
 public class InvoiceData {
