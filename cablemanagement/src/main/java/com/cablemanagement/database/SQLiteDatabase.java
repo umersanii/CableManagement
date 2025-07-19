@@ -10,11 +10,127 @@ import com.cablemanagement.model.Designation;
 import com.cablemanagement.model.Manufacturer;
 import com.cablemanagement.model.Supplier;
 
+
+import com.cablemanagement.model.BankTransaction;
+import com.cablemanagement.model.Bank;
+
+
 public class SQLiteDatabase implements db {
     
     private Connection connection;
     private String databasePath;
     
+    // Implement missing methods from db interface
+
+    @Override
+    public boolean updateBankBalance(double newBalance) {
+        // Update the balance for all banks (or you may want to specify a bank_id)
+        String query = "UPDATE Bank SET balance = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDouble(1, newBalance);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean deleteBank(int bankId) {
+        String query = "DELETE FROM Bank WHERE bank_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, bankId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public double getCashBalance() {
+        // This method is similar to getCurrentCashBalance()
+        return getCurrentCashBalance();
+    }
+
+    @Override
+    public boolean insertCashTransaction(BankTransaction transaction) {
+        // Assuming BankTransaction has getters for required fields
+        String query = "INSERT INTO Cash_Transaction (transaction_type, amount, description, transaction_date) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, transaction.getTransactionType());
+            pstmt.setDouble(2, transaction.getAmount());
+            pstmt.setString(3, transaction.getDescription());
+            pstmt.setString(4, transaction.getTransactionDate());
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean updateBank(Bank bank) {
+        String query = "UPDATE Bank SET branch_name = ?, balance = ?, account_number = ? WHERE bank_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, bank.getBranchName());
+            pstmt.setDouble(2, bank.getBalance());
+            pstmt.setString(3, bank.getAccountNumber());
+            pstmt.setInt(4, bank.getBankId());
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+public boolean insertBankTransaction(BankTransaction transaction) {
+    String query = "INSERT INTO Bank_Transaction (bank_id, transaction_date, transaction_type, amount, description, related_bank_id) " +
+                   "VALUES (?, ?, ?, ?, ?, ?)";
+    
+    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        
+        // Verify bank_id exists first
+        if (!bankExists(transaction.getBankId())) {
+            System.err.println("Bank ID " + transaction.getBankId() + " doesn't exist");
+            return false;
+        }
+        
+        // Verify related_bank_id exists if specified
+        if (transaction.getRelatedBankId() != 0 && !bankExists(transaction.getRelatedBankId())) {
+            System.err.println("Related Bank ID " + transaction.getRelatedBankId() + " doesn't exist");
+            return false;
+        }
+        
+        pstmt.setInt(1, transaction.getBankId());
+        pstmt.setString(2, transaction.getTransactionDate());
+        pstmt.setString(3, transaction.getTransactionType());
+        pstmt.setDouble(4, transaction.getAmount());
+        pstmt.setString(5, transaction.getDescription());
+        
+        // Handle null related_bank_id
+        if (transaction.getRelatedBankId() != 0) {
+            pstmt.setInt(6, transaction.getRelatedBankId());
+        } else {
+            pstmt.setNull(6, Types.INTEGER);
+        }
+        
+        return pstmt.executeUpdate() > 0;
+    } catch (SQLException e) {
+        System.err.println("Error inserting transaction: " + e.getMessage());
+        return false;
+    }
+}
+
+private boolean bankExists(int bankId) throws SQLException {
+    String query = "SELECT 1 FROM Bank WHERE bank_id = ?";
+    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        pstmt.setInt(1, bankId);
+        try (ResultSet rs = pstmt.executeQuery()) {
+            return rs.next();
+        }
+    }
+}
     public SQLiteDatabase() {
         this.databasePath = "cable_management.db";
         // Auto-connect when instantiated
@@ -340,7 +456,7 @@ public class SQLiteDatabase implements db {
                 ")",
                 
                 // Cash Transaction table
-                "CREATE TABLE IF NOT EXISTS CashTransaction (" +
+                "CREATE TABLE IF NOT EXISTS Cash_Transaction (" +
                 "transaction_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "description TEXT NOT NULL," +
                 "amount REAL NOT NULL," +
@@ -349,7 +465,7 @@ public class SQLiteDatabase implements db {
                 ")",
                 
                 // Bank Transaction table
-                "CREATE TABLE IF NOT EXISTS BankTransaction (" +
+                "CREATE TABLE IF NOT EXISTS Bank_Transaction (" +
                 "transaction_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "bank_id INTEGER NOT NULL," +
                 "description TEXT NOT NULL," +
@@ -1310,7 +1426,7 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllBanks() {
         List<Object[]> banks = new ArrayList<>();
-        String query = "SELECT bank_id, bank_name, account_number, branch_name, account_title FROM Bank ORDER BY bank_name";
+        String query = "SELECT bank_id, bank_name, account_number, branch_name, balance FROM Bank ORDER BY bank_name";
         
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
@@ -1321,7 +1437,7 @@ public class SQLiteDatabase implements db {
                     rs.getString("bank_name"),
                     rs.getString("account_number"),
                     rs.getString("branch_name"),
-                    rs.getString("account_title")
+                    rs.getDouble("balance")
                 };
                 banks.add(row);
             }
@@ -1332,14 +1448,13 @@ public class SQLiteDatabase implements db {
     }
 
     @Override
-    public boolean insertBank(String bankName, String accountNumber, String branchName, String accountTitle) {
-        String query = "INSERT INTO Bank (bank_name, account_number, branch_name, account_title) VALUES (?, ?, ?, ?)";
+    public boolean insertBank(String bankName, String accountNumber, String branchName) {
+        String query = "INSERT INTO Bank (bank_name, account_number, branch_name) VALUES (?, ?, ?)";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, bankName);
             pstmt.setString(2, accountNumber);
             pstmt.setString(3, branchName);
-            pstmt.setString(4, accountTitle);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -1375,32 +1490,45 @@ public class SQLiteDatabase implements db {
         return transactions;
     }
 
-    @Override
-    public List<Object[]> getAllCashTransactions() {
-        List<Object[]> transactions = new ArrayList<>();
-        String query = "SELECT transaction_date, transaction_type, amount, description " +
-                      "FROM Cash_Transaction " +
-                      "ORDER BY transaction_date DESC";
-        
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
-            
-            while (rs.next()) {
-                Object[] row = {
-                    rs.getString("transaction_date"),
-                    rs.getString("transaction_type"),
-                    rs.getDouble("amount"),
-                    rs.getString("description")
-                };
-                transactions.add(row);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return transactions;
-    }
+@Override
+public List<Object[]> getAllCashTransactions() {
+    List<Object[]> transactions = new ArrayList<>();
+    String query = "SELECT " +
+                 "    transaction_date AS date, " +
+                 "    transaction_type, " +
+                 "    amount, " +
+                 "    description, " +
+                 "    'cash' AS source " +
+                 "FROM Cash_Transaction " +
+                 "UNION ALL " +
+                 "SELECT " +
+                 "    transaction_date AS date, " +
+                 "    transaction_type, " +
+                 "    amount, " +
+                 "    description, " +
+                 "    'bank' AS source " +
+                 "FROM Bank_Transaction " +
+                 "ORDER BY date DESC";
 
-    @Override
+    try (Statement stmt = connection.createStatement();
+         ResultSet rs = stmt.executeQuery(query)) {
+        
+        while (rs.next()) {
+            Object[] row = new Object[] {
+                rs.getString("date"),
+                rs.getString("transaction_type"),
+                rs.getDouble("amount"),
+                rs.getString("description"),
+                rs.getString("source")
+            };
+            transactions.add(row);
+        }
+    } catch (SQLException e) {
+        System.err.println("Error loading transactions: " + e.getMessage());
+    }
+    return transactions;
+}
+@Override
     public double getCurrentCashBalance() {
         String query = "SELECT " +
                       "IFNULL(SUM(CASE WHEN transaction_type IN ('cash_in', 'transfer_from_bank') THEN amount ELSE 0 END), 0) - " +

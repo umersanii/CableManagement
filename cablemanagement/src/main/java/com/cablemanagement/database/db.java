@@ -2,6 +2,8 @@ package com.cablemanagement.database;
 
 import java.util.List;
 
+import com.cablemanagement.model.Bank;
+import com.cablemanagement.model.BankTransaction;
 import com.cablemanagement.model.Brand;
 import com.cablemanagement.model.Customer;
 import com.cablemanagement.model.Manufacturer;
@@ -159,7 +161,7 @@ public interface db {
     // --------------------------
     List<Object[]> getAllBanks();
     
-    boolean insertBank(String bankName, String accountNumber, String branchName, String accountTitle);
+    boolean insertBank(String bankName, String accountNumber, String branchName);
     
     List<Object[]> getAllBankTransactions();
     
@@ -218,4 +220,15 @@ public interface db {
     
     boolean updateSalesman(int salesmanId, String name, String contact, String address, double commissionRate);
 
+boolean updateBank(Bank bank);
+
+boolean deleteBank(int bankId);
+
+boolean insertBankTransaction(BankTransaction transaction);
+
+boolean insertCashTransaction(BankTransaction transaction);
+
+double getCashBalance();
+
+boolean updateBankBalance(double newBalance);
 }

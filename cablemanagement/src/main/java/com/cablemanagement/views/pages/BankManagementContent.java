@@ -1,5 +1,8 @@
 package com.cablemanagement.views.pages;
 
+import com.cablemanagement.config;
+import com.cablemanagement.model.Bank;
+import com.cablemanagement.model.BankTransaction;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -9,11 +12,19 @@ import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
-import com.cablemanagement.model.Bank;
+import javafx.util.StringConverter;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 public class BankManagementContent {
 
     private static final ObservableList<Bank> registeredBanks = FXCollections.observableArrayList();
+    private static final ObservableList<BankTransaction> bankTransactions = FXCollections.observableArrayList();
+    private static final ObservableList<BankTransaction> cashTransactions = FXCollections.observableArrayList();
+    
+    private static final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     public static Node get() {
         BorderPane mainLayout = new BorderPane();
@@ -40,6 +51,10 @@ public class BankManagementContent {
         mainLayout.setTop(scrollPane);
         mainLayout.setCenter(contentArea);
 
+        // Load initial data
+        loadBanksFromDatabase();
+        loadTransactionsFromDatabase();
+
         return mainLayout;
     }
 
@@ -50,6 +65,139 @@ public class BankManagementContent {
         bar.getChildren().add(btn);
     }
 
+    private static void loadBanksFromDatabase() {
+        registeredBanks.clear();
+        if (config.database != null && config.database.isConnected()) {
+            List<Object[]> bankRows = config.database.getAllBanks();
+            List<Bank> banks = FXCollections.observableArrayList();
+            for (Object[] row : bankRows) {
+                // Assuming columns: id, name, branch, accNum, balance
+                int id = (int) row[0];
+                String name = (String) row[1];
+                String branch = (String) row[2];
+                String accNum = (String) row[3];
+                double balance = (double) row[4];
+                banks.add(new Bank(id, name, branch, accNum, balance));
+            }
+            registeredBanks.addAll(banks);
+        }
+    }
+
+    private static void loadTransactionsFromDatabase() {
+    bankTransactions.clear();
+    cashTransactions.clear();
+    
+    if (config.database != null && config.database.isConnected()) {
+        try {
+            // Load bank transactions
+            List<Object[]> transactionRows = config.database.getAllBankTransactions();
+            for (Object[] row : transactionRows) {
+                try {
+                    BankTransaction transaction = createTransactionFromRow(row, true);
+                    if (transaction != null) {
+                        bankTransactions.add(transaction);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error processing bank transaction row: " + e.getMessage());
+                }
+            }
+
+            // Load cash transactions
+            List<Object[]> cashRows = config.database.getAllCashTransactions();
+            for (Object[] row : cashRows) {
+                try {
+                    BankTransaction transaction = createTransactionFromRow(row, false);
+                    if (transaction != null) {
+                        cashTransactions.add(transaction);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error processing cash transaction row: " + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading transactions: " + e.getMessage());
+        }
+    }
+}
+
+private static BankTransaction createTransactionFromRow(Object[] row, boolean isBankTransaction) {
+    if (row == null || row.length < 4) { // Minimum: id, date, type, amount
+        System.err.println("Invalid row data - expected at least 4 columns, got " + 
+                         (row == null ? "null" : row.length));
+        return null;
+    }
+
+    try {
+        // Map columns according to your database structure
+        int id = safeParseInt(row[0]);
+        String date = row[1] != null ? row[1].toString() : LocalDate.now().toString();
+        String type = row[2] != null ? row[2].toString() : "unknown";
+        double amount = safeParseDouble(row[3]);
+        
+        // Optional columns
+        String description = row.length > 4 && row[4] != null ? row[4].toString() : "";
+        
+        // For cash transactions, bankId and relatedBankId are not in the database
+        int bankId = 0; // Default for cash transactions
+        int relatedBankId = type.equals("transfer_from_bank") ? 1 : 0; // Adjust as needed
+        
+        return new BankTransaction(id, bankId, date, type, amount, description, relatedBankId);
+    } catch (Exception e) {
+        System.err.println("Error creating transaction from row: " + e.getMessage());
+        return null;
+    }
+}
+
+private static String normalizeTransactionType(String type, boolean isBankTransaction) {
+    if (type == null) return "other";
+    
+    String lowerType = type.toLowerCase();
+    if (isBankTransaction) {
+        switch (lowerType) {
+            case "deposit":
+            case "withdraw":
+            case "transfer_in":
+            case "transfer_out":
+                return lowerType;
+            default:
+                return "other";
+        }
+    } else {
+        switch (lowerType) {
+            case "transfer_from_bank":
+            case "cash_in":
+            case "cash_out":
+                return lowerType;
+            default:
+                return "other";
+        }
+    }
+}
+
+private static int safeParseInt(Object value) {
+    if (value == null) return 0;
+    try {
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        return Integer.parseInt(value.toString());
+    } catch (NumberFormatException e) {
+        return 0;
+    }
+}
+
+private static double safeParseDouble(Object value) {
+    if (value == null) return 0.0;
+    try {
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        return Double.parseDouble(value.toString());
+    } catch (NumberFormatException e) {
+        return 0.0;
+    }
+}
+
     private static VBox viewManageBanks() {
         VBox box = createSection("Manage Banks", "Register a new bank with full details and see the list.");
 
@@ -59,8 +207,7 @@ public class BankManagementContent {
         branchField.getStyleClass().add("text-field");
         TextField accountNumberField = new TextField();
         accountNumberField.getStyleClass().add("text-field");
-        TextField accountHolderField = new TextField();
-        accountHolderField.getStyleClass().add("text-field");
+
 
         Button registerBtn = new Button("Register Bank");
         registerBtn.getStyleClass().add("register-button");
@@ -75,8 +222,7 @@ public class BankManagementContent {
         );
 
         HBox row2 = new HBox(10,
-                new VBox(new Label("Account Number:"), accountNumberField),
-                new VBox(new Label("Account Holder:"), accountHolderField)
+                new VBox(new Label("Account Number:"), accountNumberField)
         );
 
         HBox buttonRow = new HBox(10, registerBtn, updateBtn);
@@ -87,74 +233,109 @@ public class BankManagementContent {
         bankTable.setPrefHeight(250);
 
         TableColumn<Bank, String> nameCol = new TableColumn<>("Bank Name");
-        nameCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().getName()));
+        nameCol.setCellValueFactory(new PropertyValueFactory<>("bankName"));
 
         TableColumn<Bank, String> branchCol = new TableColumn<>("Branch");
-        branchCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().getBranch()));
+        branchCol.setCellValueFactory(new PropertyValueFactory<>("branchName"));
 
         TableColumn<Bank, String> accNumCol = new TableColumn<>("Account Number");
-        accNumCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().getAccountNumber()));
+        accNumCol.setCellValueFactory(new PropertyValueFactory<>("accountNumber"));
 
-        TableColumn<Bank, String> holderCol = new TableColumn<>("Account Holder");
-        holderCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().getAccountHolder()));
 
-        TableColumn<Bank, Void> editCol = new TableColumn<>("Edit");
+        TableColumn<Bank, String> balanceCol = new TableColumn<>("Balance");
+        balanceCol.setCellValueFactory(data -> 
+            new ReadOnlyStringWrapper(String.format("Rs. %.2f", data.getValue().getBalance())));
+
+        TableColumn<Bank, Void> editCol = new TableColumn<>("Actions");
         editCol.setCellFactory(col -> new TableCell<>() {
             private final Button editButton = new Button("Edit");
+            private final Button deleteButton = new Button("Delete");
 
             {
                 editButton.getStyleClass().add("button");
+                deleteButton.getStyleClass().add("delete-button");
+                
                 editButton.setOnAction(e -> {
                     Bank selected = getTableView().getItems().get(getIndex());
-                    nameField.setText(selected.getName());
-                    branchField.setText(selected.getBranch());
+                    nameField.setText(selected.getBankName());
+                    branchField.setText(selected.getBranchName());
                     accountNumberField.setText(selected.getAccountNumber());
-                    accountHolderField.setText(selected.getAccountHolder());
 
                     registerBtn.setVisible(false);
                     updateBtn.setVisible(true);
 
                     updateBtn.setOnAction(ev -> {
-                        selected.setName(nameField.getText().trim());
-                        selected.setBranch(branchField.getText().trim());
+                        selected.setBankName(nameField.getText().trim());
+                        selected.setBranchName(branchField.getText().trim());
                         selected.setAccountNumber(accountNumberField.getText().trim());
-                        selected.setAccountHolder(accountHolderField.getText().trim());
-                        bankTable.refresh();
-
-                        nameField.clear();
-                        branchField.clear();
-                        accountNumberField.clear();
-                        accountHolderField.clear();
-
-                        registerBtn.setVisible(true);
-                        updateBtn.setVisible(false);
+                        
+                        if (config.database != null && config.database.isConnected()) {
+                            if (config.database.updateBank(selected)) {
+                                bankTable.refresh();
+                                nameField.clear();
+                                branchField.clear();
+                                accountNumberField.clear();
+                                registerBtn.setVisible(true);
+                                updateBtn.setVisible(false);
+                                showAlert("Success", "Bank updated successfully!");
+                            } else {
+                                showAlert("Error", "Failed to update bank in database!");
+                            }
+                        }
                     });
+                });
+
+                deleteButton.setOnAction(e -> {
+                    Bank selected = getTableView().getItems().get(getIndex());
+                    if (config.database != null && config.database.isConnected()) {
+                        if (config.database.deleteBank(selected.getBankId())) {
+                            registeredBanks.remove(selected);
+                            showAlert("Success", "Bank deleted successfully!");
+                        } else {
+                            showAlert("Error", "Failed to delete bank from database!");
+                        }
+                    }
                 });
             }
 
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
-                setGraphic(empty ? null : editButton);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    HBox buttons = new HBox(5, editButton, deleteButton);
+                    setGraphic(buttons);
+                }
             }
         });
 
-        bankTable.getColumns().addAll(nameCol, branchCol, accNumCol, holderCol, editCol);
+        bankTable.getColumns().addAll(nameCol, branchCol, accNumCol, balanceCol, editCol);
 
         registerBtn.setOnAction(e -> {
             String name = nameField.getText().trim();
             String branch = branchField.getText().trim();
             String accNum = accountNumberField.getText().trim();
-            String holder = accountHolderField.getText().trim();
 
             if (!name.isEmpty() && !accNum.isEmpty()) {
-                Bank bank = new Bank(name, branch, accNum, holder);
-                registeredBanks.add(bank);
-
-                nameField.clear();
-                branchField.clear();
-                accountNumberField.clear();
-                accountHolderField.clear();
+                Bank bank = new Bank(0, name, branch, accNum, 0.0);
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.insertBank(name, branch, accNum)) {
+                        // Optionally, fetch the new bank's ID and balance from DB if needed
+                        Bank newBank = new Bank(0, name, branch, accNum, 0.0);
+                        registeredBanks.add(newBank);
+                        nameField.clear();
+                        branchField.clear();
+                        accountNumberField.clear();
+                        showAlert("Success", "Bank registered successfully!");
+                    } else {
+                        showAlert("Error", "Failed to register bank in database!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            } else {
+                showAlert("Error", "Bank name and account number are required!");
             }
         });
 
@@ -171,6 +352,17 @@ public class BankManagementContent {
         ComboBox<Bank> bankSelector = new ComboBox<>(registeredBanks);
         bankSelector.setPromptText("Select Bank");
         bankSelector.setPrefWidth(250);
+        bankSelector.setConverter(new StringConverter<Bank>() {
+            @Override
+            public String toString(Bank bank) {
+                return bank == null ? "" : bank.getBankName() + " (" + bank.getAccountNumber() + ")";
+            }
+
+            @Override
+            public Bank fromString(String string) {
+                return null;
+            }
+        });
         bankSelector.getStyleClass().add("combo-box");
 
         ComboBox<String> actionSelector = new ComboBox<>();
@@ -217,29 +409,130 @@ public class BankManagementContent {
     private static Node depositForm(ComboBox<Bank> bankSelector) {
         TextField amountField = new TextField();
         amountField.getStyleClass().add("text-field");
+        TextField descriptionField = new TextField();
+        descriptionField.getStyleClass().add("text-field");
+        DatePicker datePicker = new DatePicker(LocalDate.now());
+        datePicker.getStyleClass().add("date-picker");
 
         Button submit = new Button("Deposit");
         submit.getStyleClass().add("button");
 
-        VBox box = new VBox(10,
+        submit.setOnAction(e -> {
+            Bank selectedBank = bankSelector.getValue();
+            String amountText = amountField.getText().trim();
+            String description = descriptionField.getText().trim();
+            LocalDate date = datePicker.getValue();
+
+            if (selectedBank != null && !amountText.isEmpty() && date != null) {
+                try {
+                    double amount = Double.parseDouble(amountText);
+                    if (amount <= 0) {
+                        showAlert("Error", "Amount must be greater than 0");
+                        return;
+                    }
+
+                    BankTransaction transaction = new BankTransaction(
+                            0, selectedBank.getBankId(), date.format(dateFormatter),
+                            "deposit", amount, description, 0
+                    );
+
+                    if (config.database != null && config.database.isConnected()) {
+                        if (config.database.insertBankTransaction(transaction)) {
+                            // Update bank balance
+                            selectedBank.setBalance(selectedBank.getBalance() + amount);
+                            config.database.updateBank(selectedBank);
+                            
+                            bankTransactions.add(transaction);
+                            amountField.clear();
+                            descriptionField.clear();
+                            showAlert("Success", "Deposit recorded successfully!");
+                        } else {
+                            showAlert("Error", "Failed to record deposit in database!");
+                        }
+                    } else {
+                        showAlert("Error", "Database not connected!");
+                    }
+                } catch (NumberFormatException ex) {
+                    showAlert("Error", "Invalid amount format!");
+                }
+            } else {
+                showAlert("Error", "Bank selection, amount and date are required!");
+            }
+        });
+
+        return new VBox(10,
                 new Label("Amount to Deposit:"), amountField,
+                new Label("Description:"), descriptionField,
+                new Label("Date:"), datePicker,
                 submit
         );
-        return box;
     }
 
     private static Node withdrawForm(ComboBox<Bank> bankSelector) {
         TextField amountField = new TextField();
         amountField.getStyleClass().add("text-field");
+        TextField descriptionField = new TextField();
+        descriptionField.getStyleClass().add("text-field");
+        DatePicker datePicker = new DatePicker(LocalDate.now());
+        datePicker.getStyleClass().add("date-picker");
 
         Button submit = new Button("Withdraw");
         submit.getStyleClass().add("button");
 
-        VBox box = new VBox(10,
+        submit.setOnAction(e -> {
+            Bank selectedBank = bankSelector.getValue();
+            String amountText = amountField.getText().trim();
+            String description = descriptionField.getText().trim();
+            LocalDate date = datePicker.getValue();
+
+            if (selectedBank != null && !amountText.isEmpty() && date != null) {
+                try {
+                    double amount = Double.parseDouble(amountText);
+                    if (amount <= 0) {
+                        showAlert("Error", "Amount must be greater than 0");
+                        return;
+                    }
+
+                    if (amount > selectedBank.getBalance()) {
+                        showAlert("Error", "Insufficient funds in bank account!");
+                        return;
+                    }
+
+                    BankTransaction transaction = new BankTransaction(
+                            0, selectedBank.getBankId(), date.format(dateFormatter),
+                            "withdraw", amount, description, 0
+                    );
+
+                    if (config.database != null && config.database.isConnected()) {
+                        if (config.database.insertBankTransaction(transaction)) {
+                            // Update bank balance
+                            selectedBank.setBalance(selectedBank.getBalance() - amount);
+                            config.database.updateBank(selectedBank);
+                            
+                            bankTransactions.add(transaction);
+                            amountField.clear();
+                            descriptionField.clear();
+                            showAlert("Success", "Withdrawal recorded successfully!");
+                        } else {
+                            showAlert("Error", "Failed to record withdrawal in database!");
+                        }
+                    } else {
+                        showAlert("Error", "Database not connected!");
+                    }
+                } catch (NumberFormatException ex) {
+                    showAlert("Error", "Invalid amount format!");
+                }
+            } else {
+                showAlert("Error", "Bank selection, amount and date are required!");
+            }
+        });
+
+        return new VBox(10,
                 new Label("Amount to Withdraw:"), amountField,
+                new Label("Description:"), descriptionField,
+                new Label("Date:"), datePicker,
                 submit
         );
-        return box;
     }
 
     private static Node transferBankToBankForm() {
@@ -247,65 +540,314 @@ public class BankManagementContent {
         ComboBox<Bank> toBank = new ComboBox<>(registeredBanks);
         fromBank.getStyleClass().add("combo-box");
         toBank.getStyleClass().add("combo-box");
+        fromBank.setConverter(new StringConverter<Bank>() {
+            @Override
+            public String toString(Bank bank) {
+                return bank == null ? "" : bank.getBankName() + " (" + bank.getAccountNumber() + ")";
+            }
+
+            @Override
+            public Bank fromString(String string) {
+                return null;
+            }
+        });
+        toBank.setConverter(new StringConverter<Bank>() {
+            @Override
+            public String toString(Bank bank) {
+                return bank == null ? "" : bank.getBankName() + " (" + bank.getAccountNumber() + ")";
+            }
+
+            @Override
+            public Bank fromString(String string) {
+                return null;
+            }
+        });
 
         TextField amount = new TextField();
         amount.getStyleClass().add("text-field");
+        TextField description = new TextField();
+        description.getStyleClass().add("text-field");
+        DatePicker datePicker = new DatePicker(LocalDate.now());
+        datePicker.getStyleClass().add("date-picker");
 
         Button submit = new Button("Transfer");
         submit.getStyleClass().add("button");
 
-        VBox box = new VBox(10,
+        submit.setOnAction(e -> {
+            Bank from = fromBank.getValue();
+            Bank to = toBank.getValue();
+            String amountText = amount.getText().trim();
+            String desc = description.getText().trim();
+            LocalDate date = datePicker.getValue();
+
+            if (from != null && to != null && !amountText.isEmpty() && date != null) {
+                if (from.getBankId() == to.getBankId()) {
+                    showAlert("Error", "Cannot transfer to the same bank account!");
+                    return;
+                }
+
+                try {
+                    double transferAmount = Double.parseDouble(amountText);
+                    if (transferAmount <= 0) {
+                        showAlert("Error", "Amount must be greater than 0");
+                        return;
+                    }
+
+                    if (transferAmount > from.getBalance()) {
+                        showAlert("Error", "Insufficient funds in source account!");
+                        return;
+                    }
+
+                    if (config.database != null && config.database.isConnected()) {
+                        // Create transaction for source account (transfer_out)
+                        BankTransaction outTransaction = new BankTransaction(
+                                0, from.getBankId(), date.format(dateFormatter),
+                                "transfer_out", transferAmount, desc, to.getBankId()
+                        );
+
+                        // Create transaction for destination account (transfer_in)
+                        BankTransaction inTransaction = new BankTransaction(
+                                0, to.getBankId(), date.format(dateFormatter),
+                                "transfer_in", transferAmount, desc, from.getBankId()
+                        );
+
+                        if (config.database.insertBankTransaction(outTransaction) && 
+                            config.database.insertBankTransaction(inTransaction)) {
+                            
+                            // Update balances
+                            from.setBalance(from.getBalance() - transferAmount);
+                            to.setBalance(to.getBalance() + transferAmount);
+                            
+                            config.database.updateBank(from);
+                            config.database.updateBank(to);
+                            
+                            bankTransactions.add(outTransaction);
+                            bankTransactions.add(inTransaction);
+                            
+                            amount.clear();
+                            description.clear();
+                            fromBank.getSelectionModel().clearSelection();
+                            toBank.getSelectionModel().clearSelection();
+                            
+                            showAlert("Success", "Transfer completed successfully!");
+                        } else {
+                            showAlert("Error", "Failed to record transfer in database!");
+                        }
+                    } else {
+                        showAlert("Error", "Database not connected!");
+                    }
+                } catch (NumberFormatException ex) {
+                    showAlert("Error", "Invalid amount format!");
+                }
+            } else {
+                showAlert("Error", "All fields are required!");
+            }
+        });
+
+        return new VBox(10,
                 new Label("From Bank:"), fromBank,
                 new Label("To Bank:"), toBank,
                 new Label("Amount:"), amount,
+                new Label("Description:"), description,
+                new Label("Date:"), datePicker,
                 submit
         );
-        return box;
     }
 
     private static Node transferBankToCashForm(ComboBox<Bank> bankSelector) {
         TextField amountField = new TextField();
         amountField.getStyleClass().add("text-field");
+        TextField descriptionField = new TextField();
+        descriptionField.getStyleClass().add("text-field");
+        DatePicker datePicker = new DatePicker(LocalDate.now());
+        datePicker.getStyleClass().add("date-picker");
 
         Button submit = new Button("Transfer to Cash");
         submit.getStyleClass().add("button");
 
-        VBox box = new VBox(10,
+        submit.setOnAction(e -> {
+            Bank selectedBank = bankSelector.getValue();
+            String amountText = amountField.getText().trim();
+            String description = descriptionField.getText().trim();
+            LocalDate date = datePicker.getValue();
+
+            if (selectedBank != null && !amountText.isEmpty() && date != null) {
+                try {
+                    double amount = Double.parseDouble(amountText);
+                    if (amount <= 0) {
+                        showAlert("Error", "Amount must be greater than 0");
+                        return;
+                    }
+
+                    if (amount > selectedBank.getBalance()) {
+                        showAlert("Error", "Insufficient funds in bank account!");
+                        return;
+                    }
+
+                    // Create bank transaction (transfer_out)
+                    BankTransaction bankTransaction = new BankTransaction(
+                            0, selectedBank.getBankId(), date.format(dateFormatter),
+                            "transfer_out", amount, description, 0
+                    );
+
+                    // Create cash transaction (transfer_from_bank)
+                    BankTransaction cashTransaction = new BankTransaction(
+                            0, 0, date.format(dateFormatter),
+                            "transfer_from_bank", amount, description, selectedBank.getBankId()
+                    );
+
+                    if (config.database != null && config.database.isConnected()) {
+                        if (config.database.insertBankTransaction(bankTransaction) && 
+                            config.database.insertCashTransaction(cashTransaction)) {
+                            
+                            // Update bank balance
+                            selectedBank.setBalance(selectedBank.getBalance() - amount);
+                            config.database.updateBank(selectedBank);
+                            
+                            bankTransactions.add(bankTransaction);
+                            cashTransactions.add(cashTransaction);
+                            
+                            amountField.clear();
+                            descriptionField.clear();
+                            showAlert("Success", "Transfer to cash completed successfully!");
+                        } else {
+                            showAlert("Error", "Failed to record transfer in database!");
+                        }
+                    } else {
+                        showAlert("Error", "Database not connected!");
+                    }
+                } catch (NumberFormatException ex) {
+                    showAlert("Error", "Invalid amount format!");
+                }
+            } else {
+                showAlert("Error", "Bank selection, amount and date are required!");
+            }
+        });
+
+        return new VBox(10,
                 new Label("Amount to Convert:"), amountField,
+                new Label("Description:"), descriptionField,
+                new Label("Date:"), datePicker,
                 submit
         );
-        return box;
     }
 
     private static VBox viewCashInHand() {
         VBox box = createSection("Cash In Hand", "Shows the total available cash.");
 
-        Label amount = new Label("Rs. 0.00");
+        double cashBalance = calculateCashBalance();
+        Label amount = new Label(String.format("Rs. %.2f", cashBalance));
         amount.getStyleClass().add("amount-label");
 
         box.getChildren().add(amount);
         return box;
     }
 
-    private static VBox viewCashLedger() {
-        VBox box = createSection("Cash Ledger", "Shows the list of all cash transactions.");
+    private static double calculateCashBalance() {
+        double balance = 0.0;
+        if (config.database != null && config.database.isConnected()) {
+            balance = config.database.getCashBalance();
+        }
+        return balance;
+    }
 
-        TableView<String> ledgerTable = new TableView<>();
-        ledgerTable.setPrefHeight(250);
-        ledgerTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+private static VBox viewCashLedger() {
+    VBox box = createSection("Cash Ledger", "Complete record of all cash and bank transactions");
+    
+    TableView<BankTransaction> ledgerTable = new TableView<>();
+    ledgerTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        TableColumn<String, String> typeCol = new TableColumn<>("Type");
-        typeCol.setCellValueFactory(data -> new ReadOnlyStringWrapper("Deposit"));
+    // Date Column
+    TableColumn<BankTransaction, String> dateCol = new TableColumn<>("Date");
+    dateCol.setCellValueFactory(cell -> {
+        String dateStr = cell.getValue().getTransactionDate();
+        try {
+            LocalDate date = LocalDate.parse(dateStr);
+            return new ReadOnlyStringWrapper(date.format(DateTimeFormatter.ofPattern("dd-MMM-yyyy")));
+        } catch (Exception e) {
+            return new ReadOnlyStringWrapper(dateStr); // Fallback to raw string
+        }
+    });
 
-        TableColumn<String, String> amountCol = new TableColumn<>("Amount");
-        amountCol.setCellValueFactory(data -> new ReadOnlyStringWrapper("Rs. 500"));
+    // Source Column
+    TableColumn<BankTransaction, String> sourceCol = new TableColumn<>("Source");
+    sourceCol.setCellValueFactory(cell -> 
+        new ReadOnlyStringWrapper(cell.getValue().getBankId() == 0 ? "Cash" : "Bank"));
 
-        TableColumn<String, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(data -> new ReadOnlyStringWrapper("2025-07-12"));
+    // Type Column
+    TableColumn<BankTransaction, String> typeCol = new TableColumn<>("Type");
+    typeCol.setCellValueFactory(cell -> {
+        String type = cell.getValue().getTransactionType();
+        type = type.replace("_", " ");
+        return new ReadOnlyStringWrapper(type.substring(0, 1).toUpperCase() + type.substring(1));
+    });
 
-        ledgerTable.getColumns().addAll(typeCol, amountCol, dateCol);
-        box.getChildren().add(ledgerTable);
-        return box;
+    // Amount Column
+    TableColumn<BankTransaction, String> amountCol = new TableColumn<>("Amount");
+    amountCol.setCellValueFactory(cell -> 
+        new ReadOnlyStringWrapper(String.format("Rs. %,.2f", cell.getValue().getAmount())));
+
+    // Description Column
+    TableColumn<BankTransaction, String> descCol = new TableColumn<>("Description");
+    descCol.setCellValueFactory(cell -> 
+        new ReadOnlyStringWrapper(cell.getValue().getDescription()));
+
+    ledgerTable.getColumns().addAll(dateCol, sourceCol, typeCol, amountCol, descCol);
+    
+    // Load data
+    try {
+        List<Object[]> rawTransactions = config.database.getAllCashTransactions();
+        ObservableList<BankTransaction> transactions = FXCollections.observableArrayList();
+        
+        for (Object[] row : rawTransactions) {
+            BankTransaction transaction = new BankTransaction(
+                0, // transactionId
+                row[4].equals("bank") ? 1 : 0, // bankId (1 for bank, 0 for cash)
+                row[0].toString(), // date
+                row[1].toString(), // type
+                Double.parseDouble(row[2].toString()), // amount
+                row[3].toString(), // description
+                0  // relatedBankId
+            );
+            transactions.add(transaction);
+        }
+        
+        ledgerTable.setItems(transactions);
+    } catch (Exception e) {
+        System.err.println("Error loading transactions: " + e.getMessage());
+        showAlert("Error", "Failed to load transactions: " + e.getMessage());
+    }
+
+    box.getChildren().add(ledgerTable);
+    return box;
+}
+private static void loadCashTransactions(TableView<BankTransaction> table) {
+    ObservableList<BankTransaction> transactions = FXCollections.observableArrayList();
+    
+    if (config.database != null && config.database.isConnected()) {
+        List<Object[]> cashRows = config.database.getAllCashTransactions();
+        for (Object[] row : cashRows) {
+            try {
+                BankTransaction transaction = createTransactionFromRow(row, false);
+                if (transaction != null) {
+                    transactions.add(transaction);
+                    System.out.println("Loaded transaction: " + transaction);
+                }
+            } catch (Exception e) {
+                System.err.println("Error processing cash transaction row: " + e.getMessage());
+            }
+        }
+    }
+    
+    table.setItems(transactions);
+}
+    private static Bank findBankById(int bankId) {
+        for (Bank bank : registeredBanks) {
+            if (bank.getBankId() == bankId) {
+                return bank;
+            }
+        }
+        return null;
     }
 
     private static VBox createSection(String title, String description) {
@@ -322,5 +864,13 @@ public class BankManagementContent {
 
         box.getChildren().addAll(heading, note);
         return box;
+    }
+
+    private static void showAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
 }

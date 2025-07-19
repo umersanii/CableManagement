@@ -1,42 +1,64 @@
 package com.cablemanagement.model;
 
+// Bank.java
 public class Bank {
-    private String name;
-    private String branch;
+    private int bankId;
+    private String bankName;
+    private String branchName;
     private String accountNumber;
-    private String accountHolder;
+    private double balance;
+    
+    // Constructors, getters, setters
+    public Bank() {
+    }
 
-    public Bank(String name, String branch, String accountNumber, String accountHolder) {
-        this.name = name;
-        this.branch = branch;
+    public Bank(int bankId, String bankName, String branchName, String accountNumber, double balance) {
+        this.bankId = bankId;
+        this.bankName = bankName;
+        this.branchName = branchName;
         this.accountNumber = accountNumber;
-        this.accountHolder = accountHolder;
+        this.balance = balance;
     }
 
-    public String getName() {
-        return name;
+    public int getBankId() {
+        return bankId;
     }
 
-    public String getBranch() {
-        return branch;
+    public void setBankId(int bankId) {
+        this.bankId = bankId;
+    }
+
+    public String getBankName() {
+        return bankName;
+    }
+
+    public void setBankName(String bankName) {
+        this.bankName = bankName;
+    }
+
+    public String getBranchName() {
+        return branchName;
+    }
+
+    public void setBranchName(String branchName) {
+        this.branchName = branchName;
     }
 
     public String getAccountNumber() {
         return accountNumber;
     }
 
-    public String getAccountHolder() {
-        return accountHolder;
+    public void setAccountNumber(String accountNumber) {
+        this.accountNumber = accountNumber;
     }
 
-    @Override
-    public String toString() {
-        return name + " | " + branch + " | " + accountNumber + " | " + accountHolder;
+
+    public double getBalance() {
+        return balance;
     }
 
-    public void setName(String name) { this.name = name; }
-    public void setBranch(String branch) { this.branch = branch; }
-    public void setAccountNumber(String accountNumber) { this.accountNumber = accountNumber; }
-    public void setAccountHolder(String accountHolder) { this.accountHolder = accountHolder; }
-
+    public void setBalance(double balance) {
+        this.balance = balance;
+    }
 }
+
