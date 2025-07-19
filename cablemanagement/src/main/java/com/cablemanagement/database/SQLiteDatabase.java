@@ -1573,6 +1573,120 @@ public class SQLiteDatabase implements db {
     }
 
     // --------------------------
+    // Employee Attendance Operations
+    // --------------------------
+    @Override
+    public boolean insertEmployeeAttendance(int employeeId, String attendanceDate, String status, double workingHours) {
+        // Check if attendance already exists for this employee on this date
+        String checkQuery = "SELECT COUNT(*) FROM Employee_Attendance WHERE employee_id = ? AND attendance_date = ?";
+        try (PreparedStatement checkStmt = connection.prepareStatement(checkQuery)) {
+            checkStmt.setInt(1, employeeId);
+            checkStmt.setString(2, attendanceDate);
+            ResultSet rs = checkStmt.executeQuery();
+            if (rs.next() && rs.getInt(1) > 0) {
+                // Attendance already exists, update it instead
+                String updateQuery = "UPDATE Employee_Attendance SET status = ?, working_hours = ? WHERE employee_id = ? AND attendance_date = ?";
+                try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
+                    updateStmt.setString(1, status.toLowerCase());
+                    updateStmt.setDouble(2, workingHours);
+                    updateStmt.setInt(3, employeeId);
+                    updateStmt.setString(4, attendanceDate);
+                    return updateStmt.executeUpdate() > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+        
+        // Insert new attendance record
+        String insertQuery = "INSERT INTO Employee_Attendance (employee_id, attendance_date, status, working_hours) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(insertQuery)) {
+            pstmt.setInt(1, employeeId);
+            pstmt.setString(2, attendanceDate);
+            pstmt.setString(3, status.toLowerCase());
+            pstmt.setDouble(4, workingHours);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public List<Object[]> getEmployeeAttendanceByDateRange(String startDate, String endDate) {
+        List<Object[]> attendance = new ArrayList<>();
+        String query = "SELECT e.employee_id, e.employee_name, ea.attendance_date, ea.status, ea.working_hours " +
+                      "FROM Employee_Attendance ea " +
+                      "JOIN Employee e ON ea.employee_id = e.employee_id " +
+                      "WHERE ea.attendance_date >= ? AND ea.attendance_date <= ? " +
+                      "ORDER BY ea.attendance_date DESC, e.employee_name";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("employee_id"),
+                    rs.getString("employee_name"),
+                    rs.getString("attendance_date"),
+                    rs.getString("status"),
+                    rs.getDouble("working_hours")
+                };
+                attendance.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return attendance;
+    }
+
+    @Override
+    public List<Object[]> getEmployeeAttendanceByEmployee(int employeeId) {
+        List<Object[]> attendance = new ArrayList<>();
+        String query = "SELECT e.employee_name, ea.attendance_date, ea.status, ea.working_hours " +
+                      "FROM Employee_Attendance ea " +
+                      "JOIN Employee e ON ea.employee_id = e.employee_id " +
+                      "WHERE ea.employee_id = ? " +
+                      "ORDER BY ea.attendance_date DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, employeeId);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getString("attendance_date"),
+                    rs.getString("status"),
+                    rs.getDouble("working_hours")
+                };
+                attendance.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return attendance;
+    }
+
+    @Override
+    public int getEmployeeIdByName(String employeeName) {
+        String query = "SELECT employee_id FROM Employee WHERE employee_name = ? AND is_active = 1";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, employeeName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("employee_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1; // Return -1 if employee not found
+    }
+
+    // --------------------------
     // Salesman Operations
     // --------------------------
     @Override
@@ -1771,5 +1885,20 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return false;
+    }
+
+    public String getLastAttendanceStatus(int empId) {
+        String query = "SELECT status FROM Employee_Attendance WHERE employee_id = ? ORDER BY attendance_date DESC LIMIT 1";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, empId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+            if (rs.next()) {
+                return rs.getString("status");
+            }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 }

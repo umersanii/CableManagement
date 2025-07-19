@@ -178,8 +178,22 @@ public interface db {
     
     boolean deleteEmployee(int employeeId);
     
+    // --------------------------
+    // Employee Attendance Operations
+    // --------------------------
+    boolean insertEmployeeAttendance(int employeeId, String attendanceDate, String status, double workingHours);
+    
     List<Object[]> getAllEmployeeAttendance();
     
+    List<Object[]> getEmployeeAttendanceByDateRange(String startDate, String endDate);
+    
+    List<Object[]> getEmployeeAttendanceByEmployee(int employeeId);
+    
+    int getEmployeeIdByName(String employeeName);
+    
+    // --------------------------
+    // Employee Salary Payment Operations
+    // --------------------------
     List<Object[]> getAllEmployeeSalaryPayments();
     
     List<Object[]> getAllEmployeeLoans();

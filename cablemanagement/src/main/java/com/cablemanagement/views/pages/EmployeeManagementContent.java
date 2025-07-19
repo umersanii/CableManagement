@@ -1,5 +1,8 @@
 package com.cablemanagement.views.pages;
 
+import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -8,9 +11,16 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.*;
 import com.cablemanagement.database.SQLiteDatabase;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class EmployeeManagementContent {
 
@@ -540,72 +550,261 @@ public class EmployeeManagementContent {
     ///                   Mark Employee Attendance Form              ///
     ////////////////////////////////////////////////////////////////////
 
-    private static VBox createAttendanceMarkForm() {
-        VBox box = baseForm("Mark Employee Attendance");
-        
-        // Database instance
-        SQLiteDatabase database = new SQLiteDatabase();
+private static VBox createAttendanceMarkForm() {
+    VBox box = baseForm("Mark All Employees Attendance");
 
-        ComboBox<String> employeeCombo = new ComboBox<>();
-        employeeCombo.setPromptText("Select Employee");
-        
-        // Load active employees from database
-        for (Object[] row : database.getAllEmployees()) {
-            String status = (String) row[8];
-            if ("Active".equals(status)) {
-                employeeCombo.getItems().add((String) row[1]); // employee_name
-            }
+    SQLiteDatabase database = new SQLiteDatabase();
+
+    // Top: Date Picker
+    Label dateLabel = new Label("Select Date:");
+    DatePicker datePicker = new DatePicker(LocalDate.now());
+
+    // Table Columns: ID, Name, Role, Attendance, Hours
+    TableView<EmployeeRow> table = new TableView<>();
+    ObservableList<EmployeeRow> rows = FXCollections.observableArrayList();
+
+    for (Object[] emp : database.getAllEmployees()) {
+        if ("Active".equals(emp[8])) {
+            rows.add(new EmployeeRow(
+                (int) emp[0],
+                emp[1].toString(),
+                emp[5].toString()
+            ));
+        }
+    }
+
+    table.setItems(rows);
+    table.setEditable(true);
+
+    // Columns
+    TableColumn<EmployeeRow, String> idCol = new TableColumn<>("ID");
+    idCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(String.valueOf(data.getValue().id)));
+
+    TableColumn<EmployeeRow, String> nameCol = new TableColumn<>("Name");
+    nameCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().name));
+
+    TableColumn<EmployeeRow, String> roleCol = new TableColumn<>("Designation");
+    roleCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().role));
+
+    TableColumn<EmployeeRow, Boolean> statusCol = new TableColumn<>("Status (P/A)");
+    statusCol.setCellFactory(col -> new TableCell<>() {
+        final ToggleGroup group = new ToggleGroup();
+        final RadioButton present = new RadioButton("P");
+        final RadioButton absent = new RadioButton("A");
+        {
+            present.setToggleGroup(group);
+            absent.setToggleGroup(group);
         }
 
-        DatePicker dateField = new DatePicker();
-        dateField.setPromptText("Attendance Date");
-        dateField.setValue(java.time.LocalDate.now()); // Default to today
-        
-        ToggleGroup statusGroup = new ToggleGroup();
-        RadioButton presentBtn = new RadioButton("Present");
-        RadioButton absentBtn = new RadioButton("Absent");
-        presentBtn.setToggleGroup(statusGroup);
-        absentBtn.setToggleGroup(statusGroup);
-        presentBtn.setSelected(true); // Default to present
+        @Override
+        protected void updateItem(Boolean item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty) {
+                setGraphic(null);
+            } else {
+                EmployeeRow emp = getTableView().getItems().get(getIndex());
+                present.setSelected(emp.present);
+                absent.setSelected(!emp.present);
 
-        TextField workingHoursField = new TextField();
-        workingHoursField.setPromptText("Working Hours (for present employees)");
+                group.selectedToggleProperty().addListener((obs, old, val) -> {
+                    emp.present = (val == present);
+                    emp.hours = emp.present ? emp.hours : "";
+                    table.refresh();
+                });
 
-        Button markBtn = new Button("Mark Attendance");
-        markBtn.getStyleClass().add("register-button");
-        
-        // Status label
-        Label statusLabel = new Label("");
-        statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
-
-        // Event handler (placeholder - would need attendance table implementation)
-        markBtn.setOnAction(e -> {
-            String employee = employeeCombo.getValue();
-            java.time.LocalDate date = dateField.getValue();
-            String attendanceStatus = presentBtn.isSelected() ? "Present" : "Absent";
-            String workingHours = workingHoursField.getText().trim();
-            
-            if (employee == null || date == null) {
-                statusLabel.setText("Please select employee and date.");
-                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-                return;
+                HBox box = new HBox(5, present, absent);
+                box.setAlignment(Pos.CENTER);
+                setGraphic(box);
             }
-            
-            // This would require implementing attendance tracking in the database
-            statusLabel.setText("Attendance marking functionality needs to be implemented in the database.");
-            statusLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
-        });
+        }
+    });
 
-        HBox statusBox = new HBox(10, presentBtn, absentBtn);
-        box.getChildren().addAll(employeeCombo, dateField, statusBox, workingHoursField, markBtn, statusLabel);
-        return box;
+    TableColumn<EmployeeRow, String> hoursCol = new TableColumn<>("Working Hours");
+    hoursCol.setCellFactory(TextFieldTableCell.forTableColumn());
+    hoursCol.setCellValueFactory(data -> data.getValue().hoursProperty());
+    hoursCol.setOnEditCommit(e -> e.getRowValue().setHours(e.getNewValue()));
+
+    table.getColumns().addAll(idCol, nameCol, roleCol, statusCol, hoursCol);
+    table.setPrefHeight(400);
+
+    // Submit Button & Status Label
+    Button markBtn = new Button("Mark Attendance");
+    Label statusLabel = new Label();
+
+    markBtn.setOnAction(e -> {
+        LocalDate date = datePicker.getValue();
+        if (date == null) {
+            statusLabel.setText("Please select a date.");
+            statusLabel.setStyle("-fx-text-fill: red;");
+            return;
+        }
+
+        boolean allGood = true;
+        for (EmployeeRow emp : rows) {
+            double hours = 0.0;
+            if (emp.present) {
+                if (emp.hours.isEmpty()) {
+                    statusLabel.setText("Missing hours for " + emp.name);
+                    statusLabel.setStyle("-fx-text-fill: red;");
+                    allGood = false;
+                    break;
+                }
+                try {
+                    hours = Double.parseDouble(emp.hours);
+                    if (hours < 0 || hours > 24) throw new NumberFormatException();
+                } catch (NumberFormatException ex) {
+                    statusLabel.setText("Invalid hours for " + emp.name);
+                    statusLabel.setStyle("-fx-text-fill: red;");
+                    allGood = false;
+                    break;
+                }
+            }
+            String status = emp.present ? "present" : "absent";
+            database.insertEmployeeAttendance(emp.id, date.toString(), status, hours);
+        }
+
+        if (allGood) {
+            statusLabel.setText("Attendance marked.");
+            statusLabel.setStyle("-fx-text-fill: green;");
+            table.refresh();
+        }
+    });
+
+    box.getChildren().addAll(
+        new VBox(5, dateLabel, datePicker),
+        new Separator(),
+        table,
+        new Separator(),
+        markBtn,
+        statusLabel
+    );
+
+    return box;
+}
+
+public static class EmployeeRow {
+    int id;
+    String name;
+    String role;
+    boolean present = true;
+    String hours = "";
+    StringProperty hoursProperty = new SimpleStringProperty("");
+
+    public EmployeeRow(int id, String name, String role) {
+        this.id = id;
+        this.name = name;
+        this.role = role;
+        this.hoursProperty.set(hours);
+        this.hoursProperty.addListener((obs, old, val) -> hours = val);
     }
+
+    public StringProperty hoursProperty() { return hoursProperty; }
+    public void setHours(String val) { this.hours = val; this.hoursProperty.set(val); }
+}
+
+
 
     private static VBox createAttendanceReportForm() {
         VBox box = baseForm("View Attendance Report");
-
-        Label label = new Label("Attendance report table coming soon...");
-        box.getChildren().add(label);
+        
+        // Database instance
+        SQLiteDatabase database = new SQLiteDatabase();
+        
+        // Date range filters
+        HBox dateFilterBox = new HBox(10);
+        dateFilterBox.setAlignment(Pos.CENTER_LEFT);
+        
+        DatePicker startDatePicker = new DatePicker();
+        startDatePicker.setPromptText("Start Date");
+        startDatePicker.setValue(java.time.LocalDate.now().minusDays(30)); // Default to last 30 days
+        
+        DatePicker endDatePicker = new DatePicker();
+        endDatePicker.setPromptText("End Date");
+        endDatePicker.setValue(java.time.LocalDate.now());
+        
+        Button filterBtn = new Button("Filter");
+        filterBtn.getStyleClass().add("register-button");
+        
+        Button refreshBtn = new Button("Refresh");
+        refreshBtn.getStyleClass().add("register-button");
+        
+        dateFilterBox.getChildren().addAll(
+            new Label("From:"), startDatePicker,
+            new Label("To:"), endDatePicker,
+            filterBtn, refreshBtn
+        );
+        
+        // Attendance table
+        TableView<AttendanceTableData> table = new TableView<>();
+        table.setPrefHeight(400);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        
+        TableColumn<AttendanceTableData, String> nameCol = new TableColumn<>("Employee Name");
+        nameCol.setCellValueFactory(cellData -> cellData.getValue().employeeNameProperty());
+        nameCol.setPrefWidth(150);
+        
+        TableColumn<AttendanceTableData, String> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(cellData -> cellData.getValue().dateProperty());
+        dateCol.setPrefWidth(100);
+        
+        TableColumn<AttendanceTableData, String> statusCol = new TableColumn<>("Status");
+        statusCol.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
+        statusCol.setPrefWidth(80);
+        
+        TableColumn<AttendanceTableData, Double> hoursCol = new TableColumn<>("Working Hours");
+        hoursCol.setCellValueFactory(cellData -> cellData.getValue().workingHoursProperty().asObject());
+        hoursCol.setPrefWidth(100);
+        
+        table.getColumns().addAll(nameCol, dateCol, statusCol, hoursCol);
+        
+        // Data for table
+        ObservableList<AttendanceTableData> attendanceData = FXCollections.observableArrayList();
+        table.setItems(attendanceData);
+        
+        // Load initial data
+        loadAttendanceData(database, attendanceData, null, null);
+        
+        // Filter button action
+        filterBtn.setOnAction(e -> {
+            java.time.LocalDate startDate = startDatePicker.getValue();
+            java.time.LocalDate endDate = endDatePicker.getValue();
+            
+            if (startDate != null && endDate != null) {
+                if (startDate.isAfter(endDate)) {
+                    Alert alert = new Alert(Alert.AlertType.WARNING);
+                    alert.setTitle("Invalid Date Range");
+                    alert.setHeaderText("Invalid Date Range");
+                    alert.setContentText("Start date cannot be after end date.");
+                    alert.showAndWait();
+                    return;
+                }
+                loadAttendanceData(database, attendanceData, startDate.toString(), endDate.toString());
+            } else {
+                loadAttendanceData(database, attendanceData, null, null);
+            }
+        });
+        
+        // Refresh button action
+        refreshBtn.setOnAction(e -> {
+            java.time.LocalDate startDate = startDatePicker.getValue();
+            java.time.LocalDate endDate = endDatePicker.getValue();
+            
+            if (startDate != null && endDate != null) {
+                loadAttendanceData(database, attendanceData, startDate.toString(), endDate.toString());
+            } else {
+                loadAttendanceData(database, attendanceData, null, null);
+            }
+        });
+        
+        // Summary info
+        Label summaryLabel = new Label("Attendance records will appear here");
+        summaryLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-style: italic;");
+        
+        VBox content = new VBox(15, dateFilterBox, summaryLabel, table);
+        content.setPadding(new Insets(15));
+        content.setFillWidth(true);
+        
+        box.getChildren().add(content);
         return box;
     }
 
@@ -1009,5 +1208,72 @@ public class EmployeeManagementContent {
         public String getStatus() { return status.get(); }
         public void setStatus(String status) { this.status.set(status); }
         public javafx.beans.property.SimpleStringProperty statusProperty() { return status; }
+    }
+
+    // Helper method to load attendance data into the table
+    private static void loadAttendanceData(SQLiteDatabase database, ObservableList<AttendanceTableData> attendanceData, String startDate, String endDate) {
+        attendanceData.clear();
+        List<Object[]> attendanceList;
+        
+        if (startDate != null && endDate != null) {
+            attendanceList = database.getEmployeeAttendanceByDateRange(startDate, endDate);
+        } else {
+            attendanceList = database.getAllEmployeeAttendance();
+        }
+        
+        for (Object[] row : attendanceList) {
+            if (startDate != null && endDate != null) {
+                // For date range query: employee_id, employee_name, attendance_date, status, working_hours
+                attendanceData.add(new AttendanceTableData(
+                    (String) row[1],   // employee_name
+                    (String) row[2],   // attendance_date
+                    (String) row[3],   // status
+                    (Double) row[4]    // working_hours
+                ));
+            } else {
+                // For all attendance query: employee_name, attendance_date, status, working_hours
+                attendanceData.add(new AttendanceTableData(
+                    (String) row[0],   // employee_name
+                    (String) row[1],   // attendance_date
+                    (String) row[2],   // status
+                    (Double) row[3]    // working_hours
+                ));
+            }
+        }
+    }
+
+    // Inner class for attendance table data with JavaFX properties
+    public static class AttendanceTableData {
+        private final javafx.beans.property.SimpleStringProperty employeeName;
+        private final javafx.beans.property.SimpleStringProperty date;
+        private final javafx.beans.property.SimpleStringProperty status;
+        private final javafx.beans.property.SimpleDoubleProperty workingHours;
+        
+        public AttendanceTableData(String employeeName, String date, String status, double workingHours) {
+            this.employeeName = new javafx.beans.property.SimpleStringProperty(employeeName);
+            this.date = new javafx.beans.property.SimpleStringProperty(date);
+            this.status = new javafx.beans.property.SimpleStringProperty(status);
+            this.workingHours = new javafx.beans.property.SimpleDoubleProperty(workingHours);
+        }
+        
+        // Employee Name property
+        public String getEmployeeName() { return employeeName.get(); }
+        public void setEmployeeName(String employeeName) { this.employeeName.set(employeeName); }
+        public javafx.beans.property.SimpleStringProperty employeeNameProperty() { return employeeName; }
+        
+        // Date property
+        public String getDate() { return date.get(); }
+        public void setDate(String date) { this.date.set(date); }
+        public javafx.beans.property.SimpleStringProperty dateProperty() { return date; }
+        
+        // Status property
+        public String getStatus() { return status.get(); }
+        public void setStatus(String status) { this.status.set(status); }
+        public javafx.beans.property.SimpleStringProperty statusProperty() { return status; }
+        
+        // Working Hours property
+        public double getWorkingHours() { return workingHours.get(); }
+        public void setWorkingHours(double workingHours) { this.workingHours.set(workingHours); }
+        public javafx.beans.property.SimpleDoubleProperty workingHoursProperty() { return workingHours; }
     }
 }
