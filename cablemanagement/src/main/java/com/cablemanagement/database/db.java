@@ -181,6 +181,17 @@ public interface db {
     List<Object[]> getAllEmployeeLoans();
 
     // --------------------------
+    // Designation Operations
+    // --------------------------
+    List<Object[]> getAllDesignations();
+    
+    boolean insertDesignation(String designationTitle);
+    
+    boolean updateDesignation(int designationId, String designationTitle);
+    
+    boolean deleteDesignation(int designationId);
+
+    // --------------------------
     // Salesman Operations
     // --------------------------
     List<Object[]> getAllSalesmen();

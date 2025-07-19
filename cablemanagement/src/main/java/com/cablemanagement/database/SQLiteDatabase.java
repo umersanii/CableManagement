@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.cablemanagement.model.Brand;
 import com.cablemanagement.model.Customer;
+import com.cablemanagement.model.Designation;
 import com.cablemanagement.model.Manufacturer;
 import com.cablemanagement.model.Supplier;
 
@@ -20,6 +21,8 @@ public class SQLiteDatabase implements db {
         connect(null, null, null);
         // Initialize all required tables
         initializeDatabase();
+        // Migrate schema if needed
+        migrateSchema();
     }
     
     public SQLiteDatabase(String databasePath) {
@@ -28,6 +31,8 @@ public class SQLiteDatabase implements db {
         connect(databasePath, null, null);
         // Initialize all required tables
         initializeDatabase();
+        // Migrate schema if needed
+        migrateSchema();
     }
 
     @Override
@@ -197,6 +202,12 @@ public class SQLiteDatabase implements db {
                 "category_name TEXT NOT NULL UNIQUE" +
                 ")",
                 
+                // Designation table
+                "CREATE TABLE IF NOT EXISTS Designation (" +
+                "designation_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "designation_title TEXT NOT NULL UNIQUE" +
+                ")",
+                
                 // Manufacturer table
                 "CREATE TABLE IF NOT EXISTS Manufacturer (" +
                 "manufacturer_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -246,19 +257,24 @@ public class SQLiteDatabase implements db {
                 "CREATE TABLE IF NOT EXISTS Employee (" +
                 "employee_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "employee_name TEXT NOT NULL," +
-                "position TEXT," +
-                "salary REAL," +
-                "contact_number TEXT," +
+                "phone_number TEXT," +
+                "cnic TEXT," +
                 "address TEXT," +
-                "hire_date TEXT DEFAULT CURRENT_TIMESTAMP" +
+                "hire_date TEXT NOT NULL," +
+                "designation_id INTEGER NOT NULL," +
+                "salary_type TEXT NOT NULL CHECK(salary_type IN ('monthly', 'daily', 'hourly', 'task'))," +
+                "salary_amount REAL NOT NULL," +
+                "is_active INTEGER DEFAULT 1," +
+                "FOREIGN KEY (designation_id) REFERENCES Designation(designation_id)" +
                 ")",
                 
-                // Attendance table
-                "CREATE TABLE IF NOT EXISTS Attendance (" +
+                // Employee Attendance table
+                "CREATE TABLE IF NOT EXISTS Employee_Attendance (" +
                 "attendance_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "employee_id INTEGER NOT NULL," +
-                "date TEXT NOT NULL," +
-                "status TEXT NOT NULL," +
+                "attendance_date TEXT NOT NULL," +
+                "status TEXT NOT NULL CHECK(status IN ('present', 'absent', 'leave'))," +
+                "working_hours REAL DEFAULT 0," +
                 "FOREIGN KEY (employee_id) REFERENCES Employee(employee_id)" +
                 ")",
                 
@@ -335,6 +351,80 @@ public class SQLiteDatabase implements db {
         }
     }
     
+    private void migrateSchema() {
+        try {
+            Statement stmt = connection.createStatement();
+            
+            // Check if Employee table has the new schema columns
+            DatabaseMetaData metaData = connection.getMetaData();
+            ResultSet columns = metaData.getColumns(null, null, "Employee", null);
+            
+            boolean hasDesignationId = false;
+            boolean hasSalaryType = false;
+            boolean hasSalaryAmount = false;
+            boolean hasPhoneNumber = false;
+            boolean hasCnic = false;
+            boolean hasIsActive = false;
+            
+            while (columns.next()) {
+                String columnName = columns.getString("COLUMN_NAME");
+                switch (columnName.toLowerCase()) {
+                    case "designation_id":
+                        hasDesignationId = true;
+                        break;
+                    case "salary_type":
+                        hasSalaryType = true;
+                        break;
+                    case "salary_amount":
+                        hasSalaryAmount = true;
+                        break;
+                    case "phone_number":
+                        hasPhoneNumber = true;
+                        break;
+                    case "cnic":
+                        hasCnic = true;
+                        break;
+                    case "is_active":
+                        hasIsActive = true;
+                        break;
+                }
+            }
+            columns.close();
+            
+            // Add missing columns if they don't exist
+            if (!hasDesignationId) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN designation_id INTEGER");
+                System.out.println("Added designation_id column to Employee table");
+            }
+            if (!hasSalaryType) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN salary_type TEXT DEFAULT 'monthly'");
+                System.out.println("Added salary_type column to Employee table");
+            }
+            if (!hasSalaryAmount) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN salary_amount REAL DEFAULT 0");
+                System.out.println("Added salary_amount column to Employee table");
+            }
+            if (!hasPhoneNumber) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN phone_number TEXT");
+                System.out.println("Added phone_number column to Employee table");
+            }
+            if (!hasCnic) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN cnic TEXT");
+                System.out.println("Added cnic column to Employee table");
+            }
+            if (!hasIsActive) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN is_active INTEGER DEFAULT 1");
+                System.out.println("Added is_active column to Employee table");
+            }
+            
+            stmt.close();
+            
+        } catch (SQLException e) {
+            System.err.println("Error during schema migration: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
     private void insertDefaultData(Statement stmt) throws SQLException {
         // Check if Province table is empty and insert default data
         ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM Province");
@@ -360,6 +450,15 @@ public class SQLiteDatabase implements db {
         if (rs.getInt(1) == 0) {
             stmt.execute("INSERT INTO District (district_name, province_id) VALUES " +
                         "('Lahore', 1), ('Karachi', 2), ('Peshawar', 3), ('Quetta', 4), ('Islamabad', 1)");
+        }
+        rs.close();
+        
+        // Check if Designation table is empty and insert default data
+        rs = stmt.executeQuery("SELECT COUNT(*) FROM Designation");
+        rs.next();
+        if (rs.getInt(1) == 0) {
+            stmt.execute("INSERT INTO Designation (designation_title) VALUES " +
+                        "('Manager'), ('Technician'), ('Sales Representative'), ('Accountant'), ('Supervisor')");
         }
         rs.close();
         
@@ -1548,5 +1647,90 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean deleteSupplier(String name) {
         return true;
+    }
+
+    // --------------------------
+    // Designation Operations Implementation
+    // --------------------------
+    @Override
+    public List<Object[]> getAllDesignations() {
+        List<Object[]> designations = new ArrayList<>();
+        String query = "SELECT designation_id, designation_title FROM Designation ORDER BY designation_title";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("designation_id"),
+                    rs.getString("designation_title")
+                };
+                designations.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return designations;
+    }
+
+    @Override
+    public boolean insertDesignation(String designationTitle) {
+        String query = "INSERT INTO Designation (designation_title) VALUES (?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, designationTitle);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean updateDesignation(int designationId, String designationTitle) {
+        String query = "UPDATE Designation SET designation_title = ? WHERE designation_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, designationTitle);
+            pstmt.setInt(2, designationId);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean deleteDesignation(int designationId) {
+        // First check if the designation is being used by any employee
+        String checkQuery = "SELECT COUNT(*) FROM Employee WHERE designation_id = ?";
+        try (PreparedStatement checkStmt = connection.prepareStatement(checkQuery)) {
+            checkStmt.setInt(1, designationId);
+            ResultSet rs = checkStmt.executeQuery();
+            
+            if (rs.next() && rs.getInt(1) > 0) {
+                // Designation is being used, cannot delete
+                return false;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+        
+        // If not being used, proceed with deletion
+        String deleteQuery = "DELETE FROM Designation WHERE designation_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(deleteQuery)) {
+            pstmt.setInt(1, designationId);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 }
