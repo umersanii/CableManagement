@@ -185,6 +185,8 @@ public interface db {
     // --------------------------
     List<Object[]> getAllSalesmen();
     
-    boolean insertSalesman(String name, String phone, String cnic, String address);
+    boolean insertSalesman(String name, String contact, String address, double commissionRate);
+    
+    boolean updateSalesman(int salesmanId, String name, String contact, String address, double commissionRate);
 
 }

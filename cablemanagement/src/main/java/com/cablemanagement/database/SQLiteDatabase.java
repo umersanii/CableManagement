@@ -1440,7 +1440,7 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllSalesmen() {
         List<Object[]> salesmen = new ArrayList<>();
-        String query = "SELECT salesman_id, salesman_name, phone_number, cnic, address FROM Salesman ORDER BY salesman_name";
+        String query = "SELECT salesman_id, salesman_name, contact_number, address, commission_rate FROM Salesman ORDER BY salesman_name";
         
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
@@ -1449,9 +1449,9 @@ public class SQLiteDatabase implements db {
                 Object[] row = {
                     rs.getInt("salesman_id"),
                     rs.getString("salesman_name"),
-                    rs.getString("phone_number"),
-                    rs.getString("cnic"),
-                    rs.getString("address")
+                    rs.getString("contact_number"),
+                    rs.getString("address"),
+                    rs.getDouble("commission_rate")
                 };
                 salesmen.add(row);
             }
@@ -1462,20 +1462,38 @@ public class SQLiteDatabase implements db {
     }
 
     @Override
-    public boolean insertSalesman(String name, String phone, String cnic, String address) {
-        String query = "INSERT INTO Salesman (salesman_name, phone_number, cnic, address) VALUES (?, ?, ?, ?)";
+    public boolean insertSalesman(String name, String contact, String address, double commissionRate) {
+        String query = "INSERT INTO Salesman (salesman_name, contact_number, address, commission_rate) VALUES (?, ?, ?, ?)";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, name);
-            pstmt.setString(2, phone);
-            pstmt.setString(3, cnic);
-            pstmt.setString(4, address);
+            pstmt.setString(2, contact);
+            pstmt.setString(3, address);
+            pstmt.setDouble(4, commissionRate);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return false;
     }
+
+    @Override
+    public boolean updateSalesman(int salesmanId, String name, String contact, String address, double commissionRate) {
+        String query = "UPDATE Salesman SET salesman_name = ?, contact_number = ?, address = ?, commission_rate = ? WHERE salesman_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            pstmt.setString(2, contact);
+            pstmt.setString(3, address);
+            pstmt.setDouble(4, commissionRate);
+            pstmt.setInt(5, salesmanId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
 
 
     ///////////////////////////////////////////////////////////////////
