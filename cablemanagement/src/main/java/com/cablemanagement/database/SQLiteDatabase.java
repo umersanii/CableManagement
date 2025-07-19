@@ -290,6 +290,20 @@ public class SQLiteDatabase implements db {
                 "FOREIGN KEY (employee_id) REFERENCES Employee(employee_id)" +
                 ")",
                 
+                // Employee Loan table
+                "CREATE TABLE IF NOT EXISTS Employee_Loan (" +
+                "loan_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "employee_id INTEGER NOT NULL," +
+                "loan_amount REAL NOT NULL," +
+                "loan_date TEXT NOT NULL," +
+                "due_date TEXT," +
+                "description TEXT," +
+                "status TEXT DEFAULT 'active' CHECK(status IN ('active', 'paid', 'defaulted', 'written_off'))," +
+                "remaining_amount REAL NOT NULL," +
+                "created_date TEXT DEFAULT CURRENT_TIMESTAMP," +
+                "FOREIGN KEY (employee_id) REFERENCES Employee(employee_id)" +
+                ")",
+                
                 // Salesman table
                 "CREATE TABLE IF NOT EXISTS Salesman (" +
                 "salesman_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -1521,23 +1535,25 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllEmployeeLoans() {
         List<Object[]> loans = new ArrayList<>();
-        String query = "SELECT e.employee_name, el.loan_date, el.amount, " +
-                      "CASE WHEN el.is_settled = 1 THEN 'Paid' ELSE 'Pending' END as status, " +
-                      "el.description " +
+        String query = "SELECT e.employee_name, el.loan_amount, el.loan_date, el.due_date, el.description, " +
+                      "el.status, el.remaining_amount, el.loan_id " +
                       "FROM Employee_Loan el " +
                       "JOIN Employee e ON el.employee_id = e.employee_id " +
                       "ORDER BY el.loan_date DESC";
         
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            ResultSet rs = pstmt.executeQuery();
             
             while (rs.next()) {
                 Object[] row = {
                     rs.getString("employee_name"),
+                    rs.getDouble("loan_amount"),
                     rs.getString("loan_date"),
-                    rs.getDouble("amount"),
+                    rs.getString("due_date"),
+                    rs.getString("description"),
                     rs.getString("status"),
-                    rs.getString("description")
+                    rs.getDouble("remaining_amount"),
+                    rs.getInt("loan_id")
                 };
                 loans.add(row);
             }
@@ -2025,5 +2041,102 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return salaryData;
+    }
+    
+    // --------------------------
+    // Employee Loan Operations
+    // --------------------------
+    public boolean insertEmployeeLoan(int employeeId, double loanAmount, String loanDate, String dueDate, String description) {
+        String query = "INSERT INTO Employee_Loan (employee_id, loan_amount, loan_date, due_date, description, remaining_amount) VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, employeeId);
+            pstmt.setDouble(2, loanAmount);
+            pstmt.setString(3, loanDate);
+            pstmt.setString(4, dueDate);
+            pstmt.setString(5, description);
+            pstmt.setDouble(6, loanAmount); // Initially, remaining amount equals loan amount
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public List<Object[]> getEmployeeLoansByDateRange(String startDate, String endDate) {
+        List<Object[]> loans = new ArrayList<>();
+        String query = "SELECT e.employee_name, el.loan_amount, el.loan_date, el.due_date, el.description, " +
+                      "el.status, el.remaining_amount, el.loan_id " +
+                      "FROM Employee_Loan el " +
+                      "JOIN Employee e ON el.employee_id = e.employee_id " +
+                      "WHERE el.loan_date >= ? AND el.loan_date <= ? " +
+                      "ORDER BY el.loan_date DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getDouble("loan_amount"),
+                    rs.getString("loan_date"),
+                    rs.getString("due_date"),
+                    rs.getString("description"),
+                    rs.getString("status"),
+                    rs.getDouble("remaining_amount"),
+                    rs.getInt("loan_id")
+                };
+                loans.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return loans;
+    }
+
+    public List<Object[]> getLoansByEmployee(String employeeName) {
+        List<Object[]> loans = new ArrayList<>();
+        String query = "SELECT e.employee_name, el.loan_amount, el.loan_date, el.due_date, el.description, " +
+                      "el.status, el.remaining_amount, el.loan_id " +
+                      "FROM Employee_Loan el " +
+                      "JOIN Employee e ON el.employee_id = e.employee_id " +
+                      "WHERE e.employee_name LIKE ? " +
+                      "ORDER BY el.loan_date DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, "%" + employeeName + "%");
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getDouble("loan_amount"),
+                    rs.getString("loan_date"),
+                    rs.getString("due_date"),
+                    rs.getString("description"),
+                    rs.getString("status"),
+                    rs.getDouble("remaining_amount"),
+                    rs.getInt("loan_id")
+                };
+                loans.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return loans;
+    }
+
+    public boolean updateLoanStatus(int loanId, String status, double remainingAmount) {
+        String query = "UPDATE Employee_Loan SET status = ?, remaining_amount = ? WHERE loan_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, status);
+            pstmt.setDouble(2, remainingAmount);
+            pstmt.setInt(3, loanId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 }

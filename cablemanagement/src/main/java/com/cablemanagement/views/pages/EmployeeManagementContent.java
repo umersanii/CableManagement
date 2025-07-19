@@ -1158,43 +1158,155 @@ public class EmployeeManagementContent {
     }
 
     private static VBox createLoanRegisterForm() {
-        VBox box = baseForm("Register New Loan");
+        VBox box = baseForm("Register New Employee Loan");
         
         // Database instance
         SQLiteDatabase database = new SQLiteDatabase();
 
+        // Employee search section
+        VBox searchSection = new VBox(10);
+        Label searchLabel = new Label("Search Employee:");
+        searchLabel.setStyle("-fx-font-weight: bold;");
+        
+        TextField searchField = new TextField();
+        searchField.setPromptText("Type employee name to search...");
+        searchField.setPrefWidth(300);
+        
         ComboBox<String> employeeCombo = new ComboBox<>();
         employeeCombo.setPromptText("Select Employee");
+        employeeCombo.setPrefWidth(300);
         
-        // Load active employees from database
-        for (Object[] row : database.getAllEmployees()) {
-            String status = (String) row[8];
-            if ("Active".equals(status)) {
-                employeeCombo.getItems().add((String) row[1]); // employee_name
-            }
-        }
-
+        // Load all active employees initially
+        loadEmployeeComboBox(database, employeeCombo, "");
+        
+        // Search functionality
+        searchField.textProperty().addListener((obs, oldVal, newVal) -> {
+            loadEmployeeComboBox(database, employeeCombo, newVal.trim());
+        });
+        
+        searchSection.getChildren().addAll(searchLabel, searchField, employeeCombo);
+        
+        // Employee details section
+        VBox detailsSection = new VBox(10);
+        Label detailsLabel = new Label("Employee Details:");
+        detailsLabel.setStyle("-fx-font-weight: bold;");
+        
+        GridPane detailsGrid = new GridPane();
+        detailsGrid.setHgap(10);
+        detailsGrid.setVgap(10);
+        
+        Label empIdLabel = new Label("Employee ID:");
+        Label empIdValue = new Label("-");
+        empIdValue.setStyle("-fx-text-fill: #2c3e50; -fx-font-weight: bold;");
+        
+        Label designationLabel = new Label("Designation:");
+        Label designationValue = new Label("-");
+        designationValue.setStyle("-fx-text-fill: #2c3e50;");
+        
+        Label salaryTypeLabel = new Label("Salary Type:");
+        Label salaryTypeValue = new Label("-");
+        salaryTypeValue.setStyle("-fx-text-fill: #2c3e50;");
+        
+        Label baseSalaryLabel = new Label("Base Salary:");
+        Label baseSalaryValue = new Label("-");
+        baseSalaryValue.setStyle("-fx-text-fill: #2c3e50; -fx-font-weight: bold;");
+        
+        detailsGrid.add(empIdLabel, 0, 0);
+        detailsGrid.add(empIdValue, 1, 0);
+        detailsGrid.add(designationLabel, 2, 0);
+        detailsGrid.add(designationValue, 3, 0);
+        detailsGrid.add(salaryTypeLabel, 0, 1);
+        detailsGrid.add(salaryTypeValue, 1, 1);
+        detailsGrid.add(baseSalaryLabel, 2, 1);
+        detailsGrid.add(baseSalaryValue, 3, 1);
+        
+        detailsSection.getChildren().addAll(detailsLabel, detailsGrid);
+        
+        // Loan form section
+        VBox formSection = new VBox(10);
+        Label formLabel = new Label("Loan Details:");
+        formLabel.setStyle("-fx-font-weight: bold;");
+        
         TextField amountField = new TextField();
         amountField.setPromptText("Loan Amount");
+        amountField.setPrefWidth(200);
 
         DatePicker loanDateField = new DatePicker();
         loanDateField.setPromptText("Loan Date");
         loanDateField.setValue(java.time.LocalDate.now());
+        loanDateField.setPrefWidth(200);
 
         DatePicker dueDateField = new DatePicker();
         dueDateField.setPromptText("Due Date (Optional)");
+        dueDateField.setPrefWidth(200);
 
         TextField descriptionField = new TextField();
         descriptionField.setPromptText("Description/Purpose");
+        descriptionField.setPrefWidth(300);
 
         Button saveBtn = new Button("Register Loan");
         saveBtn.getStyleClass().add("register-button");
+        saveBtn.setPrefWidth(150);
+        
+        Button viewLoansBtn = new Button("View All Loans");
+        viewLoansBtn.getStyleClass().add("register-button");
+        viewLoansBtn.setPrefWidth(150);
+        
+        HBox buttonBox = new HBox(10, saveBtn, viewLoansBtn);
+        buttonBox.setAlignment(Pos.CENTER_LEFT);
+        
+        formSection.getChildren().addAll(formLabel, amountField, loanDateField, dueDateField, descriptionField, buttonBox);
         
         // Status label
         Label statusLabel = new Label("");
         statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+        
+        // Recent loans table
+        TableView<LoanData> recentLoansTable = new TableView<>();
+        recentLoansTable.setPrefHeight(200);
+        recentLoansTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        
+        TableColumn<LoanData, String> employeeNameCol = new TableColumn<>("Employee");
+        employeeNameCol.setCellValueFactory(cellData -> cellData.getValue().employeeNameProperty());
+        
+        TableColumn<LoanData, Double> loanAmountCol = new TableColumn<>("Loan Amount");
+        loanAmountCol.setCellValueFactory(cellData -> cellData.getValue().loanAmountProperty().asObject());
+        
+        TableColumn<LoanData, String> loanDateCol = new TableColumn<>("Loan Date");
+        loanDateCol.setCellValueFactory(cellData -> cellData.getValue().loanDateProperty());
+        
+        TableColumn<LoanData, String> dueDateCol = new TableColumn<>("Due Date");
+        dueDateCol.setCellValueFactory(cellData -> cellData.getValue().dueDateProperty());
+        
+        TableColumn<LoanData, String> statusCol = new TableColumn<>("Status");
+        statusCol.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
+        
+        TableColumn<LoanData, Double> remainingCol = new TableColumn<>("Remaining");
+        remainingCol.setCellValueFactory(cellData -> cellData.getValue().remainingAmountProperty().asObject());
+        
+        recentLoansTable.getColumns().addAll(employeeNameCol, loanAmountCol, loanDateCol, dueDateCol, statusCol, remainingCol);
+        
+        ObservableList<LoanData> recentLoansData = FXCollections.observableArrayList();
+        recentLoansTable.setItems(recentLoansData);
+        
+        Label recentLoansLabel = new Label("Recent Loans:");
+        recentLoansLabel.setStyle("-fx-font-weight: bold;");
+        
+        // Employee selection event handler
+        employeeCombo.setOnAction(e -> {
+            String selectedEmployee = employeeCombo.getValue();
+            if (selectedEmployee != null && !selectedEmployee.isEmpty()) {
+                loadEmployeeDetails(database, selectedEmployee, empIdValue, designationValue, 
+                                 salaryTypeValue, baseSalaryValue);
+                // Clear recent loans for now - could load employee-specific loans here
+                recentLoansData.clear();
+            } else {
+                clearEmployeeDetails(empIdValue, designationValue, salaryTypeValue, baseSalaryValue);
+                recentLoansData.clear();
+            }
+        });
 
-        // Event handler (placeholder - would need loan table implementation)
+        // Register loan button event handler
         saveBtn.setOnAction(e -> {
             String employee = employeeCombo.getValue();
             String amountText = amountField.getText().trim();
@@ -1202,7 +1314,13 @@ public class EmployeeManagementContent {
             java.time.LocalDate dueDate = dueDateField.getValue();
             String description = descriptionField.getText().trim();
             
-            if (employee == null || amountText.isEmpty() || loanDate == null) {
+            if (employee == null || employee.isEmpty()) {
+                statusLabel.setText("Please select an employee.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                return;
+            }
+            
+            if (amountText.isEmpty() || loanDate == null) {
                 statusLabel.setText("Please fill in all required fields.");
                 statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
                 return;
@@ -1216,24 +1334,267 @@ public class EmployeeManagementContent {
                     return;
                 }
                 
-                // This would require implementing loan tracking in the database
-                statusLabel.setText("Loan registration functionality needs to be implemented in the database.");
-                statusLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
+                int employeeId = database.getEmployeeIdByName(employee);
+                if (employeeId == -1) {
+                    statusLabel.setText("Employee not found.");
+                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                    return;
+                }
+                
+                String dueDateStr = (dueDate != null) ? dueDate.toString() : null;
+                
+                if (database.insertEmployeeLoan(employeeId, amount, loanDate.toString(), dueDateStr, description)) {
+                    statusLabel.setText("Loan registered successfully!");
+                    statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+                    
+                    // Clear form
+                    amountField.clear();
+                    loanDateField.setValue(java.time.LocalDate.now());
+                    dueDateField.setValue(null);
+                    descriptionField.clear();
+                    
+                    // Refresh recent loans
+                    loadRecentLoans(database, recentLoansData);
+                } else {
+                    statusLabel.setText("Failed to register loan. Please try again.");
+                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                }
             } catch (NumberFormatException ex) {
                 statusLabel.setText("Please enter a valid amount.");
                 statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
             }
         });
+        
+        // View all loans button
+        viewLoansBtn.setOnAction(e -> {
+            loadRecentLoans(database, recentLoansData);
+            statusLabel.setText("Showing recent loan records.");
+            statusLabel.setStyle("-fx-text-fill: blue; -fx-font-weight: bold;");
+        });
 
-        box.getChildren().addAll(employeeCombo, amountField, loanDateField, dueDateField, descriptionField, saveBtn, statusLabel);
+        // Create responsive layout
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(15));
+        content.setFillWidth(true);
+        
+        // Add sections with separators
+        content.getChildren().addAll(
+            searchSection,
+            new Separator(),
+            detailsSection,
+            new Separator(),
+            formSection,
+            statusLabel,
+            new Separator(),
+            recentLoansLabel,
+            recentLoansTable
+        );
+        
+        box.getChildren().add(content);
         return box;
     }
 
     private static VBox createLoanReportForm() {
         VBox box = baseForm("View Employee Loan Report");
-
-        Label label = new Label("Loan report table coming soon...");
-        box.getChildren().add(label);
+        
+        // Database instance
+        SQLiteDatabase database = new SQLiteDatabase();
+        
+        // Filter section
+        HBox filterBox = new HBox(10);
+        filterBox.setAlignment(Pos.CENTER_LEFT);
+        
+        // Employee search filter
+        TextField employeeSearchField = new TextField();
+        employeeSearchField.setPromptText("Search by employee name...");
+        employeeSearchField.setPrefWidth(200);
+        
+        // Date range filters
+        DatePicker startDatePicker = new DatePicker();
+        startDatePicker.setPromptText("Start Date");
+        startDatePicker.setValue(java.time.LocalDate.now().minusDays(90)); // Default to last 3 months
+        
+        DatePicker endDatePicker = new DatePicker();
+        endDatePicker.setPromptText("End Date");
+        endDatePicker.setValue(java.time.LocalDate.now());
+        
+        // Status filter
+        ComboBox<String> statusFilter = new ComboBox<>();
+        statusFilter.setPromptText("Filter by Status");
+        statusFilter.getItems().addAll("All", "active", "paid", "defaulted", "written_off");
+        statusFilter.setValue("All");
+        
+        Button filterBtn = new Button("Filter");
+        filterBtn.getStyleClass().add("register-button");
+        
+        Button refreshBtn = new Button("Refresh");
+        refreshBtn.getStyleClass().add("register-button");
+        
+        Button exportBtn = new Button("Export CSV");
+        exportBtn.getStyleClass().add("register-button");
+        
+        filterBox.getChildren().addAll(
+            new Label("Employee:"), employeeSearchField,
+            new Label("From:"), startDatePicker,
+            new Label("To:"), endDatePicker,
+            new Label("Status:"), statusFilter,
+            filterBtn, refreshBtn, exportBtn
+        );
+        
+        // Loan report table
+        TableView<LoanData> table = new TableView<>();
+        table.setPrefHeight(400);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        
+        TableColumn<LoanData, String> employeeNameCol = new TableColumn<>("Employee Name");
+        employeeNameCol.setCellValueFactory(cellData -> cellData.getValue().employeeNameProperty());
+        employeeNameCol.setPrefWidth(150);
+        
+        TableColumn<LoanData, Double> loanAmountCol = new TableColumn<>("Loan Amount");
+        loanAmountCol.setCellValueFactory(cellData -> cellData.getValue().loanAmountProperty().asObject());
+        loanAmountCol.setPrefWidth(120);
+        
+        TableColumn<LoanData, String> loanDateCol = new TableColumn<>("Loan Date");
+        loanDateCol.setCellValueFactory(cellData -> cellData.getValue().loanDateProperty());
+        loanDateCol.setPrefWidth(100);
+        
+        TableColumn<LoanData, String> dueDateCol = new TableColumn<>("Due Date");
+        dueDateCol.setCellValueFactory(cellData -> cellData.getValue().dueDateProperty());
+        dueDateCol.setPrefWidth(100);
+        
+        TableColumn<LoanData, String> descriptionCol = new TableColumn<>("Description");
+        descriptionCol.setCellValueFactory(cellData -> cellData.getValue().descriptionProperty());
+        descriptionCol.setPrefWidth(150);
+        
+        TableColumn<LoanData, String> statusCol = new TableColumn<>("Status");
+        statusCol.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
+        statusCol.setPrefWidth(100);
+        statusCol.setCellFactory(column -> {
+            return new TableCell<LoanData, String>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                        setStyle("");
+                    } else {
+                        setText(item);
+                        // Color code status
+                        switch (item.toLowerCase()) {
+                            case "active":
+                                setStyle("-fx-text-fill: #f39c12; -fx-font-weight: bold;");
+                                break;
+                            case "paid":
+                                setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
+                                break;
+                            case "defaulted":
+                                setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+                                break;
+                            case "written_off":
+                                setStyle("-fx-text-fill: #95a5a6; -fx-font-weight: bold;");
+                                break;
+                            default:
+                                setStyle("");
+                        }
+                    }
+                }
+            };
+        });
+        
+        TableColumn<LoanData, Double> remainingAmountCol = new TableColumn<>("Remaining Amount");
+        remainingAmountCol.setCellValueFactory(cellData -> cellData.getValue().remainingAmountProperty().asObject());
+        remainingAmountCol.setPrefWidth(120);
+        
+        // Action column for updating loan status
+        TableColumn<LoanData, Void> actionCol = new TableColumn<>("Actions");
+        actionCol.setCellFactory(param -> new TableCell<>() {
+            private final Button updateBtn = new Button("Update");
+            {
+                updateBtn.getStyleClass().add("register-button");
+                updateBtn.setOnAction(e -> {
+                    LoanData loan = getTableView().getItems().get(getIndex());
+                    showUpdateLoanDialog(database, loan, table);
+                });
+            }
+            
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    setGraphic(updateBtn);
+                }
+            }
+        });
+        actionCol.setPrefWidth(80);
+        
+        table.getColumns().addAll(employeeNameCol, loanAmountCol, loanDateCol, dueDateCol, 
+                                 descriptionCol, statusCol, remainingAmountCol, actionCol);
+        
+        // Data for table
+        ObservableList<LoanData> loanData = FXCollections.observableArrayList();
+        table.setItems(loanData);
+        
+        // Summary info
+        Label summaryLabel = new Label("Loan records will appear here");
+        summaryLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-style: italic;");
+        
+        // Status label
+        Label statusLabel = new Label();
+        
+        // Load initial data
+        loadLoanReportData(database, loanData, null, null, null, null);
+        updateSummaryLabel(loanData, summaryLabel);
+        
+        // Filter button action
+        filterBtn.setOnAction(e -> {
+            java.time.LocalDate startDate = startDatePicker.getValue();
+            java.time.LocalDate endDate = endDatePicker.getValue();
+            String employeeName = employeeSearchField.getText().trim();
+            String status = statusFilter.getValue();
+            
+            if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+                statusLabel.setText("Start date cannot be after end date.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                return;
+            }
+            
+            String startDateStr = (startDate != null) ? startDate.toString() : null;
+            String endDateStr = (endDate != null) ? endDate.toString() : null;
+            String employeeFilter = employeeName.isEmpty() ? null : employeeName;
+            String statusFilterValue = "All".equals(status) ? null : status;
+            
+            loadLoanReportData(database, loanData, startDateStr, endDateStr, employeeFilter, statusFilterValue);
+            updateSummaryLabel(loanData, summaryLabel);
+            statusLabel.setText("");
+        });
+        
+        // Refresh button action
+        refreshBtn.setOnAction(e -> {
+            loadLoanReportData(database, loanData, null, null, null, null);
+            updateSummaryLabel(loanData, summaryLabel);
+            statusLabel.setText("Data refreshed.");
+            statusLabel.setStyle("-fx-text-fill: blue; -fx-font-weight: bold;");
+        });
+        
+        // Export button action (placeholder)
+        exportBtn.setOnAction(e -> {
+            if (loanData.isEmpty()) {
+                statusLabel.setText("No data to export. Please apply filters first.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                return;
+            }
+            
+            statusLabel.setText("Export functionality coming soon...");
+            statusLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
+        });
+        
+        VBox content = new VBox(15, filterBox, statusLabel, summaryLabel, table);
+        content.setPadding(new Insets(15));
+        content.setFillWidth(true);
+        
+        box.getChildren().add(content);
         return box;
     }
 
@@ -1758,5 +2119,223 @@ public class EmployeeManagementContent {
         public String getStatus() { return status.get(); }
         public void setStatus(String status) { this.status.set(status); }
         public javafx.beans.property.SimpleStringProperty statusProperty() { return status; }
+    }
+
+    // Helper methods for loan functionality
+    private static void loadRecentLoans(SQLiteDatabase database, ObservableList<LoanData> loanData) {
+        loanData.clear();
+        List<Object[]> loans = database.getAllEmployeeLoans();
+        
+        // Load only the most recent 10 records
+        int count = 0;
+        for (Object[] row : loans) {
+            if (count >= 10) break;
+            loanData.add(new LoanData(
+                (String) row[0],   // employee_name
+                (Double) row[1],   // loan_amount
+                (String) row[2],   // loan_date
+                (String) row[3],   // due_date
+                (String) row[4],   // description
+                (String) row[5],   // status
+                (Double) row[6],   // remaining_amount
+                (Integer) row[7]   // loan_id
+            ));
+            count++;
+        }
+    }
+    
+    private static void loadLoanReportData(SQLiteDatabase database, ObservableList<LoanData> loanData, 
+                                         String startDate, String endDate, String employeeName, String status) {
+        loanData.clear();
+        List<Object[]> loans;
+        
+        if (startDate != null && endDate != null) {
+            loans = database.getEmployeeLoansByDateRange(startDate, endDate);
+        } else if (employeeName != null) {
+            loans = database.getLoansByEmployee(employeeName);
+        } else {
+            loans = database.getAllEmployeeLoans();
+        }
+        
+        for (Object[] row : loans) {
+            String loanStatus = (String) row[5];
+            
+            // Apply status filter
+            if (status != null && !loanStatus.equalsIgnoreCase(status)) {
+                continue;
+            }
+            
+            // Apply employee name filter if not already filtered by database query
+            if (employeeName != null && startDate != null && endDate != null) {
+                String empName = (String) row[0];
+                if (!empName.toLowerCase().contains(employeeName.toLowerCase())) {
+                    continue;
+                }
+            }
+            
+            loanData.add(new LoanData(
+                (String) row[0],   // employee_name
+                (Double) row[1],   // loan_amount
+                (String) row[2],   // loan_date
+                (String) row[3],   // due_date
+                (String) row[4],   // description
+                loanStatus,        // status
+                (Double) row[6],   // remaining_amount
+                (Integer) row[7]   // loan_id
+            ));
+        }
+    }
+    
+    private static void updateSummaryLabel(ObservableList<LoanData> loanData, Label summaryLabel) {
+        if (loanData.isEmpty()) {
+            summaryLabel.setText("No loan records found.");
+            summaryLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-style: italic;");
+        } else {
+            double totalLoanAmount = loanData.stream().mapToDouble(LoanData::getLoanAmount).sum();
+            double totalRemaining = loanData.stream().mapToDouble(LoanData::getRemainingAmount).sum();
+            long activeLoans = loanData.stream().filter(loan -> "active".equalsIgnoreCase(loan.getStatus())).count();
+            
+            summaryLabel.setText(String.format("Total: %d loans | Total Amount: %.2f | Remaining: %.2f | Active: %d", 
+                loanData.size(), totalLoanAmount, totalRemaining, activeLoans));
+            summaryLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
+        }
+    }
+    
+    private static void showUpdateLoanDialog(SQLiteDatabase database, LoanData loan, TableView<LoanData> table) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Update Loan Status");
+        dialog.setHeaderText("Update loan for: " + loan.getEmployeeName());
+        
+        // Create the dialog content
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(20));
+        
+        Label currentStatusLabel = new Label("Current Status: " + loan.getStatus());
+        currentStatusLabel.setStyle("-fx-font-weight: bold;");
+        
+        Label currentRemainingLabel = new Label("Current Remaining: " + String.format("%.2f", loan.getRemainingAmount()));
+        currentRemainingLabel.setStyle("-fx-font-weight: bold;");
+        
+        ComboBox<String> statusCombo = new ComboBox<>();
+        statusCombo.getItems().addAll("active", "paid", "defaulted", "written_off");
+        statusCombo.setValue(loan.getStatus());
+        
+        TextField remainingField = new TextField();
+        remainingField.setText(String.valueOf(loan.getRemainingAmount()));
+        remainingField.setPromptText("Remaining Amount");
+        
+        content.getChildren().addAll(
+            currentStatusLabel,
+            currentRemainingLabel,
+            new Label("New Status:"),
+            statusCombo,
+            new Label("New Remaining Amount:"),
+            remainingField
+        );
+        
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        
+        // Handle the result
+        dialog.showAndWait().ifPresent(result -> {
+            if (result == ButtonType.OK) {
+                try {
+                    String newStatus = statusCombo.getValue();
+                    double newRemaining = Double.parseDouble(remainingField.getText());
+                    
+                    if (newRemaining < 0) {
+                        Alert alert = new Alert(Alert.AlertType.WARNING);
+                        alert.setTitle("Invalid Amount");
+                        alert.setContentText("Remaining amount cannot be negative.");
+                        alert.showAndWait();
+                        return;
+                    }
+                    
+                    if (database.updateLoanStatus(loan.getLoanId(), newStatus, newRemaining)) {
+                        // Refresh the table
+                        loan.setStatus(newStatus);
+                        loan.setRemainingAmount(newRemaining);
+                        table.refresh();
+                        
+                        Alert success = new Alert(Alert.AlertType.INFORMATION);
+                        success.setTitle("Success");
+                        success.setContentText("Loan status updated successfully!");
+                        success.showAndWait();
+                    } else {
+                        Alert error = new Alert(Alert.AlertType.ERROR);
+                        error.setTitle("Error");
+                        error.setContentText("Failed to update loan status.");
+                        error.showAndWait();
+                    }
+                } catch (NumberFormatException e) {
+                    Alert alert = new Alert(Alert.AlertType.WARNING);
+                    alert.setTitle("Invalid Amount");
+                    alert.setContentText("Please enter a valid remaining amount.");
+                    alert.showAndWait();
+                }
+            }
+        });
+    }
+
+    // Inner class for loan table data with JavaFX properties
+    public static class LoanData {
+        private final javafx.beans.property.SimpleStringProperty employeeName;
+        private final javafx.beans.property.SimpleDoubleProperty loanAmount;
+        private final javafx.beans.property.SimpleStringProperty loanDate;
+        private final javafx.beans.property.SimpleStringProperty dueDate;
+        private final javafx.beans.property.SimpleStringProperty description;
+        private final javafx.beans.property.SimpleStringProperty status;
+        private final javafx.beans.property.SimpleDoubleProperty remainingAmount;
+        private final int loanId;
+        
+        public LoanData(String employeeName, double loanAmount, String loanDate, String dueDate, 
+                       String description, String status, double remainingAmount, int loanId) {
+            this.employeeName = new javafx.beans.property.SimpleStringProperty(employeeName);
+            this.loanAmount = new javafx.beans.property.SimpleDoubleProperty(loanAmount);
+            this.loanDate = new javafx.beans.property.SimpleStringProperty(loanDate);
+            this.dueDate = new javafx.beans.property.SimpleStringProperty(dueDate != null ? dueDate : "N/A");
+            this.description = new javafx.beans.property.SimpleStringProperty(description != null ? description : "");
+            this.status = new javafx.beans.property.SimpleStringProperty(status);
+            this.remainingAmount = new javafx.beans.property.SimpleDoubleProperty(remainingAmount);
+            this.loanId = loanId;
+        }
+        
+        // Employee Name property
+        public String getEmployeeName() { return employeeName.get(); }
+        public void setEmployeeName(String employeeName) { this.employeeName.set(employeeName); }
+        public javafx.beans.property.SimpleStringProperty employeeNameProperty() { return employeeName; }
+        
+        // Loan Amount property
+        public double getLoanAmount() { return loanAmount.get(); }
+        public void setLoanAmount(double loanAmount) { this.loanAmount.set(loanAmount); }
+        public javafx.beans.property.SimpleDoubleProperty loanAmountProperty() { return loanAmount; }
+        
+        // Loan Date property
+        public String getLoanDate() { return loanDate.get(); }
+        public void setLoanDate(String loanDate) { this.loanDate.set(loanDate); }
+        public javafx.beans.property.SimpleStringProperty loanDateProperty() { return loanDate; }
+        
+        // Due Date property
+        public String getDueDate() { return dueDate.get(); }
+        public void setDueDate(String dueDate) { this.dueDate.set(dueDate); }
+        public javafx.beans.property.SimpleStringProperty dueDateProperty() { return dueDate; }
+        
+        // Description property
+        public String getDescription() { return description.get(); }
+        public void setDescription(String description) { this.description.set(description); }
+        public javafx.beans.property.SimpleStringProperty descriptionProperty() { return description; }
+        
+        // Status property
+        public String getStatus() { return status.get(); }
+        public void setStatus(String status) { this.status.set(status); }
+        public javafx.beans.property.SimpleStringProperty statusProperty() { return status; }
+        
+        // Remaining Amount property
+        public double getRemainingAmount() { return remainingAmount.get(); }
+        public void setRemainingAmount(double remainingAmount) { this.remainingAmount.set(remainingAmount); }
+        public javafx.beans.property.SimpleDoubleProperty remainingAmountProperty() { return remainingAmount; }
+        
+        // Loan ID getter
+        public int getLoanId() { return loanId; }
     }
 }
