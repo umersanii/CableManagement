@@ -1157,6 +1157,11 @@ public class EmployeeManagementContent {
         return box;
     }
 
+
+    ////////////////////////////////////////////////////////////////////
+    ///                  Register New Employee Loan Form             ///
+    ////////////////////////////////////////////////////////////////////
+
     private static VBox createLoanRegisterForm() {
         VBox box = baseForm("Register New Employee Loan");
         
@@ -1598,6 +1603,11 @@ public class EmployeeManagementContent {
         return box;
     }
 
+
+    /////////////////////////////////////////////////////////////
+    ///                    baseForm Method                    ///   
+    /////////////////////////////////////////////////////////////
+
     private static VBox baseForm(String title) {
         VBox form = new VBox(15);
         form.setPadding(new Insets(30));
@@ -1610,6 +1620,7 @@ public class EmployeeManagementContent {
         return form;
     }
     
+
     // Helper method to load employee data into the table
     private static void loadEmployeeData(SQLiteDatabase database, ObservableList<EmployeeTableData> employeeData) {
         employeeData.clear();
