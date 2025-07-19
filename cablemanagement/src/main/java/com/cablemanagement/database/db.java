@@ -174,17 +174,48 @@ public interface db {
     
     boolean insertEmployee(String name, String phone, String cnic, String address, String designation, String salaryType, double salaryAmount);
     
+    boolean updateEmployee(int employeeId, String name, String phone, String cnic, String address, String designation, String salaryType, double salaryAmount);
+    
+    boolean deleteEmployee(int employeeId);
+    
+    // --------------------------
+    // Employee Attendance Operations
+    // --------------------------
+    boolean insertEmployeeAttendance(int employeeId, String attendanceDate, String status, double workingHours);
+    
     List<Object[]> getAllEmployeeAttendance();
     
+    List<Object[]> getEmployeeAttendanceByDateRange(String startDate, String endDate);
+    
+    List<Object[]> getEmployeeAttendanceByEmployee(int employeeId);
+    
+    int getEmployeeIdByName(String employeeName);
+    
+    // --------------------------
+    // Employee Salary Payment Operations
+    // --------------------------
     List<Object[]> getAllEmployeeSalaryPayments();
     
     List<Object[]> getAllEmployeeLoans();
+
+    // --------------------------
+    // Designation Operations
+    // --------------------------
+    List<Object[]> getAllDesignations();
+    
+    boolean insertDesignation(String designationTitle);
+    
+    boolean updateDesignation(int designationId, String designationTitle);
+    
+    boolean deleteDesignation(int designationId);
 
     // --------------------------
     // Salesman Operations
     // --------------------------
     List<Object[]> getAllSalesmen();
     
-    boolean insertSalesman(String name, String phone, String cnic, String address);
+    boolean insertSalesman(String name, String contact, String address, double commissionRate);
+    
+    boolean updateSalesman(int salesmanId, String name, String contact, String address, double commissionRate);
 
 }

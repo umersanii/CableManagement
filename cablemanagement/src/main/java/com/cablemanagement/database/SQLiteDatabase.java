@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.cablemanagement.model.Brand;
 import com.cablemanagement.model.Customer;
+import com.cablemanagement.model.Designation;
 import com.cablemanagement.model.Manufacturer;
 import com.cablemanagement.model.Supplier;
 
@@ -20,6 +21,8 @@ public class SQLiteDatabase implements db {
         connect(null, null, null);
         // Initialize all required tables
         initializeDatabase();
+        // Migrate schema if needed
+        migrateSchema();
     }
     
     public SQLiteDatabase(String databasePath) {
@@ -28,6 +31,8 @@ public class SQLiteDatabase implements db {
         connect(databasePath, null, null);
         // Initialize all required tables
         initializeDatabase();
+        // Migrate schema if needed
+        migrateSchema();
     }
 
     @Override
@@ -197,6 +202,12 @@ public class SQLiteDatabase implements db {
                 "category_name TEXT NOT NULL UNIQUE" +
                 ")",
                 
+                // Designation table
+                "CREATE TABLE IF NOT EXISTS Designation (" +
+                "designation_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "designation_title TEXT NOT NULL UNIQUE" +
+                ")",
+                
                 // Manufacturer table
                 "CREATE TABLE IF NOT EXISTS Manufacturer (" +
                 "manufacturer_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -246,19 +257,50 @@ public class SQLiteDatabase implements db {
                 "CREATE TABLE IF NOT EXISTS Employee (" +
                 "employee_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "employee_name TEXT NOT NULL," +
-                "position TEXT," +
-                "salary REAL," +
-                "contact_number TEXT," +
+                "phone_number TEXT," +
+                "cnic TEXT," +
                 "address TEXT," +
-                "hire_date TEXT DEFAULT CURRENT_TIMESTAMP" +
+                "hire_date TEXT NOT NULL," +
+                "designation_id INTEGER NOT NULL," +
+                "salary_type TEXT NOT NULL CHECK(salary_type IN ('monthly', 'daily', 'hourly', 'task'))," +
+                "salary_amount REAL NOT NULL," +
+                "is_active INTEGER DEFAULT 1," +
+                "FOREIGN KEY (designation_id) REFERENCES Designation(designation_id)" +
                 ")",
                 
-                // Attendance table
-                "CREATE TABLE IF NOT EXISTS Attendance (" +
+                // Employee Attendance table
+                "CREATE TABLE IF NOT EXISTS Employee_Attendance (" +
                 "attendance_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "employee_id INTEGER NOT NULL," +
-                "date TEXT NOT NULL," +
-                "status TEXT NOT NULL," +
+                "attendance_date TEXT NOT NULL," +
+                "status TEXT NOT NULL CHECK(status IN ('present', 'absent', 'leave'))," +
+                "working_hours REAL DEFAULT 0," +
+                "FOREIGN KEY (employee_id) REFERENCES Employee(employee_id)" +
+                ")",
+                
+                // Employee Advance Salary table
+                "CREATE TABLE IF NOT EXISTS Employee_Advance_Salary (" +
+                "advance_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "employee_id INTEGER NOT NULL," +
+                "amount REAL NOT NULL," +
+                "advance_date TEXT NOT NULL," +
+                "description TEXT," +
+                "status TEXT DEFAULT 'granted' CHECK(status IN ('granted', 'adjusted', 'refunded'))," +
+                "created_date TEXT DEFAULT CURRENT_TIMESTAMP," +
+                "FOREIGN KEY (employee_id) REFERENCES Employee(employee_id)" +
+                ")",
+                
+                // Employee Loan table
+                "CREATE TABLE IF NOT EXISTS Employee_Loan (" +
+                "loan_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "employee_id INTEGER NOT NULL," +
+                "loan_amount REAL NOT NULL," +
+                "loan_date TEXT NOT NULL," +
+                "due_date TEXT," +
+                "description TEXT," +
+                "status TEXT DEFAULT 'active' CHECK(status IN ('active', 'paid', 'defaulted', 'written_off'))," +
+                "remaining_amount REAL NOT NULL," +
+                "created_date TEXT DEFAULT CURRENT_TIMESTAMP," +
                 "FOREIGN KEY (employee_id) REFERENCES Employee(employee_id)" +
                 ")",
                 
@@ -335,6 +377,80 @@ public class SQLiteDatabase implements db {
         }
     }
     
+    private void migrateSchema() {
+        try {
+            Statement stmt = connection.createStatement();
+            
+            // Check if Employee table has the new schema columns
+            DatabaseMetaData metaData = connection.getMetaData();
+            ResultSet columns = metaData.getColumns(null, null, "Employee", null);
+            
+            boolean hasDesignationId = false;
+            boolean hasSalaryType = false;
+            boolean hasSalaryAmount = false;
+            boolean hasPhoneNumber = false;
+            boolean hasCnic = false;
+            boolean hasIsActive = false;
+            
+            while (columns.next()) {
+                String columnName = columns.getString("COLUMN_NAME");
+                switch (columnName.toLowerCase()) {
+                    case "designation_id":
+                        hasDesignationId = true;
+                        break;
+                    case "salary_type":
+                        hasSalaryType = true;
+                        break;
+                    case "salary_amount":
+                        hasSalaryAmount = true;
+                        break;
+                    case "phone_number":
+                        hasPhoneNumber = true;
+                        break;
+                    case "cnic":
+                        hasCnic = true;
+                        break;
+                    case "is_active":
+                        hasIsActive = true;
+                        break;
+                }
+            }
+            columns.close();
+            
+            // Add missing columns if they don't exist
+            if (!hasDesignationId) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN designation_id INTEGER");
+                System.out.println("Added designation_id column to Employee table");
+            }
+            if (!hasSalaryType) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN salary_type TEXT DEFAULT 'monthly'");
+                System.out.println("Added salary_type column to Employee table");
+            }
+            if (!hasSalaryAmount) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN salary_amount REAL DEFAULT 0");
+                System.out.println("Added salary_amount column to Employee table");
+            }
+            if (!hasPhoneNumber) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN phone_number TEXT");
+                System.out.println("Added phone_number column to Employee table");
+            }
+            if (!hasCnic) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN cnic TEXT");
+                System.out.println("Added cnic column to Employee table");
+            }
+            if (!hasIsActive) {
+                stmt.execute("ALTER TABLE Employee ADD COLUMN is_active INTEGER DEFAULT 1");
+                System.out.println("Added is_active column to Employee table");
+            }
+            
+            stmt.close();
+            
+        } catch (SQLException e) {
+            System.err.println("Error during schema migration: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
     private void insertDefaultData(Statement stmt) throws SQLException {
         // Check if Province table is empty and insert default data
         ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM Province");
@@ -360,6 +476,15 @@ public class SQLiteDatabase implements db {
         if (rs.getInt(1) == 0) {
             stmt.execute("INSERT INTO District (district_name, province_id) VALUES " +
                         "('Lahore', 1), ('Karachi', 2), ('Peshawar', 3), ('Quetta', 4), ('Islamabad', 1)");
+        }
+        rs.close();
+        
+        // Check if Designation table is empty and insert default data
+        rs = stmt.executeQuery("SELECT COUNT(*) FROM Designation");
+        rs.next();
+        if (rs.getInt(1) == 0) {
+            stmt.execute("INSERT INTO Designation (designation_title) VALUES " +
+                        "('Manager'), ('Technician'), ('Sales Representative'), ('Accountant'), ('Supervisor')");
         }
         rs.close();
         
@@ -1301,7 +1426,7 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllEmployees() {
         List<Object[]> employees = new ArrayList<>();
-        String query = "SELECT e.employee_id, e.employee_name, e.phone_number, d.designation_title, " +
+        String query = "SELECT e.employee_id, e.employee_name, e.phone_number, e.cnic, e.address, d.designation_title, " +
                       "e.salary_type, e.salary_amount, " +
                       "CASE WHEN e.is_active = 1 THEN 'Active' ELSE 'Inactive' END as status " +
                       "FROM Employee e " +
@@ -1316,6 +1441,8 @@ public class SQLiteDatabase implements db {
                     rs.getInt("employee_id"),
                     rs.getString("employee_name"),
                     rs.getString("phone_number"),
+                    rs.getString("cnic"),
+                    rs.getString("address"),
                     rs.getString("designation_title"),
                     rs.getString("salary_type"),
                     rs.getDouble("salary_amount"),
@@ -1408,23 +1535,25 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllEmployeeLoans() {
         List<Object[]> loans = new ArrayList<>();
-        String query = "SELECT e.employee_name, el.loan_date, el.amount, " +
-                      "CASE WHEN el.is_settled = 1 THEN 'Paid' ELSE 'Pending' END as status, " +
-                      "el.description " +
+        String query = "SELECT e.employee_name, el.loan_amount, el.loan_date, el.due_date, el.description, " +
+                      "el.status, el.remaining_amount, el.loan_id " +
                       "FROM Employee_Loan el " +
                       "JOIN Employee e ON el.employee_id = e.employee_id " +
                       "ORDER BY el.loan_date DESC";
         
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            ResultSet rs = pstmt.executeQuery();
             
             while (rs.next()) {
                 Object[] row = {
                     rs.getString("employee_name"),
+                    rs.getDouble("loan_amount"),
                     rs.getString("loan_date"),
-                    rs.getDouble("amount"),
+                    rs.getString("due_date"),
+                    rs.getString("description"),
                     rs.getString("status"),
-                    rs.getString("description")
+                    rs.getDouble("remaining_amount"),
+                    rs.getInt("loan_id")
                 };
                 loans.add(row);
             }
@@ -1434,13 +1563,164 @@ public class SQLiteDatabase implements db {
         return loans;
     }
 
+    @Override
+    public boolean updateEmployee(int employeeId, String name, String phone, String cnic, String address, 
+                                 String designation, String salaryType, double salaryAmount) {
+        String query = "UPDATE Employee SET employee_name = ?, phone_number = ?, cnic = ?, address = ?, " +
+                      "designation_id = (SELECT designation_id FROM Designation WHERE designation_title = ?), " +
+                      "salary_type = ?, salary_amount = ? " +
+                      "WHERE employee_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            pstmt.setString(2, phone);
+            pstmt.setString(3, cnic);
+            pstmt.setString(4, address);
+            pstmt.setString(5, designation);
+            pstmt.setString(6, salaryType);
+            pstmt.setDouble(7, salaryAmount);
+            pstmt.setInt(8, employeeId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean deleteEmployee(int employeeId) {
+        String query = "UPDATE Employee SET is_active = 0 WHERE employee_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, employeeId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    // --------------------------
+    // Employee Attendance Operations
+    // --------------------------
+    @Override
+    public boolean insertEmployeeAttendance(int employeeId, String attendanceDate, String status, double workingHours) {
+        // Check if attendance already exists for this employee on this date
+        String checkQuery = "SELECT COUNT(*) FROM Employee_Attendance WHERE employee_id = ? AND attendance_date = ?";
+        try (PreparedStatement checkStmt = connection.prepareStatement(checkQuery)) {
+            checkStmt.setInt(1, employeeId);
+            checkStmt.setString(2, attendanceDate);
+            ResultSet rs = checkStmt.executeQuery();
+            if (rs.next() && rs.getInt(1) > 0) {
+                // Attendance already exists, update it instead
+                String updateQuery = "UPDATE Employee_Attendance SET status = ?, working_hours = ? WHERE employee_id = ? AND attendance_date = ?";
+                try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
+                    updateStmt.setString(1, status.toLowerCase());
+                    updateStmt.setDouble(2, workingHours);
+                    updateStmt.setInt(3, employeeId);
+                    updateStmt.setString(4, attendanceDate);
+                    return updateStmt.executeUpdate() > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+        
+        // Insert new attendance record
+        String insertQuery = "INSERT INTO Employee_Attendance (employee_id, attendance_date, status, working_hours) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(insertQuery)) {
+            pstmt.setInt(1, employeeId);
+            pstmt.setString(2, attendanceDate);
+            pstmt.setString(3, status.toLowerCase());
+            pstmt.setDouble(4, workingHours);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public List<Object[]> getEmployeeAttendanceByDateRange(String startDate, String endDate) {
+        List<Object[]> attendance = new ArrayList<>();
+        String query = "SELECT e.employee_id, e.employee_name, ea.attendance_date, ea.status, ea.working_hours " +
+                      "FROM Employee_Attendance ea " +
+                      "JOIN Employee e ON ea.employee_id = e.employee_id " +
+                      "WHERE ea.attendance_date >= ? AND ea.attendance_date <= ? " +
+                      "ORDER BY ea.attendance_date DESC, e.employee_name";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("employee_id"),
+                    rs.getString("employee_name"),
+                    rs.getString("attendance_date"),
+                    rs.getString("status"),
+                    rs.getDouble("working_hours")
+                };
+                attendance.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return attendance;
+    }
+
+    @Override
+    public List<Object[]> getEmployeeAttendanceByEmployee(int employeeId) {
+        List<Object[]> attendance = new ArrayList<>();
+        String query = "SELECT e.employee_name, ea.attendance_date, ea.status, ea.working_hours " +
+                      "FROM Employee_Attendance ea " +
+                      "JOIN Employee e ON ea.employee_id = e.employee_id " +
+                      "WHERE ea.employee_id = ? " +
+                      "ORDER BY ea.attendance_date DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, employeeId);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getString("attendance_date"),
+                    rs.getString("status"),
+                    rs.getDouble("working_hours")
+                };
+                attendance.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return attendance;
+    }
+
+    @Override
+    public int getEmployeeIdByName(String employeeName) {
+        String query = "SELECT employee_id FROM Employee WHERE employee_name = ? AND is_active = 1";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, employeeName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("employee_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1; // Return -1 if employee not found
+    }
+
     // --------------------------
     // Salesman Operations
     // --------------------------
     @Override
     public List<Object[]> getAllSalesmen() {
         List<Object[]> salesmen = new ArrayList<>();
-        String query = "SELECT salesman_id, salesman_name, phone_number, cnic, address FROM Salesman ORDER BY salesman_name";
+        String query = "SELECT salesman_id, salesman_name, contact_number, address, commission_rate FROM Salesman ORDER BY salesman_name";
         
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
@@ -1449,9 +1729,9 @@ public class SQLiteDatabase implements db {
                 Object[] row = {
                     rs.getInt("salesman_id"),
                     rs.getString("salesman_name"),
-                    rs.getString("phone_number"),
-                    rs.getString("cnic"),
-                    rs.getString("address")
+                    rs.getString("contact_number"),
+                    rs.getString("address"),
+                    rs.getDouble("commission_rate")
                 };
                 salesmen.add(row);
             }
@@ -1462,20 +1742,38 @@ public class SQLiteDatabase implements db {
     }
 
     @Override
-    public boolean insertSalesman(String name, String phone, String cnic, String address) {
-        String query = "INSERT INTO Salesman (salesman_name, phone_number, cnic, address) VALUES (?, ?, ?, ?)";
+    public boolean insertSalesman(String name, String contact, String address, double commissionRate) {
+        String query = "INSERT INTO Salesman (salesman_name, contact_number, address, commission_rate) VALUES (?, ?, ?, ?)";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, name);
-            pstmt.setString(2, phone);
-            pstmt.setString(3, cnic);
-            pstmt.setString(4, address);
+            pstmt.setString(2, contact);
+            pstmt.setString(3, address);
+            pstmt.setDouble(4, commissionRate);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return false;
     }
+
+    @Override
+    public boolean updateSalesman(int salesmanId, String name, String contact, String address, double commissionRate) {
+        String query = "UPDATE Salesman SET salesman_name = ?, contact_number = ?, address = ?, commission_rate = ? WHERE salesman_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            pstmt.setString(2, contact);
+            pstmt.setString(3, address);
+            pstmt.setDouble(4, commissionRate);
+            pstmt.setInt(5, salesmanId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
 
 
     ///////////////////////////////////////////////////////////////////
@@ -1530,5 +1828,315 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean deleteSupplier(String name) {
         return true;
+    }
+
+    // --------------------------
+    // Designation Operations Implementation
+    // --------------------------
+    @Override
+    public List<Object[]> getAllDesignations() {
+        List<Object[]> designations = new ArrayList<>();
+        String query = "SELECT designation_id, designation_title FROM Designation ORDER BY designation_title";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("designation_id"),
+                    rs.getString("designation_title")
+                };
+                designations.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return designations;
+    }
+
+    @Override
+    public boolean insertDesignation(String designationTitle) {
+        String query = "INSERT INTO Designation (designation_title) VALUES (?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, designationTitle);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean updateDesignation(int designationId, String designationTitle) {
+        String query = "UPDATE Designation SET designation_title = ? WHERE designation_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, designationTitle);
+            pstmt.setInt(2, designationId);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean deleteDesignation(int designationId) {
+        // First check if the designation is being used by any employee
+        String checkQuery = "SELECT COUNT(*) FROM Employee WHERE designation_id = ?";
+        try (PreparedStatement checkStmt = connection.prepareStatement(checkQuery)) {
+            checkStmt.setInt(1, designationId);
+            ResultSet rs = checkStmt.executeQuery();
+            
+            if (rs.next() && rs.getInt(1) > 0) {
+                // Designation is being used, cannot delete
+                return false;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+        
+        // If not being used, proceed with deletion
+        String deleteQuery = "DELETE FROM Designation WHERE designation_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(deleteQuery)) {
+            pstmt.setInt(1, designationId);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public String getLastAttendanceStatus(int empId) {
+        String query = "SELECT status FROM Employee_Attendance WHERE employee_id = ? ORDER BY attendance_date DESC LIMIT 1";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, empId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+            if (rs.next()) {
+                return rs.getString("status");
+            }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // --------------------------
+    // Employee Advance Salary Operations
+    // --------------------------
+    public boolean insertAdvanceSalary(int employeeId, double amount, String advanceDate, String description) {
+        String query = "INSERT INTO Employee_Advance_Salary (employee_id, amount, advance_date, description) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, employeeId);
+            pstmt.setDouble(2, amount);
+            pstmt.setString(3, advanceDate);
+            pstmt.setString(4, description);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public List<Object[]> getAllAdvanceSalaries() {
+        List<Object[]> advances = new ArrayList<>();
+        String query = "SELECT e.employee_name, eas.amount, eas.advance_date, eas.description, eas.status " +
+                      "FROM Employee_Advance_Salary eas " +
+                      "JOIN Employee e ON eas.employee_id = e.employee_id " +
+                      "ORDER BY eas.advance_date DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getDouble("amount"),
+                    rs.getString("advance_date"),
+                    rs.getString("description"),
+                    rs.getString("status")
+                };
+                advances.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return advances;
+    }
+
+    public List<Object[]> getAdvanceSalariesByDateRange(String startDate, String endDate) {
+        List<Object[]> advances = new ArrayList<>();
+        String query = "SELECT e.employee_name, eas.amount, eas.advance_date, eas.description, eas.status " +
+                      "FROM Employee_Advance_Salary eas " +
+                      "JOIN Employee e ON eas.employee_id = e.employee_id " +
+                      "WHERE eas.advance_date >= ? AND eas.advance_date <= ? " +
+                      "ORDER BY eas.advance_date DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getDouble("amount"),
+                    rs.getString("advance_date"),
+                    rs.getString("description"),
+                    rs.getString("status")
+                };
+                advances.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return advances;
+    }
+
+    // --------------------------
+    // Salary Report Operations
+    // --------------------------
+    public List<Object[]> getSalaryReportByDateRange(String startDate, String endDate) {
+        List<Object[]> salaryData = new ArrayList<>();
+        String query = "SELECT e.employee_id, e.employee_name, d.designation_title, e.salary_type, e.salary_amount, " +
+                      "COALESCE(SUM(CASE WHEN ea.status = 'present' THEN ea.working_hours ELSE 0 END), 0) as total_hours, " +
+                      "COALESCE(COUNT(CASE WHEN ea.status = 'present' THEN 1 END), 0) as present_days, " +
+                      "COALESCE(COUNT(CASE WHEN ea.status = 'absent' THEN 1 END), 0) as absent_days " +
+                      "FROM Employee e " +
+                      "LEFT JOIN Designation d ON e.designation_id = d.designation_id " +
+                      "LEFT JOIN Employee_Attendance ea ON e.employee_id = ea.employee_id " +
+                      "AND ea.attendance_date >= ? AND ea.attendance_date <= ? " +
+                      "WHERE e.is_active = 1 " +
+                      "GROUP BY e.employee_id, e.employee_name, d.designation_title, e.salary_type, e.salary_amount " +
+                      "ORDER BY e.employee_name";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("employee_id"),
+                    rs.getString("employee_name"),
+                    rs.getString("designation_title"),
+                    rs.getString("salary_type"),
+                    rs.getDouble("salary_amount"),
+                    rs.getDouble("total_hours"),
+                    rs.getInt("present_days"),
+                    rs.getInt("absent_days")
+                };
+                salaryData.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return salaryData;
+    }
+    
+    // --------------------------
+    // Employee Loan Operations
+    // --------------------------
+    public boolean insertEmployeeLoan(int employeeId, double loanAmount, String loanDate, String dueDate, String description) {
+        String query = "INSERT INTO Employee_Loan (employee_id, loan_amount, loan_date, due_date, description, remaining_amount) VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, employeeId);
+            pstmt.setDouble(2, loanAmount);
+            pstmt.setString(3, loanDate);
+            pstmt.setString(4, dueDate);
+            pstmt.setString(5, description);
+            pstmt.setDouble(6, loanAmount); // Initially, remaining amount equals loan amount
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public List<Object[]> getEmployeeLoansByDateRange(String startDate, String endDate) {
+        List<Object[]> loans = new ArrayList<>();
+        String query = "SELECT e.employee_name, el.loan_amount, el.loan_date, el.due_date, el.description, " +
+                      "el.status, el.remaining_amount, el.loan_id " +
+                      "FROM Employee_Loan el " +
+                      "JOIN Employee e ON el.employee_id = e.employee_id " +
+                      "WHERE el.loan_date >= ? AND el.loan_date <= ? " +
+                      "ORDER BY el.loan_date DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getDouble("loan_amount"),
+                    rs.getString("loan_date"),
+                    rs.getString("due_date"),
+                    rs.getString("description"),
+                    rs.getString("status"),
+                    rs.getDouble("remaining_amount"),
+                    rs.getInt("loan_id")
+                };
+                loans.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return loans;
+    }
+
+    public List<Object[]> getLoansByEmployee(String employeeName) {
+        List<Object[]> loans = new ArrayList<>();
+        String query = "SELECT e.employee_name, el.loan_amount, el.loan_date, el.due_date, el.description, " +
+                      "el.status, el.remaining_amount, el.loan_id " +
+                      "FROM Employee_Loan el " +
+                      "JOIN Employee e ON el.employee_id = e.employee_id " +
+                      "WHERE e.employee_name LIKE ? " +
+                      "ORDER BY el.loan_date DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, "%" + employeeName + "%");
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getDouble("loan_amount"),
+                    rs.getString("loan_date"),
+                    rs.getString("due_date"),
+                    rs.getString("description"),
+                    rs.getString("status"),
+                    rs.getDouble("remaining_amount"),
+                    rs.getInt("loan_id")
+                };
+                loans.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return loans;
+    }
+
+    public boolean updateLoanStatus(int loanId, String status, double remainingAmount) {
+        String query = "UPDATE Employee_Loan SET status = ?, remaining_amount = ? WHERE loan_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, status);
+            pstmt.setDouble(2, remainingAmount);
+            pstmt.setInt(3, loanId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 }

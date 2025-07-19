@@ -33,9 +33,8 @@ public class SalesmanContent {
         // Input Fields
         TextField nameField = new TextField(); nameField.setPromptText("Full Name");
         TextField contactField = new TextField(); contactField.setPromptText("Contact Number");
-        TextField emailField = new TextField(); emailField.setPromptText("Email");
-        TextField cnicField = new TextField(); cnicField.setPromptText("CNIC");
         TextField addressField = new TextField(); addressField.setPromptText("Address");
+        TextField commissionField = new TextField(); commissionField.setPromptText("Commission Rate");
 
         Button actionButton = new Button("Add Salesman");
         actionButton.getStyleClass().add("form-submit");
@@ -46,13 +45,12 @@ public class SalesmanContent {
         formGrid.setVgap(10);
         formGrid.setPadding(new Insets(10));
         formGrid.addRow(0, nameField, contactField);
-        formGrid.addRow(1, emailField, cnicField);
-        formGrid.addRow(2, addressField, actionButton);
+        formGrid.addRow(1, addressField, commissionField, actionButton);
 
         // Make inputs responsive
         ColumnConstraints col = new ColumnConstraints();
         col.setHgrow(Priority.ALWAYS);
-        formGrid.getColumnConstraints().addAll(col, col);
+        formGrid.getColumnConstraints().addAll(col, col, col);
 
         // Table - load data from database initially
         refreshSalesmanTable();
@@ -63,18 +61,23 @@ public class SalesmanContent {
 
         table.getColumns().add(createCol("Name", "name"));
         table.getColumns().add(createCol("Contact", "contact"));
-        table.getColumns().add(createCol("Email", "email"));
-        table.getColumns().add(createCol("CNIC", "cnic"));
         table.getColumns().add(createCol("Address", "address"));
-        table.getColumns().add(createActionCol(nameField, contactField, emailField, cnicField, addressField, actionButton, table));
+        table.getColumns().add(createCol("Commission Rate", "commissionRate"));
+        table.getColumns().add(createActionCol(nameField, contactField, addressField, commissionField, actionButton, table));
 
         // Add / Update button action
         actionButton.setOnAction(e -> {
             String name = nameField.getText().trim();
             String contact = contactField.getText().trim();
-            String email = emailField.getText().trim();
-            String cnic = cnicField.getText().trim();
             String address = addressField.getText().trim();
+            String commissionStr = commissionField.getText().trim();
+            double commissionRate = 0.0;
+            try {
+                commissionRate = commissionStr.isEmpty() ? 0.0 : Double.parseDouble(commissionStr);
+            } catch (NumberFormatException ex) {
+                showAlert("Error", "Commission Rate must be a number!");
+                return;
+            }
 
             if (name.isEmpty() || contact.isEmpty()) {
                 showAlert("Error", "Name and Contact are required!");
@@ -83,28 +86,29 @@ public class SalesmanContent {
 
             if (selectedSalesman == null) {
                 // Add new salesman to database
-                boolean success = database.insertSalesman(name, contact, cnic, address);
+                boolean success = database.insertSalesman(name, contact, address, commissionRate);
                 if (success) {
-                    salesmanList.add(new Salesman(name, contact, email, cnic, address));
+                    refreshSalesmanTable(); // Refresh to get the new ID from database
                     showAlert("Success", "Salesman added successfully!");
                 } else {
                     showAlert("Error", "Failed to add salesman to database!");
                     return;
                 }
             } else {
-                // Update existing salesman (local update only for now)
-                selectedSalesman.setName(name);
-                selectedSalesman.setContact(contact);
-                selectedSalesman.setEmail(email);
-                selectedSalesman.setCnic(cnic);
-                selectedSalesman.setAddress(address);
-                table.refresh();
+                // Update existing salesman in database
+                boolean success = database.updateSalesman(selectedSalesman.getId(), name, contact, address, commissionRate);
+                if (success) {
+                    refreshSalesmanTable(); // Refresh to get updated data
+                    showAlert("Success", "Salesman updated successfully!");
+                } else {
+                    showAlert("Error", "Failed to update salesman in database!");
+                    return;
+                }
                 selectedSalesman = null;
                 actionButton.setText("Add Salesman");
             }
 
-            nameField.clear(); contactField.clear(); emailField.clear();
-            cnicField.clear(); addressField.clear();
+            nameField.clear(); contactField.clear(); addressField.clear(); commissionField.clear();
         });
 
         mainLayout.getChildren().addAll(heading, subHeading, formGrid, table);
@@ -124,9 +128,9 @@ public class SalesmanContent {
     }
 
     private static TableColumn<Salesman, Void> createActionCol(
-        TextField nameField, TextField contactField, TextField emailField,
-        TextField cnicField, TextField addressField, Button actionButton,
-        TableView<Salesman> table
+        TextField nameField, TextField contactField,
+        TextField addressField, TextField commissionField,
+        Button actionButton, TableView<Salesman> table
     ) {
         TableColumn<Salesman, Void> actionCol = new TableColumn<>("Action");
 
@@ -139,9 +143,8 @@ public class SalesmanContent {
                     selectedSalesman = getTableView().getItems().get(getIndex());
                     nameField.setText(selectedSalesman.getName());
                     contactField.setText(selectedSalesman.getContact());
-                    emailField.setText(selectedSalesman.getEmail());
-                    cnicField.setText(selectedSalesman.getCnic());
                     addressField.setText(selectedSalesman.getAddress());
+                    commissionField.setText(String.valueOf(selectedSalesman.getCommissionRate()));
                     actionButton.setText("Update Salesman");
                 });
             }
@@ -159,14 +162,14 @@ public class SalesmanContent {
     private static void refreshSalesmanTable() {
         salesmanList.clear();
         List<Object[]> salesmen = database.getAllSalesmen();
-        
+
         for (Object[] row : salesmen) {
             salesmanList.add(new Salesman(
+                (Integer) row[0], // salesman_id
                 (String) row[1],  // salesman_name
-                (String) row[2],  // phone_number
-                "",               // email (not in database)
-                (String) row[3],  // cnic
-                (String) row[4]   // address
+                (String) row[2],  // contact_number
+                (String) row[3],  // address
+                row[4] != null ? ((Number) row[4]).doubleValue() : 0.0 // commission_rate
             ));
         }
     }
