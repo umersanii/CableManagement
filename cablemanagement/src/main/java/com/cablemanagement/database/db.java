@@ -174,6 +174,10 @@ public interface db {
     
     boolean insertEmployee(String name, String phone, String cnic, String address, String designation, String salaryType, double salaryAmount);
     
+    boolean updateEmployee(int employeeId, String name, String phone, String cnic, String address, String designation, String salaryType, double salaryAmount);
+    
+    boolean deleteEmployee(int employeeId);
+    
     List<Object[]> getAllEmployeeAttendance();
     
     List<Object[]> getAllEmployeeSalaryPayments();

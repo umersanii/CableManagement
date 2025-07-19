@@ -1400,7 +1400,7 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllEmployees() {
         List<Object[]> employees = new ArrayList<>();
-        String query = "SELECT e.employee_id, e.employee_name, e.phone_number, d.designation_title, " +
+        String query = "SELECT e.employee_id, e.employee_name, e.phone_number, e.cnic, e.address, d.designation_title, " +
                       "e.salary_type, e.salary_amount, " +
                       "CASE WHEN e.is_active = 1 THEN 'Active' ELSE 'Inactive' END as status " +
                       "FROM Employee e " +
@@ -1415,6 +1415,8 @@ public class SQLiteDatabase implements db {
                     rs.getInt("employee_id"),
                     rs.getString("employee_name"),
                     rs.getString("phone_number"),
+                    rs.getString("cnic"),
+                    rs.getString("address"),
                     rs.getString("designation_title"),
                     rs.getString("salary_type"),
                     rs.getDouble("salary_amount"),
@@ -1531,6 +1533,43 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return loans;
+    }
+
+    @Override
+    public boolean updateEmployee(int employeeId, String name, String phone, String cnic, String address, 
+                                 String designation, String salaryType, double salaryAmount) {
+        String query = "UPDATE Employee SET employee_name = ?, phone_number = ?, cnic = ?, address = ?, " +
+                      "designation_id = (SELECT designation_id FROM Designation WHERE designation_title = ?), " +
+                      "salary_type = ?, salary_amount = ? " +
+                      "WHERE employee_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            pstmt.setString(2, phone);
+            pstmt.setString(3, cnic);
+            pstmt.setString(4, address);
+            pstmt.setString(5, designation);
+            pstmt.setString(6, salaryType);
+            pstmt.setDouble(7, salaryAmount);
+            pstmt.setInt(8, employeeId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean deleteEmployee(int employeeId) {
+        String query = "UPDATE Employee SET is_active = 0 WHERE employee_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, employeeId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     // --------------------------
