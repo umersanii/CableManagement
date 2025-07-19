@@ -278,6 +278,18 @@ public class SQLiteDatabase implements db {
                 "FOREIGN KEY (employee_id) REFERENCES Employee(employee_id)" +
                 ")",
                 
+                // Employee Advance Salary table
+                "CREATE TABLE IF NOT EXISTS Employee_Advance_Salary (" +
+                "advance_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "employee_id INTEGER NOT NULL," +
+                "amount REAL NOT NULL," +
+                "advance_date TEXT NOT NULL," +
+                "description TEXT," +
+                "status TEXT DEFAULT 'granted' CHECK(status IN ('granted', 'adjusted', 'refunded'))," +
+                "created_date TEXT DEFAULT CURRENT_TIMESTAMP," +
+                "FOREIGN KEY (employee_id) REFERENCES Employee(employee_id)" +
+                ")",
+                
                 // Salesman table
                 "CREATE TABLE IF NOT EXISTS Salesman (" +
                 "salesman_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -1900,5 +1912,118 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return null;
+    }
+
+    // --------------------------
+    // Employee Advance Salary Operations
+    // --------------------------
+    public boolean insertAdvanceSalary(int employeeId, double amount, String advanceDate, String description) {
+        String query = "INSERT INTO Employee_Advance_Salary (employee_id, amount, advance_date, description) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, employeeId);
+            pstmt.setDouble(2, amount);
+            pstmt.setString(3, advanceDate);
+            pstmt.setString(4, description);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public List<Object[]> getAllAdvanceSalaries() {
+        List<Object[]> advances = new ArrayList<>();
+        String query = "SELECT e.employee_name, eas.amount, eas.advance_date, eas.description, eas.status " +
+                      "FROM Employee_Advance_Salary eas " +
+                      "JOIN Employee e ON eas.employee_id = e.employee_id " +
+                      "ORDER BY eas.advance_date DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getDouble("amount"),
+                    rs.getString("advance_date"),
+                    rs.getString("description"),
+                    rs.getString("status")
+                };
+                advances.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return advances;
+    }
+
+    public List<Object[]> getAdvanceSalariesByDateRange(String startDate, String endDate) {
+        List<Object[]> advances = new ArrayList<>();
+        String query = "SELECT e.employee_name, eas.amount, eas.advance_date, eas.description, eas.status " +
+                      "FROM Employee_Advance_Salary eas " +
+                      "JOIN Employee e ON eas.employee_id = e.employee_id " +
+                      "WHERE eas.advance_date >= ? AND eas.advance_date <= ? " +
+                      "ORDER BY eas.advance_date DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getDouble("amount"),
+                    rs.getString("advance_date"),
+                    rs.getString("description"),
+                    rs.getString("status")
+                };
+                advances.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return advances;
+    }
+
+    // --------------------------
+    // Salary Report Operations
+    // --------------------------
+    public List<Object[]> getSalaryReportByDateRange(String startDate, String endDate) {
+        List<Object[]> salaryData = new ArrayList<>();
+        String query = "SELECT e.employee_id, e.employee_name, d.designation_title, e.salary_type, e.salary_amount, " +
+                      "COALESCE(SUM(CASE WHEN ea.status = 'present' THEN ea.working_hours ELSE 0 END), 0) as total_hours, " +
+                      "COALESCE(COUNT(CASE WHEN ea.status = 'present' THEN 1 END), 0) as present_days, " +
+                      "COALESCE(COUNT(CASE WHEN ea.status = 'absent' THEN 1 END), 0) as absent_days " +
+                      "FROM Employee e " +
+                      "LEFT JOIN Designation d ON e.designation_id = d.designation_id " +
+                      "LEFT JOIN Employee_Attendance ea ON e.employee_id = ea.employee_id " +
+                      "AND ea.attendance_date >= ? AND ea.attendance_date <= ? " +
+                      "WHERE e.is_active = 1 " +
+                      "GROUP BY e.employee_id, e.employee_name, d.designation_title, e.salary_type, e.salary_amount " +
+                      "ORDER BY e.employee_name";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("employee_id"),
+                    rs.getString("employee_name"),
+                    rs.getString("designation_title"),
+                    rs.getString("salary_type"),
+                    rs.getDouble("salary_amount"),
+                    rs.getDouble("total_hours"),
+                    rs.getInt("present_days"),
+                    rs.getInt("absent_days")
+                };
+                salaryData.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return salaryData;
     }
 }

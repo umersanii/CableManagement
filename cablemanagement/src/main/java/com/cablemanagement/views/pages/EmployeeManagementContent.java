@@ -540,9 +540,133 @@ public class EmployeeManagementContent {
 
     private static VBox createSalaryReportForm() {
         VBox box = baseForm("View Salary Reports");
-
-        Label label = new Label("Salary report table coming soon...");
-        box.getChildren().add(label);
+        
+        // Database instance
+        SQLiteDatabase database = new SQLiteDatabase();
+        
+        // Date range filters
+        HBox dateFilterBox = new HBox(10);
+        dateFilterBox.setAlignment(Pos.CENTER_LEFT);
+        
+        DatePicker startDatePicker = new DatePicker();
+        startDatePicker.setPromptText("Start Date");
+        startDatePicker.setValue(java.time.LocalDate.now().withDayOfMonth(1)); // Default to first day of current month
+        
+        DatePicker endDatePicker = new DatePicker();
+        endDatePicker.setPromptText("End Date");
+        endDatePicker.setValue(java.time.LocalDate.now()); // Default to today
+        
+        Button generateReportBtn = new Button("Generate Report");
+        generateReportBtn.getStyleClass().add("register-button");
+        
+        Button exportBtn = new Button("Export CSV");
+        exportBtn.getStyleClass().add("register-button");
+        
+        dateFilterBox.getChildren().addAll(
+            new Label("From:"), startDatePicker,
+            new Label("To:"), endDatePicker,
+            generateReportBtn, exportBtn
+        );
+        
+        // Salary report table
+        TableView<SalaryReportData> table = new TableView<>();
+        table.setPrefHeight(400);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        
+        TableColumn<SalaryReportData, String> nameCol = new TableColumn<>("Employee Name");
+        nameCol.setCellValueFactory(cellData -> cellData.getValue().employeeNameProperty());
+        nameCol.setPrefWidth(150);
+        
+        TableColumn<SalaryReportData, String> designationCol = new TableColumn<>("Designation");
+        designationCol.setCellValueFactory(cellData -> cellData.getValue().designationProperty());
+        designationCol.setPrefWidth(120);
+        
+        TableColumn<SalaryReportData, String> salaryTypeCol = new TableColumn<>("Salary Type");
+        salaryTypeCol.setCellValueFactory(cellData -> cellData.getValue().salaryTypeProperty());
+        salaryTypeCol.setPrefWidth(100);
+        
+        TableColumn<SalaryReportData, Double> salaryAmountCol = new TableColumn<>("Base Salary");
+        salaryAmountCol.setCellValueFactory(cellData -> cellData.getValue().salaryAmountProperty().asObject());
+        salaryAmountCol.setPrefWidth(100);
+        
+        TableColumn<SalaryReportData, Integer> presentDaysCol = new TableColumn<>("Present Days");
+        presentDaysCol.setCellValueFactory(cellData -> cellData.getValue().presentDaysProperty().asObject());
+        presentDaysCol.setPrefWidth(100);
+        
+        TableColumn<SalaryReportData, Integer> absentDaysCol = new TableColumn<>("Absent Days");
+        absentDaysCol.setCellValueFactory(cellData -> cellData.getValue().absentDaysProperty().asObject());
+        absentDaysCol.setPrefWidth(100);
+        
+        TableColumn<SalaryReportData, Double> totalHoursCol = new TableColumn<>("Total Hours");
+        totalHoursCol.setCellValueFactory(cellData -> cellData.getValue().totalHoursProperty().asObject());
+        totalHoursCol.setPrefWidth(100);
+        
+        TableColumn<SalaryReportData, Double> calculatedSalaryCol = new TableColumn<>("Calculated Salary");
+        calculatedSalaryCol.setCellValueFactory(cellData -> cellData.getValue().calculatedSalaryProperty().asObject());
+        calculatedSalaryCol.setPrefWidth(120);
+        
+        table.getColumns().addAll(nameCol, designationCol, salaryTypeCol, salaryAmountCol, 
+                                 presentDaysCol, absentDaysCol, totalHoursCol, calculatedSalaryCol);
+        
+        // Data for table
+        ObservableList<SalaryReportData> salaryData = FXCollections.observableArrayList();
+        table.setItems(salaryData);
+        
+        // Summary info
+        Label summaryLabel = new Label("Select date range and click 'Generate Report' to view salary data");
+        summaryLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-style: italic;");
+        
+        // Status label
+        Label statusLabel = new Label();
+        
+        // Generate report button action
+        generateReportBtn.setOnAction(e -> {
+            java.time.LocalDate startDate = startDatePicker.getValue();
+            java.time.LocalDate endDate = endDatePicker.getValue();
+            
+            if (startDate == null || endDate == null) {
+                statusLabel.setText("Please select both start and end dates.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                return;
+            }
+            
+            if (startDate.isAfter(endDate)) {
+                statusLabel.setText("Start date cannot be after end date.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                return;
+            }
+            
+            loadSalaryReportData(database, salaryData, startDate.toString(), endDate.toString());
+            
+            if (salaryData.isEmpty()) {
+                summaryLabel.setText("No salary data found for the selected date range.");
+                summaryLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-style: italic;");
+            } else {
+                double totalSalary = salaryData.stream().mapToDouble(SalaryReportData::getCalculatedSalary).sum();
+                summaryLabel.setText(String.format("Showing %d employees | Total Calculated Salary: %.2f", 
+                    salaryData.size(), totalSalary));
+                summaryLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
+            }
+            statusLabel.setText("");
+        });
+        
+        // Export button action (placeholder)
+        exportBtn.setOnAction(e -> {
+            if (salaryData.isEmpty()) {
+                statusLabel.setText("No data to export. Please generate a report first.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                return;
+            }
+            
+            statusLabel.setText("Export functionality coming soon...");
+            statusLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
+        });
+        
+        VBox content = new VBox(15, dateFilterBox, statusLabel, summaryLabel, table);
+        content.setPadding(new Insets(15));
+        content.setFillWidth(true);
+        
+        box.getChildren().add(content);
         return box;
     }
 
@@ -550,159 +674,157 @@ public class EmployeeManagementContent {
     ///                   Mark Employee Attendance Form              ///
     ////////////////////////////////////////////////////////////////////
 
-private static VBox createAttendanceMarkForm() {
-    VBox box = baseForm("Mark All Employees Attendance");
+    private static VBox createAttendanceMarkForm() {
+        VBox box = baseForm("Mark All Employees Attendance");
 
-    SQLiteDatabase database = new SQLiteDatabase();
+        SQLiteDatabase database = new SQLiteDatabase();
 
-    // Top: Date Picker
-    Label dateLabel = new Label("Select Date:");
-    DatePicker datePicker = new DatePicker(LocalDate.now());
+        // Top: Date Picker
+        Label dateLabel = new Label("Select Date:");
+        DatePicker datePicker = new DatePicker(LocalDate.now());
 
-    // Table Columns: ID, Name, Role, Attendance, Hours
-    TableView<EmployeeRow> table = new TableView<>();
-    ObservableList<EmployeeRow> rows = FXCollections.observableArrayList();
+        // Table Columns: ID, Name, Role, Attendance, Hours
+        TableView<EmployeeRow> table = new TableView<>();
+        ObservableList<EmployeeRow> rows = FXCollections.observableArrayList();
 
-    for (Object[] emp : database.getAllEmployees()) {
-        if ("Active".equals(emp[8])) {
-            rows.add(new EmployeeRow(
-                (int) emp[0],
-                emp[1].toString(),
-                emp[5].toString()
-            ));
-        }
-    }
-
-    table.setItems(rows);
-    table.setEditable(true);
-
-    // Columns
-    TableColumn<EmployeeRow, String> idCol = new TableColumn<>("ID");
-    idCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(String.valueOf(data.getValue().id)));
-
-    TableColumn<EmployeeRow, String> nameCol = new TableColumn<>("Name");
-    nameCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().name));
-
-    TableColumn<EmployeeRow, String> roleCol = new TableColumn<>("Designation");
-    roleCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().role));
-
-    TableColumn<EmployeeRow, Boolean> statusCol = new TableColumn<>("Status (P/A)");
-    statusCol.setCellFactory(col -> new TableCell<>() {
-        final ToggleGroup group = new ToggleGroup();
-        final RadioButton present = new RadioButton("P");
-        final RadioButton absent = new RadioButton("A");
-        {
-            present.setToggleGroup(group);
-            absent.setToggleGroup(group);
-        }
-
-        @Override
-        protected void updateItem(Boolean item, boolean empty) {
-            super.updateItem(item, empty);
-            if (empty) {
-                setGraphic(null);
-            } else {
-                EmployeeRow emp = getTableView().getItems().get(getIndex());
-                present.setSelected(emp.present);
-                absent.setSelected(!emp.present);
-
-                group.selectedToggleProperty().addListener((obs, old, val) -> {
-                    emp.present = (val == present);
-                    emp.hours = emp.present ? emp.hours : "";
-                    table.refresh();
-                });
-
-                HBox box = new HBox(5, present, absent);
-                box.setAlignment(Pos.CENTER);
-                setGraphic(box);
+        for (Object[] emp : database.getAllEmployees()) {
+            if ("Active".equals(emp[8])) {
+                rows.add(new EmployeeRow(
+                    (int) emp[0],
+                    emp[1].toString(),
+                    emp[5].toString()
+                ));
             }
         }
-    });
 
-    TableColumn<EmployeeRow, String> hoursCol = new TableColumn<>("Working Hours");
-    hoursCol.setCellFactory(TextFieldTableCell.forTableColumn());
-    hoursCol.setCellValueFactory(data -> data.getValue().hoursProperty());
-    hoursCol.setOnEditCommit(e -> e.getRowValue().setHours(e.getNewValue()));
+        table.setItems(rows);
+        table.setEditable(true);
 
-    table.getColumns().addAll(idCol, nameCol, roleCol, statusCol, hoursCol);
-    table.setPrefHeight(400);
+        // Columns
+        TableColumn<EmployeeRow, String> idCol = new TableColumn<>("ID");
+        idCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(String.valueOf(data.getValue().id)));
 
-    // Submit Button & Status Label
-    Button markBtn = new Button("Mark Attendance");
-    Label statusLabel = new Label();
+        TableColumn<EmployeeRow, String> nameCol = new TableColumn<>("Name");
+        nameCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().name));
 
-    markBtn.setOnAction(e -> {
-        LocalDate date = datePicker.getValue();
-        if (date == null) {
-            statusLabel.setText("Please select a date.");
-            statusLabel.setStyle("-fx-text-fill: red;");
-            return;
-        }
+        TableColumn<EmployeeRow, String> roleCol = new TableColumn<>("Designation");
+        roleCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().role));
 
-        boolean allGood = true;
-        for (EmployeeRow emp : rows) {
-            double hours = 0.0;
-            if (emp.present) {
-                if (emp.hours.isEmpty()) {
-                    statusLabel.setText("Missing hours for " + emp.name);
-                    statusLabel.setStyle("-fx-text-fill: red;");
-                    allGood = false;
-                    break;
-                }
-                try {
-                    hours = Double.parseDouble(emp.hours);
-                    if (hours < 0 || hours > 24) throw new NumberFormatException();
-                } catch (NumberFormatException ex) {
-                    statusLabel.setText("Invalid hours for " + emp.name);
-                    statusLabel.setStyle("-fx-text-fill: red;");
-                    allGood = false;
-                    break;
+        TableColumn<EmployeeRow, Boolean> statusCol = new TableColumn<>("Status (P/A)");
+        statusCol.setCellFactory(col -> new TableCell<>() {
+            final ToggleGroup group = new ToggleGroup();
+            final RadioButton present = new RadioButton("P");
+            final RadioButton absent = new RadioButton("A");
+            {
+                present.setToggleGroup(group);
+                absent.setToggleGroup(group);
+            }
+
+            @Override
+            protected void updateItem(Boolean item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    EmployeeRow emp = getTableView().getItems().get(getIndex());
+                    present.setSelected(emp.present);
+                    absent.setSelected(!emp.present);
+
+                    group.selectedToggleProperty().addListener((obs, old, val) -> {
+                        emp.present = (val == present);
+                        emp.hours = emp.present ? emp.hours : "";
+                        table.refresh();
+                    });
+
+                    HBox box = new HBox(5, present, absent);
+                    box.setAlignment(Pos.CENTER);
+                    setGraphic(box);
                 }
             }
-            String status = emp.present ? "present" : "absent";
-            database.insertEmployeeAttendance(emp.id, date.toString(), status, hours);
-        }
+        });
 
-        if (allGood) {
-            statusLabel.setText("Attendance marked.");
-            statusLabel.setStyle("-fx-text-fill: green;");
-            table.refresh();
-        }
-    });
+        TableColumn<EmployeeRow, String> hoursCol = new TableColumn<>("Working Hours");
+        hoursCol.setCellFactory(TextFieldTableCell.forTableColumn());
+        hoursCol.setCellValueFactory(data -> data.getValue().hoursProperty());
+        hoursCol.setOnEditCommit(e -> e.getRowValue().setHours(e.getNewValue()));
 
-    box.getChildren().addAll(
-        new VBox(5, dateLabel, datePicker),
-        new Separator(),
-        table,
-        new Separator(),
-        markBtn,
-        statusLabel
-    );
+        table.getColumns().addAll(idCol, nameCol, roleCol, statusCol, hoursCol);
+        table.setPrefHeight(400);
 
-    return box;
-}
+        // Submit Button & Status Label
+        Button markBtn = new Button("Mark Attendance");
+        Label statusLabel = new Label();
 
-public static class EmployeeRow {
-    int id;
-    String name;
-    String role;
-    boolean present = true;
-    String hours = "";
-    StringProperty hoursProperty = new SimpleStringProperty("");
+        markBtn.setOnAction(e -> {
+            LocalDate date = datePicker.getValue();
+            if (date == null) {
+                statusLabel.setText("Please select a date.");
+                statusLabel.setStyle("-fx-text-fill: red;");
+                return;
+            }
 
-    public EmployeeRow(int id, String name, String role) {
-        this.id = id;
-        this.name = name;
-        this.role = role;
-        this.hoursProperty.set(hours);
-        this.hoursProperty.addListener((obs, old, val) -> hours = val);
+            boolean allGood = true;
+            for (EmployeeRow emp : rows) {
+                double hours = 0.0;
+                if (emp.present) {
+                    if (emp.hours.isEmpty()) {
+                        statusLabel.setText("Missing hours for " + emp.name);
+                        statusLabel.setStyle("-fx-text-fill: red;");
+                        allGood = false;
+                        break;
+                    }
+                    try {
+                        hours = Double.parseDouble(emp.hours);
+                        if (hours < 0 || hours > 24) throw new NumberFormatException();
+                    } catch (NumberFormatException ex) {
+                        statusLabel.setText("Invalid hours for " + emp.name);
+                        statusLabel.setStyle("-fx-text-fill: red;");
+                        allGood = false;
+                        break;
+                    }
+                }
+                String status = emp.present ? "present" : "absent";
+                database.insertEmployeeAttendance(emp.id, date.toString(), status, hours);
+            }
+
+            if (allGood) {
+                statusLabel.setText("Attendance marked.");
+                statusLabel.setStyle("-fx-text-fill: green;");
+                table.refresh();
+            }
+        });
+
+        box.getChildren().addAll(
+            new VBox(5, dateLabel, datePicker),
+            new Separator(),
+            table,
+            new Separator(),
+            markBtn,
+            statusLabel
+        );
+
+        return box;
     }
 
-    public StringProperty hoursProperty() { return hoursProperty; }
-    public void setHours(String val) { this.hours = val; this.hoursProperty.set(val); }
-}
+    public static class EmployeeRow {
+        int id;
+        String name;
+        String role;
+        boolean present = true;
+        String hours = "";
+        StringProperty hoursProperty = new SimpleStringProperty("");
 
+        public EmployeeRow(int id, String name, String role) {
+            this.id = id;
+            this.name = name;
+            this.role = role;
+            this.hoursProperty.set(hours);
+            this.hoursProperty.addListener((obs, old, val) -> hours = val);
+        }
 
+        public StringProperty hoursProperty() { return hoursProperty; }
+        public void setHours(String val) { this.hours = val; this.hoursProperty.set(val); }
+    }
 
     private static VBox createAttendanceReportForm() {
         VBox box = baseForm("View Attendance Report");
@@ -808,48 +930,163 @@ public static class EmployeeRow {
         return box;
     }
 
+    ///////////////////////////////////////////////////////////////////
+    ///                  Grant Advance Salary Form                /////
+    ///////////////////////////////////////////////////////////////////
+
     private static VBox createAdvanceSalaryForm() {
         VBox box = baseForm("Grant Advance Salary");
         
         // Database instance
         SQLiteDatabase database = new SQLiteDatabase();
 
+        // Employee search section
+        VBox searchSection = new VBox(10);
+        Label searchLabel = new Label("Search Employee:");
+        searchLabel.setStyle("-fx-font-weight: bold;");
+        
+        TextField searchField = new TextField();
+        searchField.setPromptText("Type employee name to search...");
+        searchField.setPrefWidth(300);
+        
         ComboBox<String> employeeCombo = new ComboBox<>();
         employeeCombo.setPromptText("Select Employee");
+        employeeCombo.setPrefWidth(300);
         
-        // Load active employees from database
-        for (Object[] row : database.getAllEmployees()) {
-            String status = (String) row[8];
-            if ("Active".equals(status)) {
-                employeeCombo.getItems().add((String) row[1]); // employee_name
-            }
-        }
-
+        // Load all active employees initially
+        loadEmployeeComboBox(database, employeeCombo, "");
+        
+        // Search functionality
+        searchField.textProperty().addListener((obs, oldVal, newVal) -> {
+            loadEmployeeComboBox(database, employeeCombo, newVal.trim());
+        });
+        
+        searchSection.getChildren().addAll(searchLabel, searchField, employeeCombo);
+        
+        // Employee details section
+        VBox detailsSection = new VBox(10);
+        Label detailsLabel = new Label("Employee Details:");
+        detailsLabel.setStyle("-fx-font-weight: bold;");
+        
+        GridPane detailsGrid = new GridPane();
+        detailsGrid.setHgap(10);
+        detailsGrid.setVgap(10);
+        
+        Label empIdLabel = new Label("Employee ID:");
+        Label empIdValue = new Label("-");
+        empIdValue.setStyle("-fx-text-fill: #2c3e50; -fx-font-weight: bold;");
+        
+        Label designationLabel = new Label("Designation:");
+        Label designationValue = new Label("-");
+        designationValue.setStyle("-fx-text-fill: #2c3e50;");
+        
+        Label salaryTypeLabel = new Label("Salary Type:");
+        Label salaryTypeValue = new Label("-");
+        salaryTypeValue.setStyle("-fx-text-fill: #2c3e50;");
+        
+        Label baseSalaryLabel = new Label("Base Salary:");
+        Label baseSalaryValue = new Label("-");
+        baseSalaryValue.setStyle("-fx-text-fill: #2c3e50; -fx-font-weight: bold;");
+        
+        detailsGrid.add(empIdLabel, 0, 0);
+        detailsGrid.add(empIdValue, 1, 0);
+        detailsGrid.add(designationLabel, 2, 0);
+        detailsGrid.add(designationValue, 3, 0);
+        detailsGrid.add(salaryTypeLabel, 0, 1);
+        detailsGrid.add(salaryTypeValue, 1, 1);
+        detailsGrid.add(baseSalaryLabel, 2, 1);
+        detailsGrid.add(baseSalaryValue, 3, 1);
+        
+        detailsSection.getChildren().addAll(detailsLabel, detailsGrid);
+        
+        // Advance salary form section
+        VBox formSection = new VBox(10);
+        Label formLabel = new Label("Advance Salary Details:");
+        formLabel.setStyle("-fx-font-weight: bold;");
+        
         TextField amountField = new TextField();
         amountField.setPromptText("Advance Amount");
+        amountField.setPrefWidth(200);
 
         DatePicker dateField = new DatePicker();
         dateField.setPromptText("Advance Date");
         dateField.setValue(java.time.LocalDate.now());
+        dateField.setPrefWidth(200);
 
         TextField descriptionField = new TextField();
         descriptionField.setPromptText("Description/Reason");
+        descriptionField.setPrefWidth(300);
 
         Button grantBtn = new Button("Grant Advance");
         grantBtn.getStyleClass().add("register-button");
+        grantBtn.setPrefWidth(150);
+        
+        Button viewAdvancesBtn = new Button("View All Advances");
+        viewAdvancesBtn.getStyleClass().add("register-button");
+        viewAdvancesBtn.setPrefWidth(150);
+        
+        HBox buttonBox = new HBox(10, grantBtn, viewAdvancesBtn);
+        buttonBox.setAlignment(Pos.CENTER_LEFT);
+        
+        formSection.getChildren().addAll(formLabel, amountField, dateField, descriptionField, buttonBox);
         
         // Status label
         Label statusLabel = new Label("");
         statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+        
+        // Advance history table
+        TableView<AdvanceSalaryData> historyTable = new TableView<>();
+        historyTable.setPrefHeight(200);
+        historyTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        
+        TableColumn<AdvanceSalaryData, String> historyDateCol = new TableColumn<>("Date");
+        historyDateCol.setCellValueFactory(cellData -> cellData.getValue().dateProperty());
+        
+        TableColumn<AdvanceSalaryData, Double> historyAmountCol = new TableColumn<>("Amount");
+        historyAmountCol.setCellValueFactory(cellData -> cellData.getValue().amountProperty().asObject());
+        
+        TableColumn<AdvanceSalaryData, String> historyDescCol = new TableColumn<>("Description");
+        historyDescCol.setCellValueFactory(cellData -> cellData.getValue().descriptionProperty());
+        
+        TableColumn<AdvanceSalaryData, String> historyStatusCol = new TableColumn<>("Status");
+        historyStatusCol.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
+        
+        historyTable.getColumns().addAll(historyDateCol, historyAmountCol, historyDescCol, historyStatusCol);
+        
+        ObservableList<AdvanceSalaryData> historyData = FXCollections.observableArrayList();
+        historyTable.setItems(historyData);
+        
+        Label historyLabel = new Label("Recent Advance History:");
+        historyLabel.setStyle("-fx-font-weight: bold;");
+        
+        // Employee selection event handler
+        employeeCombo.setOnAction(e -> {
+            String selectedEmployee = employeeCombo.getValue();
+            if (selectedEmployee != null && !selectedEmployee.isEmpty()) {
+                loadEmployeeDetails(database, selectedEmployee, empIdValue, designationValue, 
+                                 salaryTypeValue, baseSalaryValue);
+                // Clear advance history for now - could load employee-specific history here
+                historyData.clear();
+            } else {
+                clearEmployeeDetails(empIdValue, designationValue, salaryTypeValue, baseSalaryValue);
+                historyData.clear();
+            }
+        });
 
-        // Event handler (placeholder - would need salary advance table implementation)
+        // Grant advance button event handler
         grantBtn.setOnAction(e -> {
             String employee = employeeCombo.getValue();
             String amountText = amountField.getText().trim();
             java.time.LocalDate date = dateField.getValue();
             String description = descriptionField.getText().trim();
             
-            if (employee == null || amountText.isEmpty() || date == null) {
+            if (employee == null || employee.isEmpty()) {
+                statusLabel.setText("Please select an employee.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                return;
+            }
+            
+            if (amountText.isEmpty() || date == null) {
                 statusLabel.setText("Please fill in all required fields.");
                 statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
                 return;
@@ -863,16 +1100,60 @@ public static class EmployeeRow {
                     return;
                 }
                 
-                // This would require implementing advance salary tracking in the database
-                statusLabel.setText("Advance salary functionality needs to be implemented in the database.");
-                statusLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
+                int employeeId = database.getEmployeeIdByName(employee);
+                if (employeeId == -1) {
+                    statusLabel.setText("Employee not found.");
+                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                    return;
+                }
+                
+                if (database.insertAdvanceSalary(employeeId, amount, date.toString(), description)) {
+                    statusLabel.setText("Advance salary granted successfully!");
+                    statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+                    
+                    // Clear form
+                    amountField.clear();
+                    dateField.setValue(java.time.LocalDate.now());
+                    descriptionField.clear();
+                    
+                    // Refresh history
+                    loadRecentAdvances(database, historyData);
+                } else {
+                    statusLabel.setText("Failed to grant advance salary. Please try again.");
+                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                }
             } catch (NumberFormatException ex) {
                 statusLabel.setText("Please enter a valid amount.");
                 statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
             }
         });
+        
+        // View all advances button
+        viewAdvancesBtn.setOnAction(e -> {
+            loadRecentAdvances(database, historyData);
+            statusLabel.setText("Showing recent advance salary records.");
+            statusLabel.setStyle("-fx-text-fill: blue; -fx-font-weight: bold;");
+        });
 
-        box.getChildren().addAll(employeeCombo, amountField, dateField, descriptionField, grantBtn, statusLabel);
+        // Create responsive layout
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(15));
+        content.setFillWidth(true);
+        
+        // Add sections with separators
+        content.getChildren().addAll(
+            searchSection,
+            new Separator(),
+            detailsSection,
+            new Separator(),
+            formSection,
+            statusLabel,
+            new Separator(),
+            historyLabel,
+            historyTable
+        );
+        
+        box.getChildren().add(content);
         return box;
     }
 
@@ -1275,5 +1556,207 @@ public static class EmployeeRow {
         public double getWorkingHours() { return workingHours.get(); }
         public void setWorkingHours(double workingHours) { this.workingHours.set(workingHours); }
         public javafx.beans.property.SimpleDoubleProperty workingHoursProperty() { return workingHours; }
+    }
+
+    // Helper method to load salary report data into the table
+    private static void loadSalaryReportData(SQLiteDatabase database, ObservableList<SalaryReportData> salaryData, String startDate, String endDate) {
+        salaryData.clear();
+        List<Object[]> reportList = database.getSalaryReportByDateRange(startDate, endDate);
+        
+        for (Object[] row : reportList) {
+            // Row: employee_id, employee_name, designation_title, salary_type, salary_amount, total_hours, present_days, absent_days
+            String salaryType = (String) row[3];
+            double baseSalary = (Double) row[4];
+            double totalHours = (Double) row[5];
+            int presentDays = (Integer) row[6];
+            
+            // Calculate salary based on type
+            double calculatedSalary = calculateSalary(salaryType, baseSalary, totalHours, presentDays);
+            
+            salaryData.add(new SalaryReportData(
+                (String) row[1],   // employee_name
+                (String) row[2],   // designation_title
+                salaryType,        // salary_type
+                baseSalary,        // salary_amount
+                presentDays,       // present_days
+                (Integer) row[7],  // absent_days
+                totalHours,        // total_hours
+                calculatedSalary   // calculated_salary
+            ));
+        }
+    }
+    
+    // Helper method to calculate salary based on type
+    private static double calculateSalary(String salaryType, double baseSalary, double totalHours, int presentDays) {
+        switch (salaryType.toLowerCase()) {
+            case "monthly":
+                return baseSalary; // Fixed monthly salary
+            case "daily":
+                return baseSalary * presentDays; // Daily rate * present days
+            case "hourly":
+                return baseSalary * totalHours; // Hourly rate * total hours
+            case "task":
+                return baseSalary; // Fixed task-based payment
+            default:
+                return 0.0;
+        }
+    }
+
+    // Inner class for salary report table data with JavaFX properties
+    public static class SalaryReportData {
+        private final javafx.beans.property.SimpleStringProperty employeeName;
+        private final javafx.beans.property.SimpleStringProperty designation;
+        private final javafx.beans.property.SimpleStringProperty salaryType;
+        private final javafx.beans.property.SimpleDoubleProperty salaryAmount;
+        private final javafx.beans.property.SimpleIntegerProperty presentDays;
+        private final javafx.beans.property.SimpleIntegerProperty absentDays;
+        private final javafx.beans.property.SimpleDoubleProperty totalHours;
+        private final javafx.beans.property.SimpleDoubleProperty calculatedSalary;
+        
+        public SalaryReportData(String employeeName, String designation, String salaryType, 
+                               double salaryAmount, int presentDays, int absentDays, 
+                               double totalHours, double calculatedSalary) {
+            this.employeeName = new javafx.beans.property.SimpleStringProperty(employeeName);
+            this.designation = new javafx.beans.property.SimpleStringProperty(designation);
+            this.salaryType = new javafx.beans.property.SimpleStringProperty(salaryType);
+            this.salaryAmount = new javafx.beans.property.SimpleDoubleProperty(salaryAmount);
+            this.presentDays = new javafx.beans.property.SimpleIntegerProperty(presentDays);
+            this.absentDays = new javafx.beans.property.SimpleIntegerProperty(absentDays);
+            this.totalHours = new javafx.beans.property.SimpleDoubleProperty(totalHours);
+            this.calculatedSalary = new javafx.beans.property.SimpleDoubleProperty(calculatedSalary);
+        }
+        
+        // Employee Name property
+        public String getEmployeeName() { return employeeName.get(); }
+        public void setEmployeeName(String employeeName) { this.employeeName.set(employeeName); }
+        public javafx.beans.property.SimpleStringProperty employeeNameProperty() { return employeeName; }
+        
+        // Designation property
+        public String getDesignation() { return designation.get(); }
+        public void setDesignation(String designation) { this.designation.set(designation); }
+        public javafx.beans.property.SimpleStringProperty designationProperty() { return designation; }
+        
+        // Salary Type property
+        public String getSalaryType() { return salaryType.get(); }
+        public void setSalaryType(String salaryType) { this.salaryType.set(salaryType); }
+        public javafx.beans.property.SimpleStringProperty salaryTypeProperty() { return salaryType; }
+        
+        // Salary Amount property
+        public double getSalaryAmount() { return salaryAmount.get(); }
+        public void setSalaryAmount(double salaryAmount) { this.salaryAmount.set(salaryAmount); }
+        public javafx.beans.property.SimpleDoubleProperty salaryAmountProperty() { return salaryAmount; }
+        
+        // Present Days property
+        public int getPresentDays() { return presentDays.get(); }
+        public void setPresentDays(int presentDays) { this.presentDays.set(presentDays); }
+        public javafx.beans.property.SimpleIntegerProperty presentDaysProperty() { return presentDays; }
+        
+        // Absent Days property
+        public int getAbsentDays() { return absentDays.get(); }
+        public void setAbsentDays(int absentDays) { this.absentDays.set(absentDays); }
+        public javafx.beans.property.SimpleIntegerProperty absentDaysProperty() { return absentDays; }
+        
+        // Total Hours property
+        public double getTotalHours() { return totalHours.get(); }
+        public void setTotalHours(double totalHours) { this.totalHours.set(totalHours); }
+        public javafx.beans.property.SimpleDoubleProperty totalHoursProperty() { return totalHours; }
+        
+        // Calculated Salary property
+        public double getCalculatedSalary() { return calculatedSalary.get(); }
+        public void setCalculatedSalary(double calculatedSalary) { this.calculatedSalary.set(calculatedSalary); }
+        public javafx.beans.property.SimpleDoubleProperty calculatedSalaryProperty() { return calculatedSalary; }
+    }
+
+    // Helper methods for advance salary form
+    private static void loadEmployeeComboBox(SQLiteDatabase database, ComboBox<String> comboBox, String searchTerm) {
+        comboBox.getItems().clear();
+        
+        for (Object[] row : database.getAllEmployees()) {
+            String status = (String) row[8];
+            String employeeName = (String) row[1];
+            
+            if ("Active".equals(status)) {
+                if (searchTerm.isEmpty() || 
+                    employeeName.toLowerCase().contains(searchTerm.toLowerCase())) {
+                    comboBox.getItems().add(employeeName);
+                }
+            }
+        }
+    }
+    
+    private static void loadEmployeeDetails(SQLiteDatabase database, String employeeName, 
+                                          Label empIdValue, Label designationValue, 
+                                          Label salaryTypeValue, Label baseSalaryValue) {
+        for (Object[] row : database.getAllEmployees()) {
+            String name = (String) row[1];
+            if (name.equals(employeeName)) {
+                empIdValue.setText(String.valueOf(row[0]));
+                designationValue.setText((String) row[5]);
+                salaryTypeValue.setText((String) row[6]);
+                baseSalaryValue.setText(String.format("%.2f", (Double) row[7]));
+                break;
+            }
+        }
+    }
+    
+    private static void clearEmployeeDetails(Label empIdValue, Label designationValue, 
+                                           Label salaryTypeValue, Label baseSalaryValue) {
+        empIdValue.setText("-");
+        designationValue.setText("-");
+        salaryTypeValue.setText("-");
+        baseSalaryValue.setText("-");
+    }
+    
+    private static void loadRecentAdvances(SQLiteDatabase database, ObservableList<AdvanceSalaryData> historyData) {
+        historyData.clear();
+        List<Object[]> advances = database.getAllAdvanceSalaries();
+        
+        // Load only the most recent 10 records
+        int count = 0;
+        for (Object[] row : advances) {
+            if (count >= 10) break;
+            historyData.add(new AdvanceSalaryData(
+                (String) row[2],   // advance_date
+                (Double) row[1],   // amount
+                (String) row[3],   // description
+                (String) row[4]    // status
+            ));
+            count++;
+        }
+    }
+
+    // Inner class for advance salary table data with JavaFX properties
+    public static class AdvanceSalaryData {
+        private final javafx.beans.property.SimpleStringProperty date;
+        private final javafx.beans.property.SimpleDoubleProperty amount;
+        private final javafx.beans.property.SimpleStringProperty description;
+        private final javafx.beans.property.SimpleStringProperty status;
+        
+        public AdvanceSalaryData(String date, double amount, String description, String status) {
+            this.date = new javafx.beans.property.SimpleStringProperty(date);
+            this.amount = new javafx.beans.property.SimpleDoubleProperty(amount);
+            this.description = new javafx.beans.property.SimpleStringProperty(description != null ? description : "");
+            this.status = new javafx.beans.property.SimpleStringProperty(status);
+        }
+        
+        // Date property
+        public String getDate() { return date.get(); }
+        public void setDate(String date) { this.date.set(date); }
+        public javafx.beans.property.SimpleStringProperty dateProperty() { return date; }
+        
+        // Amount property
+        public double getAmount() { return amount.get(); }
+        public void setAmount(double amount) { this.amount.set(amount); }
+        public javafx.beans.property.SimpleDoubleProperty amountProperty() { return amount; }
+        
+        // Description property
+        public String getDescription() { return description.get(); }
+        public void setDescription(String description) { this.description.set(description); }
+        public javafx.beans.property.SimpleStringProperty descriptionProperty() { return description; }
+        
+        // Status property
+        public String getStatus() { return status.get(); }
+        public void setStatus(String status) { this.status.set(status); }
+        public javafx.beans.property.SimpleStringProperty statusProperty() { return status; }
     }
 }
