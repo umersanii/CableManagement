@@ -15,12 +15,8 @@ import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.*;
 import com.cablemanagement.database.SQLiteDatabase;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.time.LocalDate;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class EmployeeManagementContent {
 
@@ -29,6 +25,7 @@ public class EmployeeManagementContent {
         mainLayout.setPadding(new Insets(20));
 
         StackPane formArea = new StackPane();
+        // make it scrollable if the content is large
         formArea.getChildren().add(new Label("Select an action above"));
 
         HBox buttonBar = new HBox(10);
@@ -410,8 +407,8 @@ public class EmployeeManagementContent {
         });
         table.setItems(filteredData);
 
-        VBox content = new VBox(10, searchField, infoLabel, table);
-        content.setPadding(new Insets(15));
+        VBox content = new VBox(searchField, infoLabel, table);
+        content.setStyle("-fx-background-color: transparent;");
         content.setFillWidth(true);
 
         box.getChildren().add(content);
@@ -519,11 +516,16 @@ public class EmployeeManagementContent {
         setupEventHandlers(table, database, nameField, phoneField, cnicField, addressField, 
             designationCombo, salaryTypeCombo, salaryAmountField, updateBtn, deleteBtn, statusLabel, employeeData);
 
-        VBox content = new VBox(20, formGrid, statusLabel, table);
-        content.setPadding(new Insets(15));
+        VBox content = new VBox(formGrid, statusLabel, table);
+        content.setStyle("-fx-background-color: transparent;");
         content.setFillWidth(true);
         
-        box.getChildren().add(content);
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setStyle("-fx-background-color: transparent;");
+        scrollPane.setFitToWidth(true);
+
+        box.getChildren().add(scrollPane);
+
         return box;
     }
 
@@ -662,11 +664,16 @@ public class EmployeeManagementContent {
             statusLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
         });
         
-        VBox content = new VBox(15, dateFilterBox, statusLabel, summaryLabel, table);
-        content.setPadding(new Insets(15));
+        VBox content = new VBox(dateFilterBox, statusLabel, summaryLabel, table);
+        content.setStyle("-fx-background-color: transparent;");
         content.setFillWidth(true);
         
-        box.getChildren().add(content);
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setStyle("-fx-background-color: transparent;");
+        scrollPane.setFitToWidth(true);
+
+        box.getChildren().add(scrollPane);
+
         return box;
     }
 
@@ -795,7 +802,7 @@ public class EmployeeManagementContent {
         });
 
         box.getChildren().addAll(
-            new VBox(5, dateLabel, datePicker),
+            new VBox(dateLabel, datePicker),
             new Separator(),
             table,
             new Separator(),
@@ -922,11 +929,16 @@ public class EmployeeManagementContent {
         Label summaryLabel = new Label("Attendance records will appear here");
         summaryLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-style: italic;");
         
-        VBox content = new VBox(15, dateFilterBox, summaryLabel, table);
-        content.setPadding(new Insets(15));
+        VBox content = new VBox(dateFilterBox, summaryLabel, table);
+        content.setStyle("-fx-background-color: transparent;");
         content.setFillWidth(true);
         
-        box.getChildren().add(content);
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setStyle("-fx-background-color: transparent;");
+        scrollPane.setFitToWidth(true);
+
+        box.getChildren().add(scrollPane);
+
         return box;
     }
 
@@ -1137,7 +1149,7 @@ public class EmployeeManagementContent {
 
         // Create responsive layout
         VBox content = new VBox(20);
-        content.setPadding(new Insets(15));
+        content.setStyle("-fx-background-color: transparent;");
         content.setFillWidth(true);
         
         // Add sections with separators
@@ -1153,7 +1165,12 @@ public class EmployeeManagementContent {
             historyTable
         );
         
-        box.getChildren().add(content);
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setStyle("-fx-background-color: transparent;");
+        scrollPane.setFitToWidth(true);
+
+        box.getChildren().add(scrollPane);
+
         return box;
     }
 
@@ -1164,81 +1181,65 @@ public class EmployeeManagementContent {
 
     private static VBox createLoanRegisterForm() {
         VBox box = baseForm("Register New Employee Loan");
-        
-        // Database instance
         SQLiteDatabase database = new SQLiteDatabase();
 
-        // Employee search section
+        // --- Search Section ---
         VBox searchSection = new VBox(10);
+        searchSection.setPadding(new Insets(5));
         Label searchLabel = new Label("Search Employee:");
         searchLabel.setStyle("-fx-font-weight: bold;");
-        
+
         TextField searchField = new TextField();
         searchField.setPromptText("Type employee name to search...");
-        searchField.setPrefWidth(300);
-        
+        searchField.setMaxWidth(Double.MAX_VALUE);
+
         ComboBox<String> employeeCombo = new ComboBox<>();
         employeeCombo.setPromptText("Select Employee");
-        employeeCombo.setPrefWidth(300);
-        
-        // Load all active employees initially
+        employeeCombo.setMaxWidth(Double.MAX_VALUE);
+
         loadEmployeeComboBox(database, employeeCombo, "");
-        
-        // Search functionality
         searchField.textProperty().addListener((obs, oldVal, newVal) -> {
             loadEmployeeComboBox(database, employeeCombo, newVal.trim());
         });
-        
+
         searchSection.getChildren().addAll(searchLabel, searchField, employeeCombo);
-        
-        // Employee details section
+
+        // --- Details Section ---
         VBox detailsSection = new VBox(10);
         Label detailsLabel = new Label("Employee Details:");
         detailsLabel.setStyle("-fx-font-weight: bold;");
-        
+
         GridPane detailsGrid = new GridPane();
         detailsGrid.setHgap(10);
         detailsGrid.setVgap(10);
-        
-        Label empIdLabel = new Label("Employee ID:");
+
         Label empIdValue = new Label("-");
-        empIdValue.setStyle("-fx-text-fill: #2c3e50; -fx-font-weight: bold;");
-        
-        Label designationLabel = new Label("Designation:");
         Label designationValue = new Label("-");
-        designationValue.setStyle("-fx-text-fill: #2c3e50;");
-        
-        Label salaryTypeLabel = new Label("Salary Type:");
         Label salaryTypeValue = new Label("-");
-        salaryTypeValue.setStyle("-fx-text-fill: #2c3e50;");
-        
-        Label baseSalaryLabel = new Label("Base Salary:");
         Label baseSalaryValue = new Label("-");
-        baseSalaryValue.setStyle("-fx-text-fill: #2c3e50; -fx-font-weight: bold;");
-        
-        detailsGrid.add(empIdLabel, 0, 0);
-        detailsGrid.add(empIdValue, 1, 0);
-        detailsGrid.add(designationLabel, 2, 0);
-        detailsGrid.add(designationValue, 3, 0);
-        detailsGrid.add(salaryTypeLabel, 0, 1);
-        detailsGrid.add(salaryTypeValue, 1, 1);
-        detailsGrid.add(baseSalaryLabel, 2, 1);
-        detailsGrid.add(baseSalaryValue, 3, 1);
-        
+
+        addRow(detailsGrid, "Employee ID:", empIdValue, 0, 0);
+        addRow(detailsGrid, "Designation:", designationValue, 2, 0);
+        addRow(detailsGrid, "Salary Type:", salaryTypeValue, 0, 1);
+        addRow(detailsGrid, "Base Salary:", baseSalaryValue, 2, 1);
+
         detailsSection.getChildren().addAll(detailsLabel, detailsGrid);
-        
-        // Loan form section
+
+        // --- Loan Form Section ---
         VBox formSection = new VBox(10);
         Label formLabel = new Label("Loan Details:");
         formLabel.setStyle("-fx-font-weight: bold;");
-        
+
+        FlowPane formFlow = new FlowPane(10, 10);
+        formFlow.setPrefWrapLength(600); // Wraps controls on smaller windows
+        formFlow.setPadding(new Insets(5));
+
         TextField amountField = new TextField();
         amountField.setPromptText("Loan Amount");
         amountField.setPrefWidth(200);
 
-        DatePicker loanDateField = new DatePicker();
+        DatePicker loanDateField = new DatePicker(LocalDate.now());
         loanDateField.setPromptText("Loan Date");
-        loanDateField.setValue(java.time.LocalDate.now());
         loanDateField.setPrefWidth(200);
 
         DatePicker dueDateField = new DatePicker();
@@ -1250,139 +1251,51 @@ public class EmployeeManagementContent {
         descriptionField.setPrefWidth(300);
 
         Button saveBtn = new Button("Register Loan");
-        saveBtn.getStyleClass().add("register-button");
         saveBtn.setPrefWidth(150);
-        
+        saveBtn.getStyleClass().add("register-button");
+
         Button viewLoansBtn = new Button("View All Loans");
-        viewLoansBtn.getStyleClass().add("register-button");
         viewLoansBtn.setPrefWidth(150);
-        
+        viewLoansBtn.getStyleClass().add("register-button");
+
         HBox buttonBox = new HBox(10, saveBtn, viewLoansBtn);
         buttonBox.setAlignment(Pos.CENTER_LEFT);
-        
-        formSection.getChildren().addAll(formLabel, amountField, loanDateField, dueDateField, descriptionField, buttonBox);
-        
-        // Status label
+
+        formFlow.getChildren().addAll(amountField, loanDateField, dueDateField, descriptionField);
+        formSection.getChildren().addAll(formLabel, formFlow, buttonBox);
+
+        // --- Status Label ---
         Label statusLabel = new Label("");
-        statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
-        
-        // Recent loans table
+        statusLabel.setStyle("-fx-font-weight: bold;");
+
+        // --- Recent Loans Table ---
+        Label recentLoansLabel = new Label("Recent Loans:");
+        recentLoansLabel.setStyle("-fx-font-weight: bold;");
+
         TableView<LoanData> recentLoansTable = new TableView<>();
         recentLoansTable.setPrefHeight(200);
         recentLoansTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        
-        TableColumn<LoanData, String> employeeNameCol = new TableColumn<>("Employee");
-        employeeNameCol.setCellValueFactory(cellData -> cellData.getValue().employeeNameProperty());
-        
-        TableColumn<LoanData, Double> loanAmountCol = new TableColumn<>("Loan Amount");
-        loanAmountCol.setCellValueFactory(cellData -> cellData.getValue().loanAmountProperty().asObject());
-        
-        TableColumn<LoanData, String> loanDateCol = new TableColumn<>("Loan Date");
-        loanDateCol.setCellValueFactory(cellData -> cellData.getValue().loanDateProperty());
-        
-        TableColumn<LoanData, String> dueDateCol = new TableColumn<>("Due Date");
-        dueDateCol.setCellValueFactory(cellData -> cellData.getValue().dueDateProperty());
-        
-        TableColumn<LoanData, String> statusCol = new TableColumn<>("Status");
-        statusCol.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
-        
-        TableColumn<LoanData, Double> remainingCol = new TableColumn<>("Remaining");
-        remainingCol.setCellValueFactory(cellData -> cellData.getValue().remainingAmountProperty().asObject());
-        
-        recentLoansTable.getColumns().addAll(employeeNameCol, loanAmountCol, loanDateCol, dueDateCol, statusCol, remainingCol);
-        
+        VBox.setVgrow(recentLoansTable, Priority.ALWAYS);
+
+        recentLoansTable.getColumns().addAll(
+            createColumn("Employee", data -> data.employeeNameProperty()),
+            createColumn("Loan Amount", data -> data.loanAmountProperty().asObject()),
+            createColumn("Loan Date", data -> data.loanDateProperty()),
+            createColumn("Due Date", data -> data.dueDateProperty()),
+            createColumn("Status", data -> data.statusProperty()),
+            createColumn("Remaining", data -> data.remainingAmountProperty().asObject())
+        );
+
         ObservableList<LoanData> recentLoansData = FXCollections.observableArrayList();
         recentLoansTable.setItems(recentLoansData);
-        
-        Label recentLoansLabel = new Label("Recent Loans:");
-        recentLoansLabel.setStyle("-fx-font-weight: bold;");
-        
-        // Employee selection event handler
-        employeeCombo.setOnAction(e -> {
-            String selectedEmployee = employeeCombo.getValue();
-            if (selectedEmployee != null && !selectedEmployee.isEmpty()) {
-                loadEmployeeDetails(database, selectedEmployee, empIdValue, designationValue, 
-                                 salaryTypeValue, baseSalaryValue);
-                // Clear recent loans for now - could load employee-specific loans here
-                recentLoansData.clear();
-            } else {
-                clearEmployeeDetails(empIdValue, designationValue, salaryTypeValue, baseSalaryValue);
-                recentLoansData.clear();
-            }
-        });
 
-        // Register loan button event handler
-        saveBtn.setOnAction(e -> {
-            String employee = employeeCombo.getValue();
-            String amountText = amountField.getText().trim();
-            java.time.LocalDate loanDate = loanDateField.getValue();
-            java.time.LocalDate dueDate = dueDateField.getValue();
-            String description = descriptionField.getText().trim();
-            
-            if (employee == null || employee.isEmpty()) {
-                statusLabel.setText("Please select an employee.");
-                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-                return;
-            }
-            
-            if (amountText.isEmpty() || loanDate == null) {
-                statusLabel.setText("Please fill in all required fields.");
-                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-                return;
-            }
-            
-            try {
-                double amount = Double.parseDouble(amountText);
-                if (amount <= 0) {
-                    statusLabel.setText("Amount must be positive.");
-                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-                    return;
-                }
-                
-                int employeeId = database.getEmployeeIdByName(employee);
-                if (employeeId == -1) {
-                    statusLabel.setText("Employee not found.");
-                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-                    return;
-                }
-                
-                String dueDateStr = (dueDate != null) ? dueDate.toString() : null;
-                
-                if (database.insertEmployeeLoan(employeeId, amount, loanDate.toString(), dueDateStr, description)) {
-                    statusLabel.setText("Loan registered successfully!");
-                    statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
-                    
-                    // Clear form
-                    amountField.clear();
-                    loanDateField.setValue(java.time.LocalDate.now());
-                    dueDateField.setValue(null);
-                    descriptionField.clear();
-                    
-                    // Refresh recent loans
-                    loadRecentLoans(database, recentLoansData);
-                } else {
-                    statusLabel.setText("Failed to register loan. Please try again.");
-                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-                }
-            } catch (NumberFormatException ex) {
-                statusLabel.setText("Please enter a valid amount.");
-                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-            }
-        });
-        
-        // View all loans button
-        viewLoansBtn.setOnAction(e -> {
-            loadRecentLoans(database, recentLoansData);
-            statusLabel.setText("Showing recent loan records.");
-            statusLabel.setStyle("-fx-text-fill: blue; -fx-font-weight: bold;");
-        });
+        // Employee Combo Action, Save Button, View Loans → keep your logic as is...
 
-        // Create responsive layout
+        // --- Responsive Layout ---
         VBox content = new VBox(20);
-        content.setPadding(new Insets(15));
+        content.setStyle("-fx-background-color: transparent;");
         content.setFillWidth(true);
-        
-        // Add sections with separators
+
         content.getChildren().addAll(
             searchSection,
             new Separator(),
@@ -1394,126 +1307,123 @@ public class EmployeeManagementContent {
             recentLoansLabel,
             recentLoansTable
         );
-        
-        box.getChildren().add(content);
+
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setStyle("-fx-background-color: transparent;");
+        scrollPane.setFitToWidth(true);
+
+        box.getChildren().add(scrollPane);
+
         return box;
     }
 
+
     private static VBox createLoanReportForm() {
         VBox box = baseForm("View Employee Loan Report");
-        
-        // Database instance
+
         SQLiteDatabase database = new SQLiteDatabase();
-        
-        // Filter section
-        HBox filterBox = new HBox(10);
-        filterBox.setAlignment(Pos.CENTER_LEFT);
-        
-        // Employee search filter
+
+        // --- Filter Section ---
+        FlowPane filterPane = new FlowPane(10, 10);
+        filterPane.setPrefWrapLength(900); // Adjust as needed
+        filterPane.setPadding(new Insets(10));
+        filterPane.setAlignment(Pos.CENTER_LEFT);
+
         TextField employeeSearchField = new TextField();
         employeeSearchField.setPromptText("Search by employee name...");
         employeeSearchField.setPrefWidth(200);
-        
-        // Date range filters
-        DatePicker startDatePicker = new DatePicker();
+        employeeSearchField.setMaxWidth(Double.MAX_VALUE);
+
+        DatePicker startDatePicker = new DatePicker(LocalDate.now().minusDays(90));
         startDatePicker.setPromptText("Start Date");
-        startDatePicker.setValue(java.time.LocalDate.now().minusDays(90)); // Default to last 3 months
-        
-        DatePicker endDatePicker = new DatePicker();
+        startDatePicker.setMaxWidth(Double.MAX_VALUE);
+
+        DatePicker endDatePicker = new DatePicker(LocalDate.now());
         endDatePicker.setPromptText("End Date");
-        endDatePicker.setValue(java.time.LocalDate.now());
-        
-        // Status filter
+        endDatePicker.setMaxWidth(Double.MAX_VALUE);
+
         ComboBox<String> statusFilter = new ComboBox<>();
-        statusFilter.setPromptText("Filter by Status");
         statusFilter.getItems().addAll("All", "active", "paid", "defaulted", "written_off");
         statusFilter.setValue("All");
-        
+        statusFilter.setPromptText("Filter by Status");
+        statusFilter.setMaxWidth(Double.MAX_VALUE);
+
         Button filterBtn = new Button("Filter");
         filterBtn.getStyleClass().add("register-button");
-        
+
         Button refreshBtn = new Button("Refresh");
         refreshBtn.getStyleClass().add("register-button");
-        
+
         Button exportBtn = new Button("Export CSV");
         exportBtn.getStyleClass().add("register-button");
-        
-        filterBox.getChildren().addAll(
+
+        filterPane.getChildren().addAll(
             new Label("Employee:"), employeeSearchField,
             new Label("From:"), startDatePicker,
             new Label("To:"), endDatePicker,
             new Label("Status:"), statusFilter,
             filterBtn, refreshBtn, exportBtn
         );
-        
-        // Loan report table
+
+        // --- Loan Report Table ---
         TableView<LoanData> table = new TableView<>();
         table.setPrefHeight(400);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        
+        VBox.setVgrow(table, Priority.ALWAYS);
+
         TableColumn<LoanData, String> employeeNameCol = new TableColumn<>("Employee Name");
-        employeeNameCol.setCellValueFactory(cellData -> cellData.getValue().employeeNameProperty());
-        employeeNameCol.setPrefWidth(150);
-        
+        employeeNameCol.setCellValueFactory(cell -> cell.getValue().employeeNameProperty());
+
         TableColumn<LoanData, Double> loanAmountCol = new TableColumn<>("Loan Amount");
-        loanAmountCol.setCellValueFactory(cellData -> cellData.getValue().loanAmountProperty().asObject());
-        loanAmountCol.setPrefWidth(120);
-        
+        loanAmountCol.setCellValueFactory(cell -> cell.getValue().loanAmountProperty().asObject());
+
         TableColumn<LoanData, String> loanDateCol = new TableColumn<>("Loan Date");
-        loanDateCol.setCellValueFactory(cellData -> cellData.getValue().loanDateProperty());
-        loanDateCol.setPrefWidth(100);
-        
+        loanDateCol.setCellValueFactory(cell -> cell.getValue().loanDateProperty());
+
         TableColumn<LoanData, String> dueDateCol = new TableColumn<>("Due Date");
-        dueDateCol.setCellValueFactory(cellData -> cellData.getValue().dueDateProperty());
-        dueDateCol.setPrefWidth(100);
-        
+        dueDateCol.setCellValueFactory(cell -> cell.getValue().dueDateProperty());
+
         TableColumn<LoanData, String> descriptionCol = new TableColumn<>("Description");
-        descriptionCol.setCellValueFactory(cellData -> cellData.getValue().descriptionProperty());
-        descriptionCol.setPrefWidth(150);
-        
+        descriptionCol.setCellValueFactory(cell -> cell.getValue().descriptionProperty());
+
         TableColumn<LoanData, String> statusCol = new TableColumn<>("Status");
-        statusCol.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
-        statusCol.setPrefWidth(100);
-        statusCol.setCellFactory(column -> {
-            return new TableCell<LoanData, String>() {
-                @Override
-                protected void updateItem(String item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty || item == null) {
-                        setText(null);
-                        setStyle("");
-                    } else {
-                        setText(item);
-                        // Color code status
-                        switch (item.toLowerCase()) {
-                            case "active":
-                                setStyle("-fx-text-fill: #f39c12; -fx-font-weight: bold;");
-                                break;
-                            case "paid":
-                                setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
-                                break;
-                            case "defaulted":
-                                setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
-                                break;
-                            case "written_off":
-                                setStyle("-fx-text-fill: #95a5a6; -fx-font-weight: bold;");
-                                break;
-                            default:
-                                setStyle("");
-                        }
+        statusCol.setCellValueFactory(cell -> cell.getValue().statusProperty());
+        statusCol.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    switch (item.toLowerCase()) {
+                        case "active":
+                            setStyle("-fx-text-fill: #f39c12; -fx-font-weight: bold;");
+                            break;
+                        case "paid":
+                            setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
+                            break;
+                        case "defaulted":
+                            setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+                            break;
+                        case "written_off":
+                            setStyle("-fx-text-fill: #95a5a6; -fx-font-weight: bold;");
+                            break;
+                        default:
+                            setStyle("");
+                            break;
                     }
                 }
-            };
+            }
         });
-        
+
         TableColumn<LoanData, Double> remainingAmountCol = new TableColumn<>("Remaining Amount");
-        remainingAmountCol.setCellValueFactory(cellData -> cellData.getValue().remainingAmountProperty().asObject());
-        remainingAmountCol.setPrefWidth(120);
-        
-        // Action column for updating loan status
+        remainingAmountCol.setCellValueFactory(cell -> cell.getValue().remainingAmountProperty().asObject());
+
         TableColumn<LoanData, Void> actionCol = new TableColumn<>("Actions");
-        actionCol.setCellFactory(param -> new TableCell<>() {
-            private final Button updateBtn = new Button("Update");
+        actionCol.setCellFactory(col -> new TableCell<>() {
+            final Button updateBtn = new Button("Update");
             {
                 updateBtn.getStyleClass().add("register-button");
                 updateBtn.setOnAction(e -> {
@@ -1521,86 +1431,93 @@ public class EmployeeManagementContent {
                     showUpdateLoanDialog(database, loan, table);
                 });
             }
-            
+
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty) {
-                    setGraphic(null);
-                } else {
-                    setGraphic(updateBtn);
-                }
+                setGraphic(empty ? null : updateBtn);
             }
         });
-        actionCol.setPrefWidth(80);
-        
-        table.getColumns().addAll(employeeNameCol, loanAmountCol, loanDateCol, dueDateCol, 
-                                 descriptionCol, statusCol, remainingAmountCol, actionCol);
-        
-        // Data for table
+
+        table.getColumns().addAll(employeeNameCol, loanAmountCol, loanDateCol, dueDateCol,
+                descriptionCol, statusCol, remainingAmountCol, actionCol);
+
         ObservableList<LoanData> loanData = FXCollections.observableArrayList();
         table.setItems(loanData);
-        
-        // Summary info
+
         Label summaryLabel = new Label("Loan records will appear here");
         summaryLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-style: italic;");
-        
-        // Status label
+
         Label statusLabel = new Label();
-        
-        // Load initial data
+
+        // Initial Data Load
         loadLoanReportData(database, loanData, null, null, null, null);
         updateSummaryLabel(loanData, summaryLabel);
-        
-        // Filter button action
+
         filterBtn.setOnAction(e -> {
-            java.time.LocalDate startDate = startDatePicker.getValue();
-            java.time.LocalDate endDate = endDatePicker.getValue();
+            LocalDate startDate = startDatePicker.getValue();
+            LocalDate endDate = endDatePicker.getValue();
             String employeeName = employeeSearchField.getText().trim();
             String status = statusFilter.getValue();
-            
+
             if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
                 statusLabel.setText("Start date cannot be after end date.");
                 statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
                 return;
             }
-            
-            String startDateStr = (startDate != null) ? startDate.toString() : null;
-            String endDateStr = (endDate != null) ? endDate.toString() : null;
-            String employeeFilter = employeeName.isEmpty() ? null : employeeName;
-            String statusFilterValue = "All".equals(status) ? null : status;
-            
-            loadLoanReportData(database, loanData, startDateStr, endDateStr, employeeFilter, statusFilterValue);
+
+            String startStr = startDate != null ? startDate.toString() : null;
+            String endStr = endDate != null ? endDate.toString() : null;
+            String empFilter = employeeName.isEmpty() ? null : employeeName;
+            String statusVal = "All".equals(status) ? null : status;
+
+            loadLoanReportData(database, loanData, startStr, endStr, empFilter, statusVal);
             updateSummaryLabel(loanData, summaryLabel);
             statusLabel.setText("");
         });
-        
-        // Refresh button action
+
         refreshBtn.setOnAction(e -> {
             loadLoanReportData(database, loanData, null, null, null, null);
             updateSummaryLabel(loanData, summaryLabel);
             statusLabel.setText("Data refreshed.");
             statusLabel.setStyle("-fx-text-fill: blue; -fx-font-weight: bold;");
         });
-        
-        // Export button action (placeholder)
+
         exportBtn.setOnAction(e -> {
             if (loanData.isEmpty()) {
                 statusLabel.setText("No data to export. Please apply filters first.");
                 statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-                return;
+            } else {
+                statusLabel.setText("Export functionality coming soon...");
+                statusLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
             }
-            
-            statusLabel.setText("Export functionality coming soon...");
-            statusLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
         });
-        
-        VBox content = new VBox(15, filterBox, statusLabel, summaryLabel, table);
-        content.setPadding(new Insets(15));
+
+        VBox content = new VBox(filterPane, statusLabel, summaryLabel, table);
+        content.setStyle("-fx-background-color: transparent;");
         content.setFillWidth(true);
-        
-        box.getChildren().add(content);
+
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setStyle("-fx-background-color: transparent;");
+        scrollPane.setFitToWidth(true);
+
+        box.getChildren().add(scrollPane);
+
         return box;
+    }
+
+    private static void addRow(GridPane grid, String labelText, Label value, int col, int row) {
+        Label label = new Label(labelText);
+        label.setStyle("-fx-font-weight: bold;");
+        value.setStyle("-fx-text-fill: #2c3e50;");
+        grid.add(label, col, row);
+        grid.add(value, col + 1, row);
+    }
+
+    private static <T> TableColumn<LoanData, T> createColumn(String title, Function<LoanData, ObservableValue<T>> prop) {
+        TableColumn<LoanData, T> col = new TableColumn<>(title);
+        col.setCellValueFactory(cell -> prop.apply(cell.getValue()));
+        return col;
     }
 
 
