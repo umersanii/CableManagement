@@ -19,6 +19,11 @@ public class InvoiceData {
         this.previousBalance = previousBalance;
     }
 
+    public InvoiceData(String invoiceNumber2, String date2, String customerName2, String customerAddress2,
+            double previousBalance2, List<Item> items2) {
+        //TODO Auto-generated constructor stub
+    }
+
     public int getInvoiceNumber() {
         return invoiceNumber;
     }

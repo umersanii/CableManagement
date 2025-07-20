@@ -6,21 +6,19 @@ import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
 import java.io.FileOutputStream;
 import java.util.List;
+// import java.awt.print.PrinterJob; // Removed due to accessibility issue
 
 public class InvoiceGenerator {
     public static void generatePDF(InvoiceData data, String filename) {
         try {
-            // Create document with A4 size and margins
             Document document = new Document(PageSize.A4, 50, 50, 50, 50);
             PdfWriter.getInstance(document, new FileOutputStream(filename));
             document.open();
 
-            // Define fonts
             Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, BaseColor.BLACK);
             Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.DARK_GRAY);
             Font regularFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.BLACK);
 
-            // Header Section
             Paragraph header = new Paragraph("HASEEB WIRE & CABLES", titleFont);
             header.setAlignment(Element.ALIGN_CENTER);
             document.add(header);
@@ -29,7 +27,6 @@ public class InvoiceGenerator {
             contact.setAlignment(Element.ALIGN_CENTER);
             document.add(contact);
 
-            // Invoice Details Table
             PdfPTable detailsTable = new PdfPTable(3);
             detailsTable.setWidthPercentage(100);
             detailsTable.setWidths(new float[]{3f, 3f, 3f});
@@ -49,12 +46,10 @@ public class InvoiceGenerator {
             document.add(detailsTable);
             document.add(Chunk.NEWLINE);
 
-            // Main Table
             PdfPTable table = new PdfPTable(6);
             table.setWidthPercentage(100);
             table.setWidths(new int[]{1, 4, 2, 3, 2, 3});
 
-            // Table Header
             PdfPCell[] headers = {
                 new PdfPCell(new Phrase("#", headerFont)),
                 new PdfPCell(new Phrase("Item", headerFont)),
@@ -69,7 +64,6 @@ public class InvoiceGenerator {
                 table.addCell(cell);
             }
 
-            // Table Data
             double total = 0;
             List<Item> items = data.getItems();
             for (int i = 0; i < items.size(); i++) {
@@ -90,7 +84,6 @@ public class InvoiceGenerator {
             document.add(table);
             document.add(Chunk.NEWLINE);
 
-            // Summary Section
             PdfPTable summaryTable = new PdfPTable(3);
             summaryTable.setWidthPercentage(100);
             summaryTable.setWidths(new float[]{3f, 3f, 3f});
@@ -125,10 +118,8 @@ public class InvoiceGenerator {
 
             document.add(summaryTable);
 
-            // Add spacing before signature section
             document.add(Chunk.NEWLINE);
 
-            // Signature Section
             PdfPTable signatureTable = new PdfPTable(2);
             signatureTable.setWidthPercentage(100);
 
@@ -158,14 +149,9 @@ public class InvoiceGenerator {
         }
     }
 
-    private static void addSummaryRow(PdfPTable table, String label, String value, Font font) {
-        PdfPCell labelCell = new PdfPCell(new Phrase(label, font));
-        labelCell.setBorder(Rectangle.NO_BORDER);
-        table.addCell(labelCell);
-
-        PdfPCell valueCell = new PdfPCell(new Phrase(value, font));
-        valueCell.setBorder(Rectangle.NO_BORDER);
-        valueCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        table.addCell(valueCell);
+    // Placeholder printPDF method
+    public static void printPDF(String filename) {
+        // Printing functionality is not available due to inaccessible PrinterJob.
+        System.out.println("Printing is not supported in this environment.");
     }
 }
