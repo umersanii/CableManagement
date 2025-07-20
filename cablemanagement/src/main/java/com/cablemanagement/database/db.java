@@ -145,6 +145,9 @@ public interface db {
     
     List<Object[]> getAllRawPurchaseInvoices();
     
+    boolean insertRawPurchaseInvoice(String invoiceNumber, int supplierId, String invoiceDate, 
+                                   double totalAmount, double discountAmount, double paidAmount);
+    
     List<Object[]> getAllRawStockUsage();
 
     // --------------------------

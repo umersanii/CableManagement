@@ -443,6 +443,29 @@ private boolean bankExists(int bankId) throws SQLException {
                 "FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id)" +
                 ")",
                 
+                // Raw Purchase Invoice table
+                "CREATE TABLE IF NOT EXISTS Raw_Purchase_Invoice (" +
+                "raw_purchase_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "invoice_number TEXT NOT NULL UNIQUE," +
+                "supplier_id INTEGER NOT NULL," +
+                "invoice_date TEXT NOT NULL," +
+                "total_amount REAL NOT NULL," +
+                "discount_amount REAL DEFAULT 0," +
+                "paid_amount REAL DEFAULT 0," +
+                "FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id)" +
+                ")",
+                
+                // Raw Purchase Invoice Item table
+                "CREATE TABLE IF NOT EXISTS Raw_Purchase_Invoice_Item (" +
+                "raw_purchase_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "raw_purchase_invoice_id INTEGER NOT NULL," +
+                "raw_stock_id INTEGER NOT NULL," +
+                "quantity REAL NOT NULL," +
+                "unit_price REAL NOT NULL," +
+                "FOREIGN KEY (raw_purchase_invoice_id) REFERENCES Raw_Purchase_Invoice(raw_purchase_invoice_id)," +
+                "FOREIGN KEY (raw_stock_id) REFERENCES RawStock(stock_id)" +
+                ")",
+                
                 // Production Stock table
                 "CREATE TABLE IF NOT EXISTS ProductionStock (" +
                 "production_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -456,6 +479,11 @@ private boolean bankExists(int bankId) throws SQLException {
                 ")",
                 
                 // Cash Transaction table
+                "CREATE TABLE IF NOT EXISTS Unit (" +
+                "unit_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "unit_name TEXT NOT NULL UNIQUE" +
+                ")",
+                
                 "CREATE TABLE IF NOT EXISTS Cash_Transaction (" +
                 "transaction_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "description TEXT NOT NULL," +
@@ -582,7 +610,7 @@ private boolean bankExists(int bankId) throws SQLException {
         rs.next();
         if (rs.getInt(1) == 0) {
             stmt.execute("INSERT INTO Category (category_name) VALUES " +
-                        "('Electric Cables'), ('Fiber Optic'), ('Coaxial'), ('Network Cables'), ('Power Cables')");
+                        "('Electric Cables'), ('Fiber Optic'), ('Coaxial'), ('Network Cables'), ('Power Cables'), ('ABC')");
         }
         rs.close();
         
@@ -610,6 +638,33 @@ private boolean bankExists(int bankId) throws SQLException {
         if (rs.getInt(1) == 0) {
             stmt.execute("INSERT INTO Tehsil (tehsil_name, district_id) VALUES " +
                         "('Model Town', 1), ('Gulshan', 2), ('University Town', 3), ('Satellite Town', 4), ('F-10', 5)");
+        }
+        rs.close();
+        
+        // Check if Unit table is empty and insert default data
+        rs = stmt.executeQuery("SELECT COUNT(*) FROM Unit");
+        rs.next();
+        if (rs.getInt(1) == 0) {
+            stmt.execute("INSERT INTO Unit (unit_name) VALUES " +
+                        "('Meter'), ('Roll'), ('Kg'), ('Gram'), ('Piece'), ('Box'), ('Liter')");
+        }
+        rs.close();
+        
+        // Check if Manufacturer table is empty and insert some default manufacturers
+        rs = stmt.executeQuery("SELECT COUNT(*) FROM Manufacturer");
+        rs.next();
+        if (rs.getInt(1) == 0) {
+            stmt.execute("INSERT INTO Manufacturer (manufacturer_name, tehsil_id) VALUES " +
+                        "('CableTech Industries', 1), ('ABC Manufacturing', 1), ('Test Manufacturer', 1)");
+        }
+        rs.close();
+        
+        // Check if Brand table is empty and insert some default brands
+        rs = stmt.executeQuery("SELECT COUNT(*) FROM Brand");
+        rs.next();
+        if (rs.getInt(1) == 0) {
+            stmt.execute("INSERT INTO Brand (brand_name, manufacturer_id, tehsil_id) VALUES " +
+                        "('PowerFlex', 1, 1), ('ABC', 2, 1), ('aa', 3, 1)");
         }
         rs.close();
     }
@@ -1218,27 +1273,23 @@ private boolean bankExists(int bankId) throws SQLException {
     @Override
     public List<Object[]> getAllRawStocks() {
         List<Object[]> rawStocks = new ArrayList<>();
-        String query = "SELECT r.raw_stock_id, r.raw_stock_name, c.category_name, b.brand_name, " +
-                      "u.unit_name, r.opening_quantity, r.purchase_price_per_unit, r.reorder_level " +
-                      "FROM Raw_Stock r " +
-                      "JOIN Category c ON r.category_id = c.category_id " +
-                      "JOIN Brand b ON r.brand_id = b.brand_id " +
-                      "JOIN Unit u ON r.unit_id = u.unit_id " +
-                      "ORDER BY r.raw_stock_name";
+        String query = "SELECT rs.stock_id, rs.item_name, b.brand_name, " +
+                      "rs.quantity, rs.unit_price, rs.total_cost " +
+                      "FROM RawStock rs " +
+                      "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                      "ORDER BY rs.item_name";
         
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             
             while (rs.next()) {
                 Object[] row = {
-                    rs.getInt("raw_stock_id"),
-                    rs.getString("raw_stock_name"),
-                    rs.getString("category_name"),
+                    rs.getInt("stock_id"),
+                    rs.getString("item_name"),
                     rs.getString("brand_name"),
-                    rs.getString("unit_name"),
-                    rs.getDouble("opening_quantity"),
-                    rs.getDouble("purchase_price_per_unit"),
-                    rs.getDouble("reorder_level")
+                    (double) rs.getInt("quantity"),  // Convert int to double for consistency
+                    rs.getDouble("unit_price"),
+                    rs.getDouble("total_cost")
                 };
                 rawStocks.add(row);
             }
@@ -1251,20 +1302,41 @@ private boolean bankExists(int bankId) throws SQLException {
     @Override
     public boolean insertRawStock(String name, String category, String brand, String unit, 
                                  double openingQty, double purchasePrice, double reorderLevel) {
-        String query = "INSERT INTO Raw_Stock (raw_stock_name, category_id, brand_id, unit_id, " +
-                      "opening_quantity, purchase_price_per_unit, reorder_level) " +
-                      "SELECT ?, c.category_id, b.brand_id, u.unit_id, ?, ?, ? " +
-                      "FROM Category c, Brand b, Unit u " +
-                      "WHERE c.category_name = ? AND b.brand_name = ? AND u.unit_name = ?";
+        // For the existing RawStock table, we need to calculate total_cost and use different fields
+        double totalCost = openingQty * purchasePrice;
+        int quantity = (int) Math.round(openingQty); // Convert double to int safely
+        
+        String query = "INSERT INTO RawStock (item_name, brand_id, quantity, unit_price, total_cost) " +
+                      "SELECT ?, b.brand_id, ?, ?, ? " +
+                      "FROM Brand b " +
+                      "WHERE b.brand_name = ?";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, name);
-            pstmt.setDouble(2, openingQty);
+            pstmt.setInt(2, quantity);  // Now properly converted to int
             pstmt.setDouble(3, purchasePrice);
-            pstmt.setDouble(4, reorderLevel);
-            pstmt.setString(5, category);
-            pstmt.setString(6, brand);
-            pstmt.setString(7, unit);
+            pstmt.setDouble(4, totalCost);
+            pstmt.setString(5, brand);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean insertRawPurchaseInvoice(String invoiceNumber, int supplierId, String invoiceDate, 
+                                           double totalAmount, double discountAmount, double paidAmount) {
+        String query = "INSERT INTO Raw_Purchase_Invoice (invoice_number, supplier_id, invoice_date, " +
+                      "total_amount, discount_amount, paid_amount) VALUES (?, ?, ?, ?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, invoiceNumber);
+            pstmt.setInt(2, supplierId);
+            pstmt.setString(3, invoiceDate);
+            pstmt.setDouble(4, totalAmount);
+            pstmt.setDouble(5, discountAmount);
+            pstmt.setDouble(6, paidAmount);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();

@@ -192,14 +192,14 @@ public class RawStock {
         
         for (Object[] row : rawStocks) {
             data.add(new RawStockRecord(
-                (Integer) row[0],  // id
-                (String) row[1],   // name
-                (String) row[2],   // category
-                (String) row[3],   // brand
-                (String) row[4],   // unit
-                (Double) row[5],   // opening quantity
-                (Double) row[6],   // purchase price
-                (Double) row[7]    // reorder level
+                (Integer) row[0],  // stock_id
+                (String) row[1],   // item_name
+                "",                // category (not available in RawStock table)
+                (String) row[2],   // brand_name
+                "",                // unit (not available in RawStock table)
+                (Double) row[3],   // quantity
+                (Double) row[4],   // unit_price
+                0.0                // reorder_level (not available in RawStock table)
             ));
         }
         

@@ -130,7 +130,7 @@ public class home_page {
         });
 
         Scene scene = new Scene(mainLayout, 800, 500);
-        scene.getStylesheets().add(home_page.class.getResource("style.css").toExternalForm());
+        scene.getStylesheets().add(home_page.class.getResource("/com/cablemanagement/style.css").toExternalForm());
         return scene;
     }
 
