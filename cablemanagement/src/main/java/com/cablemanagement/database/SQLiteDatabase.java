@@ -3,6 +3,7 @@ package com.cablemanagement.database;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import com.cablemanagement.model.Brand;
 import com.cablemanagement.model.Customer;
@@ -2267,4 +2268,67 @@ public List<Object[]> getAllCashTransactions() {
         }
         return false;
     }
+
+public List<Object[]> getViewData(String viewName, Map<String, String> filters) {
+    List<Object[]> results = new ArrayList<>();
+    StringBuilder query = new StringBuilder("SELECT * FROM " + viewName);
+    List<String> values = new ArrayList<>();
+    
+    if (filters != null && !filters.isEmpty()) {
+        query.append(" WHERE ");
+        List<String> clauses = new ArrayList<>();
+        
+        for (Map.Entry<String, String> entry : filters.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            
+            // Handle date filters specifically for each view
+            if (key.equals("fromDate")) {
+                clauses.add("date >= ?");
+                values.add(value);
+            } else if (key.equals("toDate")) {
+                clauses.add("date <= ?");
+                values.add(value);
+            } else {
+                clauses.add(key + " LIKE ?");
+                values.add("%" + value + "%");
+            }
+        }
+        query.append(String.join(" AND ", clauses));
+    }
+    System.out.println("Query: " + query.toString() + ", Values: " + values);
+    try (PreparedStatement stmt = connection.prepareStatement(query.toString())) {
+        for (int i = 0; i < values.size(); i++) {
+            stmt.setString(i + 1, values.get(i));
+        }
+        try (ResultSet rs = stmt.executeQuery()) {
+            int columnCount = rs.getMetaData().getColumnCount();
+            while (rs.next()) {
+                Object[] row = new Object[columnCount];
+                for (int i = 0; i < columnCount; i++) {
+                    row[i] = rs.getObject(i + 1);
+                }
+                results.add(row);
+            }
+        }
+    } catch (SQLException e) {
+        System.err.println("SQL Error: " + e.getMessage());
+    }
+    System.out.println("Rows returned: " + results.size());
+    return results;
+}
+
+@Override
+    public List<Object[]> getAllProductionStock() {
+        // Dummy implementation: returns an empty list
+        return new ArrayList<>();
+    }
+
+    @Override
+    public List<Object[]> getAllRawStock() {
+        // Dummy implementation: returns an empty list
+        return new ArrayList<>();
+    }
+
+
 }

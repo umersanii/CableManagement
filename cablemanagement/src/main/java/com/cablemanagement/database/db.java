@@ -1,6 +1,7 @@
 package com.cablemanagement.database;
 
 import java.util.List;
+import java.util.Map;
 
 import com.cablemanagement.model.Bank;
 import com.cablemanagement.model.BankTransaction;
@@ -231,4 +232,9 @@ boolean insertCashTransaction(BankTransaction transaction);
 double getCashBalance();
 
 boolean updateBankBalance(double newBalance);
+
+List<Object[]> getViewData(String viewName, Map<String, String> filters);
+
+ List<Object[]> getAllRawStock();
+    List<Object[]> getAllProductionStock();
 }
