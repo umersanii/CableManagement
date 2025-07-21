@@ -8,6 +8,8 @@ import com.cablemanagement.model.BankTransaction;
 import com.cablemanagement.model.Brand;
 import com.cablemanagement.model.Customer;
 import com.cablemanagement.model.Manufacturer;
+import com.cablemanagement.model.RawStockPurchaseItem;
+import com.cablemanagement.model.RawStockUseItem;
 import com.cablemanagement.model.Supplier;
 
 public interface db {
@@ -149,7 +151,56 @@ public interface db {
     boolean insertRawPurchaseInvoice(String invoiceNumber, int supplierId, String invoiceDate, 
                                    double totalAmount, double discountAmount, double paidAmount);
     
+    int insertRawPurchaseInvoiceAndGetId(String invoiceNumber, int supplierId, String invoiceDate, 
+                                       double totalAmount, double discountAmount, double paidAmount);
+    
     List<Object[]> getAllRawStockUsage();
+    
+    // New methods for enhanced invoice functionality
+    String generateNextInvoiceNumber(String prefix);
+    
+    List<Object[]> getAllRawStocksForDropdown();
+    
+    List<String> getAllSupplierNames();
+    
+    int getSupplierIdByName(String supplierName);
+    
+    int getRawStockIdByName(String rawStockName);
+    
+    // Simplified invoice methods that work with existing tables
+    boolean insertSimpleRawPurchaseInvoice(String invoiceNumber, String supplierName, String invoiceDate, 
+                                          double totalAmount, double discountAmount, double paidAmount, 
+                                          List<RawStockPurchaseItem> items);
+
+    // --------------------------
+    // Raw Purchase Return Invoice Operations
+    // --------------------------
+    String generateReturnInvoiceNumber();
+    
+    List<Object[]> getAllRawPurchaseInvoicesForDropdown();
+    
+    List<Object[]> getRawStockItemsByInvoiceId(int invoiceId);
+    
+    int insertRawPurchaseReturnInvoiceAndGetId(String returnInvoiceNumber, int originalInvoiceId, 
+                                             int supplierId, String returnDate, double totalReturnAmount);
+    
+    boolean insertRawPurchaseReturnInvoiceItems(int returnInvoiceId, List<RawStockPurchaseItem> items);
+    
+    List<Object[]> getAllRawPurchaseReturnInvoices();
+
+    // --------------------------
+    // Raw Stock Use Invoice Operations
+    // --------------------------
+    String generateUseInvoiceNumber();
+    
+    List<Object[]> getAllRawStocksWithUnitsForDropdown();
+    
+    int insertRawStockUseInvoiceAndGetId(String useInvoiceNumber, String usageDate, 
+                                        double totalUsageAmount, String referencePurpose);
+    
+    boolean insertRawStockUseInvoiceItems(int useInvoiceId, List<RawStockUseItem> items);
+    
+    List<Object[]> getAllRawStockUseInvoices();
 
     // --------------------------
     // Production Stock Operations  

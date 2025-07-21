@@ -213,9 +213,16 @@ CREATE TABLE Raw_Purchase_Invoice_Item (
     FOREIGN KEY (raw_stock_id) REFERENCES Raw_Stock(raw_stock_id)
 );
 
-
-
-
+CREATE TABLE Raw_Purchase_Return_Invoice (
+    raw_purchase_return_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    return_invoice_number TEXT NOT NULL UNIQUE,
+    original_invoice_id INTEGER NOT NULL,
+    supplier_id INTEGER NOT NULL,
+    return_date TEXT NOT NULL,
+    total_return_amount REAL NOT NULL,
+    FOREIGN KEY (original_invoice_id) REFERENCES Raw_Purchase_Invoice(raw_purchase_invoice_id),
+    FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id)
+);
 
 CREATE TABLE Raw_Purchase_Return_Invoice_Item (
     raw_purchase_return_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -235,6 +242,25 @@ CREATE TABLE Raw_Stock_Usage (
     usage_date TEXT NOT NULL,
     quantity_used REAL NOT NULL,
     reference TEXT, -- e.g., linked to a production batch or comment
+    FOREIGN KEY (raw_stock_id) REFERENCES Raw_Stock(raw_stock_id)
+);
+
+-- Raw Stock Use Invoice Tables
+CREATE TABLE Raw_Stock_Use_Invoice (
+    raw_stock_use_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    use_invoice_number TEXT NOT NULL UNIQUE,
+    usage_date TEXT NOT NULL,
+    total_usage_amount REAL NOT NULL,
+    reference_purpose TEXT -- Overall purpose/reference for the usage
+);
+
+CREATE TABLE Raw_Stock_Use_Invoice_Item (
+    raw_stock_use_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    raw_stock_use_invoice_id INTEGER NOT NULL,
+    raw_stock_id INTEGER NOT NULL,
+    quantity_used REAL NOT NULL,
+    unit_cost REAL NOT NULL, -- Cost per unit for this item
+    FOREIGN KEY (raw_stock_use_invoice_id) REFERENCES Raw_Stock_Use_Invoice(raw_stock_use_invoice_id),
     FOREIGN KEY (raw_stock_id) REFERENCES Raw_Stock(raw_stock_id)
 );
 
