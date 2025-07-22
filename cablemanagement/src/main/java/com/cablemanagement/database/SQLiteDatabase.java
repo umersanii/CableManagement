@@ -2130,27 +2130,25 @@ Override
     @Override
     public List<Object[]> getAllRawStocksWithUnitsForDropdown() {
         List<Object[]> rawStocks = new ArrayList<>();
-        String query = "SELECT rs.raw_stock_id, rs.raw_stock_name, c.category_name, " +
-                      "b.brand_name, u.unit_name, rs.opening_quantity, rs.purchase_price_per_unit " +
+        String query = "SELECT rs.stock_id, rs.item_name, b.brand_name, " +
+                      "'N/A' as unit_name, rs.quantity, rs.unit_price " +
                       "FROM Raw_Stock rs " +
-                      "JOIN Category c ON rs.category_id = c.category_id " +
                       "JOIN Brand b ON rs.brand_id = b.brand_id " +
-                      "JOIN Unit u ON rs.unit_id = u.unit_id " +
-                      "WHERE rs.opening_quantity > 0 " +
-                      "ORDER BY rs.raw_stock_name";
+                      "WHERE rs.quantity > 0 " +
+                      "ORDER BY rs.item_name";
         
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             
             while (rs.next()) {
                 Object[] row = {
-                    rs.getInt("raw_stock_id"),
-                    rs.getString("raw_stock_name"),
-                    rs.getString("category_name"),
+                    rs.getInt("stock_id"),
+                    rs.getString("item_name"),
+                    "N/A", // category_name (not available in Raw_Stock table)
                     rs.getString("brand_name"),
                     rs.getString("unit_name"),
-                    rs.getDouble("opening_quantity"),
-                    rs.getDouble("purchase_price_per_unit")
+                    rs.getDouble("quantity"),
+                    rs.getDouble("unit_price")
                 };
                 rawStocks.add(row);
             }
@@ -2292,6 +2290,163 @@ Override
             e.printStackTrace();
         }
         return productionStocks;
+    }
+
+    @Override
+    public List<Object[]> getAllProductionStocksForDropdown() {
+        List<Object[]> productionStocks = new ArrayList<>();
+        String query = "SELECT ps.production_id, ps.product_name, b.brand_name, " +
+                      "'N/A' as unit_name, ps.unit_cost, ps.quantity " +
+                      "FROM ProductionStock ps " +
+                      "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                      "WHERE ps.quantity > 0 " +
+                      "ORDER BY ps.product_name";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("production_id"),
+                    rs.getString("product_name"),
+                    "N/A", // category_name (not available in ProductionStock table)
+                    rs.getString("brand_name"),
+                    rs.getString("unit_name"),
+                    rs.getDouble("unit_cost"),
+                    rs.getDouble("quantity")
+                };
+                productionStocks.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return productionStocks;
+    }
+
+    @Override
+    public String generateProductionInvoiceNumber() {
+        String query = "SELECT COUNT(*) FROM Production_Invoice";
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            if (rs.next()) {
+                int count = rs.getInt(1);
+                return String.format("PI-%04d", count + 1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return "PI-0001";
+    }
+
+    @Override
+    public int insertProductionInvoiceAndGetId(String productionDate, String notes) {
+        String query = "INSERT INTO Production_Invoice (production_date, notes) VALUES (?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, productionDate);
+            pstmt.setString(2, notes);
+            
+            int affectedRows = pstmt.executeUpdate();
+            if (affectedRows > 0) {
+                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        return generatedKeys.getInt(1);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    @Override
+    public boolean insertProductionInvoiceItems(int productionInvoiceId, List<Object[]> productionItems) {
+        String query = "INSERT INTO Production_Invoice_Item (production_invoice_id, " +
+                      "production_stock_id, quantity_produced) VALUES (?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            connection.setAutoCommit(false);
+            
+            for (Object[] item : productionItems) {
+                pstmt.setInt(1, productionInvoiceId);
+                pstmt.setInt(2, (Integer) item[0]); // production_id from ProductionStock table
+                pstmt.setDouble(3, (Double) item[1]); // quantity_produced
+                pstmt.addBatch();
+            }
+            
+            int[] results = pstmt.executeBatch();
+            connection.commit();
+            connection.setAutoCommit(true);
+            
+            for (int result : results) {
+                if (result <= 0) {
+                    return false;
+                }
+            }
+            return true;
+            
+        } catch (SQLException e) {
+            try {
+                connection.rollback();
+                connection.setAutoCommit(true);
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    @Override
+    public boolean insertProductionStockRawUsage(int productionInvoiceId, List<Object[]> rawMaterialsUsed) {
+        String query = "INSERT INTO Production_Stock_Raw_Usage (production_invoice_id, " +
+                      "raw_stock_id, quantity_used) VALUES (?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            connection.setAutoCommit(false);
+            
+            for (Object[] material : rawMaterialsUsed) {
+                pstmt.setInt(1, productionInvoiceId);
+                pstmt.setInt(2, (Integer) material[0]); // stock_id from Raw_Stock table
+                pstmt.setDouble(3, (Double) material[1]); // quantity_used
+                pstmt.addBatch();
+            }
+            
+            int[] results = pstmt.executeBatch();
+            
+            // Update raw stock quantities
+            String updateStockQuery = "UPDATE Raw_Stock SET quantity = quantity - ? " +
+                                    "WHERE stock_id = ?";
+            try (PreparedStatement updatePstmt = connection.prepareStatement(updateStockQuery)) {
+                for (Object[] material : rawMaterialsUsed) {
+                    updatePstmt.setDouble(1, (Double) material[1]); // quantity_used
+                    updatePstmt.setInt(2, (Integer) material[0]); // stock_id
+                    updatePstmt.addBatch();
+                }
+                updatePstmt.executeBatch();
+            }
+            
+            connection.commit();
+            connection.setAutoCommit(true);
+            
+            for (int result : results) {
+                if (result <= 0) {
+                    return false;
+                }
+            }
+            return true;
+            
+        } catch (SQLException e) {
+            try {
+                connection.rollback();
+                connection.setAutoCommit(true);
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
+            e.printStackTrace();
+            return false;
+        }
     }
 
     @Override

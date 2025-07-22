@@ -216,6 +216,19 @@ public interface db {
     List<Object[]> getAllRawStockUseInvoices();
 
     // --------------------------
+    // Production Invoice Operations
+    // --------------------------
+    List<Object[]> getAllProductionStocksForDropdown();
+    
+    String generateProductionInvoiceNumber();
+    
+    int insertProductionInvoiceAndGetId(String productionDate, String notes);
+    
+    boolean insertProductionInvoiceItems(int productionInvoiceId, List<Object[]> productionItems);
+    
+    boolean insertProductionStockRawUsage(int productionInvoiceId, List<Object[]> rawMaterialsUsed);
+
+    // --------------------------
     // Production Stock Operations  
     // --------------------------
     List<Object[]> getAllProductionInvoices();

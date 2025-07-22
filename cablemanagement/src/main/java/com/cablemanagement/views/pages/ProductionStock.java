@@ -13,6 +13,8 @@ import javafx.scene.text.Font;
 import javafx.beans.property.SimpleStringProperty;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.ArrayList;
 
 import com.cablemanagement.database.SQLiteDatabase;
 import com.cablemanagement.database.db;
@@ -176,7 +178,8 @@ public class ProductionStock {
         VBox itemsSection = new VBox(10);
         itemsSection.setMinWidth(400);
         
-        TextField productField = createTextField("Product");
+        // Load production stocks for dropdown
+        ComboBox<String> productComboBox = createProductionStockComboBox();
         TextField quantityField = createTextField("Quantity");
         
         HBox itemButtonBox = new HBox(10);
@@ -189,7 +192,7 @@ public class ProductionStock {
         
         itemsSection.getChildren().addAll(
             createSubheading("Production Items:"),
-            createFormRow("Product:", productField),
+            createFormRow("Product:", productComboBox),
             createFormRow("Quantity:", quantityField),
             itemButtonBox,
             itemsList
@@ -199,7 +202,8 @@ public class ProductionStock {
         VBox materialsSection = new VBox(10);
         materialsSection.setMinWidth(400);
         
-        TextField rawMaterialField = createTextField("Raw Material");
+        // Load raw stocks for dropdown
+        ComboBox<String> rawMaterialComboBox = createRawStockComboBox();
         TextField rawQuantityField = createTextField("Quantity Used");
         
         HBox materialButtonBox = new HBox(10);
@@ -212,7 +216,7 @@ public class ProductionStock {
         
         materialsSection.getChildren().addAll(
             createSubheading("Raw Materials Used:"),
-            createFormRow("Raw Material:", rawMaterialField),
+            createFormRow("Raw Material:", rawMaterialComboBox),
             createFormRow("Quantity Used:", rawQuantityField),
             materialButtonBox,
             materialsList
@@ -234,9 +238,8 @@ public class ProductionStock {
         );
 
         // Event Handlers
-        addItemBtn.setOnAction(e -> handleAddItem(productField, quantityField, itemsList));
-        productField.setOnAction(e -> handleAddItem(productField, quantityField, itemsList));
-        quantityField.setOnAction(e -> handleAddItem(productField, quantityField, itemsList));
+        addItemBtn.setOnAction(e -> handleAddProductionItem(productComboBox, quantityField, itemsList));
+        quantityField.setOnAction(e -> handleAddProductionItem(productComboBox, quantityField, itemsList));
         
         clearItemsBtn.setOnAction(e -> {
             if (!itemsList.getItems().isEmpty()) {
@@ -251,9 +254,8 @@ public class ProductionStock {
             }
         });
         
-        addMaterialBtn.setOnAction(e -> handleAddMaterial(rawMaterialField, rawQuantityField, materialsList));
-        rawMaterialField.setOnAction(e -> handleAddMaterial(rawMaterialField, rawQuantityField, materialsList));
-        rawQuantityField.setOnAction(e -> handleAddMaterial(rawMaterialField, rawQuantityField, materialsList));
+        addMaterialBtn.setOnAction(e -> handleAddRawMaterial(rawMaterialComboBox, rawQuantityField, materialsList));
+        rawQuantityField.setOnAction(e -> handleAddRawMaterial(rawMaterialComboBox, rawQuantityField, materialsList));
         
         clearMaterialsBtn.setOnAction(e -> {
             if (!materialsList.getItems().isEmpty()) {
@@ -268,7 +270,7 @@ public class ProductionStock {
             }
         });
         
-        submitBtn.setOnAction(e -> handleSubmitProduction(
+        submitBtn.setOnAction(e -> handleSubmitProductionInvoice(
             productionDatePicker, 
             notesArea, 
             itemsList, 
@@ -652,77 +654,6 @@ public class ProductionStock {
         return form;
     }
 
-    private static void handleAddItem(TextField productField, TextField quantityField, ListView<String> itemsList) {
-        String product = productField.getText().trim();
-        String quantity = quantityField.getText().trim();
-        
-        if (!product.isEmpty() && !quantity.isEmpty()) {
-            try {
-                double qty = Double.parseDouble(quantity);
-                itemsList.getItems().add(String.format("%s - %.2f", product, qty));
-                productField.clear();
-                quantityField.clear();
-                productField.requestFocus();
-            } catch (NumberFormatException e) {
-                showAlert("Invalid Quantity", "Please enter a valid number for quantity");
-            }
-        }
-    }
-
-    private static void handleAddMaterial(TextField materialField, TextField quantityField, ListView<String> materialsList) {
-        String material = materialField.getText().trim();
-        String quantity = quantityField.getText().trim();
-        
-        if (!material.isEmpty() && !quantity.isEmpty()) {
-            try {
-                double qty = Double.parseDouble(quantity);
-                materialsList.getItems().add(String.format("%s - %.2f", material, qty));
-                materialField.clear();
-                quantityField.clear();
-                materialField.requestFocus();
-            } catch (NumberFormatException e) {
-                showAlert("Invalid Quantity", "Please enter a valid number for quantity");
-            }
-        }
-    }
-
-    private static void handleSubmitProduction(
-        DatePicker datePicker, 
-        TextArea notesArea, 
-        ListView<String> itemsList, 
-        ListView<String> materialsList
-    ) {
-        String date = datePicker.getValue().format(DATE_FORMATTER);
-        String notes = notesArea.getText().trim();
-        
-        if (itemsList.getItems().isEmpty()) {
-            showAlert("No Items", "Please add at least one production item");
-            return;
-        }
-        
-        // In real app, this would save to database
-        StringBuilder summary = new StringBuilder();
-        summary.append("Production Invoice Summary\n");
-        summary.append("Date: ").append(date).append("\n");
-        if (!notes.isEmpty()) summary.append("Notes: ").append(notes).append("\n");
-        
-        summary.append("\nProduction Items:\n");
-        itemsList.getItems().forEach(item -> summary.append("- ").append(item).append("\n"));
-        
-        if (!materialsList.getItems().isEmpty()) {
-            summary.append("\nRaw Materials Used:\n");
-            materialsList.getItems().forEach(mat -> summary.append("- ").append(mat).append("\n"));
-        }
-        
-        System.out.println(summary.toString());
-        
-        // Clear form
-        datePicker.setValue(LocalDate.now());
-        notesArea.clear();
-        itemsList.getItems().clear();
-        materialsList.getItems().clear();
-    }
-
     private static ListView<String> createEnhancedListView() {
         ListView<String> listView = new ListView<>();
         listView.setPrefHeight(300);
@@ -925,5 +856,220 @@ public class ProductionStock {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    // Production Stock ComboBox
+    private static ComboBox<String> createProductionStockComboBox() {
+        ComboBox<String> comboBox = new ComboBox<>();
+        comboBox.getStyleClass().add("form-input");
+        comboBox.setPromptText("Select Production Stock");
+        comboBox.setMaxWidth(Double.MAX_VALUE);
+        
+        // Load production stocks from database
+        try {
+            List<Object[]> productionStocks = database.getAllProductionStocksForDropdown();
+            ObservableList<String> items = FXCollections.observableArrayList();
+            
+            for (Object[] stock : productionStocks) {
+                // Format: "Product Name - Brand - Available: X"
+                String item = String.format("%s - %s - Available: %.2f", 
+                    stock[1], // product_name
+                    stock[3], // brand_name
+                    stock[6]  // quantity
+                );
+                items.add(item);
+            }
+            
+            comboBox.setItems(items);
+        } catch (Exception e) {
+            e.printStackTrace();
+            showAlert("Error", "Failed to load production stocks: " + e.getMessage());
+        }
+        
+        return comboBox;
+    }
+
+    // Raw Stock ComboBox
+    private static ComboBox<String> createRawStockComboBox() {
+        ComboBox<String> comboBox = new ComboBox<>();
+        comboBox.getStyleClass().add("form-input");
+        comboBox.setPromptText("Select Raw Material");
+        comboBox.setMaxWidth(Double.MAX_VALUE);
+        
+        // Load raw stocks from database
+        try {
+            List<Object[]> rawStocks = database.getAllRawStocksWithUnitsForDropdown();
+            ObservableList<String> items = FXCollections.observableArrayList();
+            
+            for (Object[] stock : rawStocks) {
+                // Format: "Raw Material Name - Brand - Available: X"
+                String item = String.format("%s - %s - Available: %.2f", 
+                    stock[1], // item_name
+                    stock[3], // brand_name
+                    stock[5]  // quantity
+                );
+                items.add(item);
+            }
+            
+            comboBox.setItems(items);
+        } catch (Exception e) {
+            e.printStackTrace();
+            showAlert("Error", "Failed to load raw stocks: " + e.getMessage());
+        }
+        
+        return comboBox;
+    }
+
+    // Handle adding production item with ComboBox
+    private static void handleAddProductionItem(ComboBox<String> productComboBox, TextField quantityField, ListView<String> itemsList) {
+        String selectedProduct = productComboBox.getValue();
+        String quantityText = quantityField.getText().trim();
+        
+        if (selectedProduct != null && !quantityText.isEmpty()) {
+            try {
+                double quantity = Double.parseDouble(quantityText);
+                if (quantity <= 0) {
+                    showAlert("Invalid Input", "Quantity must be greater than 0");
+                    return;
+                }
+                
+                // Extract product name from the ComboBox selection
+                String productName = selectedProduct.split(" - ")[0];
+                String displayText = String.format("%s - Quantity: %.2f", productName, quantity);
+                
+                itemsList.getItems().add(displayText);
+                productComboBox.setValue(null);
+                quantityField.clear();
+                
+            } catch (NumberFormatException e) {
+                showAlert("Invalid Input", "Please enter a valid number for quantity");
+            }
+        } else {
+            showAlert("Missing Input", "Please select a product and enter quantity");
+        }
+    }
+
+    // Handle adding raw material with ComboBox
+    private static void handleAddRawMaterial(ComboBox<String> rawMaterialComboBox, TextField quantityField, ListView<String> materialsList) {
+        String selectedMaterial = rawMaterialComboBox.getValue();
+        String quantityText = quantityField.getText().trim();
+        
+        if (selectedMaterial != null && !quantityText.isEmpty()) {
+            try {
+                double quantity = Double.parseDouble(quantityText);
+                if (quantity <= 0) {
+                    showAlert("Invalid Input", "Quantity must be greater than 0");
+                    return;
+                }
+                
+                // Extract material name from the ComboBox selection
+                String materialName = selectedMaterial.split(" - ")[0];
+                String displayText = String.format("%s - Quantity Used: %.2f", materialName, quantity);
+                
+                materialsList.getItems().add(displayText);
+                rawMaterialComboBox.setValue(null);
+                quantityField.clear();
+                
+            } catch (NumberFormatException e) {
+                showAlert("Invalid Input", "Please enter a valid number for quantity");
+            }
+        } else {
+            showAlert("Missing Input", "Please select a raw material and enter quantity");
+        }
+    }
+
+    // Handle production invoice submission
+    private static void handleSubmitProductionInvoice(DatePicker productionDatePicker, TextArea notesArea, 
+                                                    ListView<String> itemsList, ListView<String> materialsList) {
+        try {
+            String productionDate = productionDatePicker.getValue().format(DATE_FORMATTER);
+            String notes = notesArea.getText().trim();
+            
+            if (itemsList.getItems().isEmpty()) {
+                showAlert("Missing Items", "Please add at least one production item");
+                return;
+            }
+            
+            // Insert production invoice and get ID
+            int invoiceId = database.insertProductionInvoiceAndGetId(productionDate, notes);
+            if (invoiceId == -1) {
+                showAlert("Error", "Failed to create production invoice");
+                return;
+            }
+            
+            // Prepare production items data
+            List<Object[]> productionItems = new ArrayList<>();
+            for (String item : itemsList.getItems()) {
+                // Parse the display text to extract data
+                String[] parts = item.split(" - Quantity: ");
+                if (parts.length == 2) {
+                    String productName = parts[0];
+                    double quantity = Double.parseDouble(parts[1]);
+                    
+                    // Get production stock ID by name
+                    int productionStockId = getProductionStockIdByName(productName);
+                    if (productionStockId != -1) {
+                        productionItems.add(new Object[]{productionStockId, quantity});
+                    }
+                }
+            }
+            
+            // Insert production invoice items
+            if (!database.insertProductionInvoiceItems(invoiceId, productionItems)) {
+                showAlert("Error", "Failed to save production items");
+                return;
+            }
+            
+            // Prepare raw materials data (if any)
+            if (!materialsList.getItems().isEmpty()) {
+                List<Object[]> rawMaterialsUsed = new ArrayList<>();
+                for (String material : materialsList.getItems()) {
+                    // Parse the display text to extract data
+                    String[] parts = material.split(" - Quantity Used: ");
+                    if (parts.length == 2) {
+                        String materialName = parts[0];
+                        double quantity = Double.parseDouble(parts[1]);
+                        
+                        // Get raw stock ID by name
+                        int rawStockId = database.getRawStockIdByName(materialName);
+                        if (rawStockId != -1) {
+                            rawMaterialsUsed.add(new Object[]{rawStockId, quantity});
+                        }
+                    }
+                }
+                
+                // Insert raw material usage
+                if (!database.insertProductionStockRawUsage(invoiceId, rawMaterialsUsed)) {
+                    showAlert("Warning", "Production invoice created but failed to save raw material usage");
+                }
+            }
+            
+            showAlert("Success", "Production invoice created successfully!");
+            
+            // Clear form
+            productionDatePicker.setValue(LocalDate.now());
+            notesArea.clear();
+            itemsList.getItems().clear();
+            materialsList.getItems().clear();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            showAlert("Error", "Failed to submit production invoice: " + e.getMessage());
+        }
+    }
+
+    // Helper method to get production stock ID by name
+    private static int getProductionStockIdByName(String productName) {
+        try {
+            List<Object[]> productionStocks = database.getAllProductionStocksForDropdown();
+            for (Object[] stock : productionStocks) {
+                if (stock[1].toString().equals(productName)) {
+                    return (Integer) stock[0]; // production_id
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return -1;
     }
 }
