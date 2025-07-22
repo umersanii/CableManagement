@@ -150,6 +150,13 @@ public interface db {
     
     boolean insertRawStock(String name, String category, String brand, String unit, double openingQty, double purchasePrice, double reorderLevel);
     
+    // --------------------------
+    // Production Stock Operations
+    // --------------------------
+    List<Object[]> getAllProductionStocks();
+    
+    boolean insertProductionStock(String name, String category, String brand, String unit, double openingQty, double salePrice, double reorderLevel);
+    
     List<Object[]> getAllRawPurchaseInvoices();
     
     boolean insertRawPurchaseInvoice(String invoiceNumber, int supplierId, String invoiceDate, 
@@ -211,8 +218,6 @@ public interface db {
     // --------------------------
     // Production Stock Operations  
     // --------------------------
-    List<Object[]> getAllProductionStocks();
-    
     List<Object[]> getAllProductionInvoices();
     
     List<Object[]> getAllSalesInvoices();

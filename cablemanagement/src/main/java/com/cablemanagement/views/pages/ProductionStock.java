@@ -6,22 +6,30 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
+import javafx.beans.property.SimpleStringProperty;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
+
+import com.cablemanagement.database.SQLiteDatabase;
+import com.cablemanagement.database.db;
+import com.cablemanagement.model.Brand;
+import com.cablemanagement.model.ProductionStockItem;
 
 public class ProductionStock {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final db database = new SQLiteDatabase();
 
     public static Node get() {
         BorderPane mainLayout = new BorderPane();
         mainLayout.setPadding(new Insets(20));
 
         StackPane formArea = new StackPane();
-        formArea.getChildren().add(createProductionInvoiceForm());
+        formArea.getChildren().add(createProductionStockForm());
 
         HBox buttonBar = createButtonBar(formArea);
 
@@ -40,6 +48,7 @@ public class ProductionStock {
         buttonBar.setAlignment(Pos.CENTER_LEFT);
 
         String[] buttonLabels = {
+            "Register Production Stock",
             "Create Production Invoice",
             "Create Return Production Invoice",
             "Create Sales Invoice", 
@@ -48,6 +57,7 @@ public class ProductionStock {
         };
 
         Runnable[] actions = {
+            () -> formArea.getChildren().setAll(createProductionStockForm()),
             () -> formArea.getChildren().setAll(createProductionInvoiceForm()),
             () -> formArea.getChildren().setAll(createReturnProductionInvoiceForm()),
             () -> formArea.getChildren().setAll(createSalesInvoiceForm()),
@@ -77,6 +87,62 @@ public class ProductionStock {
         btn.getStyleClass().add("register-button");
         btn.setOnAction(e -> action.run());
         bar.getChildren().add(btn);
+    }
+
+    private static VBox createProductionStockForm() {
+        VBox form = new VBox(15);
+        form.setPadding(new Insets(20));
+        form.getStyleClass().add("form-container");
+
+        Label heading = createHeading("Register Production Stock");
+
+        // Input fields matching ProductionStock table structure
+        TextField nameField = createTextField("Product Name");
+        TextField quantityField = createTextField("Quantity");
+        TextField unitCostField = createTextField("Unit Cost");
+        
+        // Brand ComboBox 
+        ComboBox<String> brandCombo = new ComboBox<>();
+        brandCombo.setPromptText("Select Brand");
+        for (Brand b : database.getAllBrands()) {
+            brandCombo.getItems().add(b.nameProperty().get());
+        }
+        brandCombo.setPrefWidth(200);
+
+        Button submitBtn = createSubmitButton("Submit Production Stock");
+
+        // Production Stock Table
+        Label tableHeading = createSubheading("Registered Production Stock:");
+        TableView<ProductionStockRecord> stockTable = createProductionStockTable();
+        refreshProductionStockTable(stockTable);
+
+        submitBtn.setOnAction(e -> handleProductionStockSubmit(
+            nameField, brandCombo, quantityField, unitCostField, stockTable
+        ));
+
+        // Create form content in a compact layout
+        VBox formContent = new VBox(15);
+        formContent.getChildren().addAll(
+            heading, 
+            createFormRow("Product Name:", nameField),
+            createFormRow("Brand:", brandCombo),
+            createFormRow("Quantity:", quantityField),
+            createFormRow("Unit Cost:", unitCostField),
+            submitBtn, tableHeading, stockTable
+        );
+
+        // Wrap form in ScrollPane for responsiveness
+        ScrollPane scrollPane = new ScrollPane(formContent);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(false);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setPrefViewportHeight(600);
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+
+        form.getChildren().add(scrollPane);
+        
+        return form;
     }
 
     private static VBox createProductionInvoiceForm() {
@@ -685,6 +751,121 @@ public class ProductionStock {
         });
         
         return listView;
+    }
+
+    // Production Stock specific methods
+    private static void handleProductionStockSubmit(
+            TextField nameField, ComboBox<String> brandCombo, 
+            TextField quantityField, TextField unitCostField, 
+            TableView<ProductionStockRecord> stockTable) {
+        
+        String name = nameField.getText().trim();
+        String brand = brandCombo.getSelectionModel().getSelectedItem();
+        String quantityText = quantityField.getText().trim();
+        String unitCostText = unitCostField.getText().trim();
+        
+        // Validation
+        if (name.isEmpty() || brand == null || quantityText.isEmpty() || unitCostText.isEmpty()) {
+            showAlert("Error", "Please fill in all fields.");
+            return;
+        }
+        
+        try {
+            int quantity = Integer.parseInt(quantityText);
+            double unitCost = Double.parseDouble(unitCostText);
+            
+            if (quantity < 0 || unitCost < 0) {
+                showAlert("Error", "Quantity and Unit Cost must be non-negative.");
+                return;
+            }
+            
+            // Insert into database - using quantity as openingQty and unitCost as salePrice
+            boolean success = database.insertProductionStock(name, "", brand, "", quantity, unitCost, 0.0);
+            
+            if (success) {
+                showAlert("Success", "Production Stock registered successfully!");
+                // Clear form
+                nameField.clear();
+                brandCombo.getSelectionModel().clearSelection();
+                quantityField.clear();
+                unitCostField.clear();
+                // Refresh table
+                refreshProductionStockTable(stockTable);
+            } else {
+                showAlert("Error", "Failed to register production stock.");
+            }
+            
+        } catch (NumberFormatException ex) {
+            showAlert("Error", "Please enter valid numbers for Quantity and Unit Cost.");
+        }
+    }
+
+    private static TableView<ProductionStockRecord> createProductionStockTable() {
+        TableView<ProductionStockRecord> table = new TableView<>();
+        table.setPrefHeight(300);
+        
+        TableColumn<ProductionStockRecord, String> nameCol = new TableColumn<>("Product Name");
+        nameCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getName()));
+        nameCol.setPrefWidth(150);
+        
+        TableColumn<ProductionStockRecord, String> brandCol = new TableColumn<>("Brand");
+        brandCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getBrand()));
+        brandCol.setPrefWidth(100);
+        
+        TableColumn<ProductionStockRecord, String> quantityCol = new TableColumn<>("Quantity");
+        quantityCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getQuantity())));
+        quantityCol.setPrefWidth(80);
+        
+        TableColumn<ProductionStockRecord, String> unitCostCol = new TableColumn<>("Unit Cost");
+        unitCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("%.2f", data.getValue().getUnitCost())));
+        unitCostCol.setPrefWidth(100);
+        
+        TableColumn<ProductionStockRecord, String> totalCostCol = new TableColumn<>("Total Cost");
+        totalCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("%.2f", data.getValue().getTotalCost())));
+        totalCostCol.setPrefWidth(100);
+        
+        table.getColumns().addAll(nameCol, brandCol, quantityCol, unitCostCol, totalCostCol);
+        return table;
+    }
+
+    private static void refreshProductionStockTable(TableView<ProductionStockRecord> table) {
+        ObservableList<ProductionStockRecord> data = FXCollections.observableArrayList();
+        
+        // Get all production stocks from database
+        for (Object[] stock : database.getAllProductionStocks()) {
+            data.add(new ProductionStockRecord(
+                (String) stock[1], // product_name
+                (String) stock[2], // brand_name
+                (Integer) stock[3], // quantity
+                (Double) stock[4], // unit_cost
+                (Double) stock[5]  // total_cost
+            ));
+        }
+        
+        table.setItems(data);
+    }
+
+    // Simple record class for table display
+    private static class ProductionStockRecord {
+        private final String name;
+        private final String brand;
+        private final int quantity;
+        private final double unitCost;
+        private final double totalCost;
+        
+        public ProductionStockRecord(String name, String brand, int quantity, double unitCost, double totalCost) {
+            this.name = name;
+            this.brand = brand;
+            this.quantity = quantity;
+            this.unitCost = unitCost;
+            this.totalCost = totalCost;
+        }
+        
+        public String getName() { return name; }
+        public String getBrand() { return brand; }
+        public int getQuantity() { return quantity; }
+        public double getUnitCost() { return unitCost; }
+        public double getTotalCost() { return totalCost; }
     }
 
     private static Label createHeading(String text) {

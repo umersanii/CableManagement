@@ -2267,26 +2267,24 @@ Override
     @Override
     public List<Object[]> getAllProductionStocks() {
         List<Object[]> productionStocks = new ArrayList<>();
-        String query = "SELECT ps.production_stock_id, ps.production_stock_name, c.category_name, " +
-                      "b.brand_name, u.unit_name, ps.sale_price_per_unit, ps.opening_quantity " +
-                      "FROM Production_Stock ps " +
-                      "JOIN Category c ON ps.category_id = c.category_id " +
+        String query = "SELECT ps.production_id, ps.product_name, b.brand_name, " +
+                      "ps.quantity, ps.unit_cost, ps.total_cost, ps.production_date " +
+                      "FROM ProductionStock ps " +
                       "JOIN Brand b ON ps.brand_id = b.brand_id " +
-                      "JOIN Unit u ON ps.unit_id = u.unit_id " +
-                      "ORDER BY ps.production_stock_name";
+                      "ORDER BY ps.product_name";
         
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             
             while (rs.next()) {
                 Object[] row = {
-                    rs.getInt("production_stock_id"),
-                    rs.getString("production_stock_name"),
-                    rs.getString("category_name"),
+                    rs.getInt("production_id"),
+                    rs.getString("product_name"),
                     rs.getString("brand_name"),
-                    rs.getString("unit_name"),
-                    rs.getDouble("sale_price_per_unit"),
-                    rs.getDouble("opening_quantity")
+                    rs.getInt("quantity"),
+                    rs.getDouble("unit_cost"),
+                    rs.getDouble("total_cost"),
+                    rs.getString("production_date")
                 };
                 productionStocks.add(row);
             }
@@ -2294,6 +2292,43 @@ Override
             e.printStackTrace();
         }
         return productionStocks;
+    }
+
+    @Override
+    public boolean insertProductionStock(String name, String category, String brand, String unit, 
+                                       double openingQty, double salePrice, double reorderLevel) {
+        String query = "INSERT INTO ProductionStock (product_name, brand_id, quantity, unit_cost, total_cost) " +
+                      "VALUES (?, (SELECT brand_id FROM Brand WHERE brand_name = ? LIMIT 1), ?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            connection.setAutoCommit(false); // Start transaction
+            
+            // Ensure brand exists
+            ensureBrandExists(brand, 1); // Default tehsil_id = 1
+            
+            double totalCost = openingQty * salePrice;
+            
+            pstmt.setString(1, name);
+            pstmt.setString(2, brand);
+            pstmt.setInt(3, (int) openingQty);
+            pstmt.setDouble(4, salePrice);
+            pstmt.setDouble(5, totalCost);
+            
+            int result = pstmt.executeUpdate();
+            connection.commit(); // Commit transaction
+            connection.setAutoCommit(true); // Reset auto-commit
+            
+            return result > 0;
+        } catch (SQLException e) {
+            try {
+                connection.rollback(); // Rollback on error
+                connection.setAutoCommit(true);
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
+            e.printStackTrace();
+            return false;
+        }
     }
 
     @Override
