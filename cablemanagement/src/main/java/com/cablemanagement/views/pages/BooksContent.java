@@ -3,6 +3,13 @@ package com.cablemanagement.views.pages;
 import com.cablemanagement.config;
 import com.cablemanagement.invoice.*;
 import com.cablemanagement.model.*;
+import com.cablemanagement.views.pages.BooksContent.ProductionRecord;
+import com.cablemanagement.views.pages.BooksContent.ReturnProductionRecord;
+import com.cablemanagement.views.pages.BooksContent.ReturnPurchaseRecord;
+import com.cablemanagement.views.pages.BooksContent.ReturnRawStockRecord;
+import com.cablemanagement.views.pages.BooksContent.ReturnSalesRecord;
+import com.cablemanagement.views.pages.BooksContent.SalesRecord;
+
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
@@ -533,7 +540,7 @@ private static TableView<PurchaseRecord> createPurchaseTable(ObservableList<Purc
 
     // Data loading methods
 private static void loadPurchaseData(TableView<PurchaseRecord> table, DatePicker fromDatePicker, 
-                                   DatePicker toDatePicker, ComboBox<String> supplierFilter) {
+                                    DatePicker toDatePicker, ComboBox<String> supplierFilter) {
     ObservableList<PurchaseRecord> data = FXCollections.observableArrayList();
     try {
         Map<String, String> filters = new HashMap<>();
@@ -544,29 +551,45 @@ private static void loadPurchaseData(TableView<PurchaseRecord> table, DatePicker
             filters.put("toDate", toDatePicker.getValue().format(DATE_FORMATTER));
         }
         if (supplierFilter.getValue() != null && !supplierFilter.getValue().isEmpty()) {
-            filters.put("supplier", supplierFilter.getValue());
+            filters.put("supplier_name", supplierFilter.getValue()); // Use supplier_name for View_Purchase_Book
         }
-        
+
         List<Object[]> result = config.database.getViewData("View_Purchase_Book", filters);
         System.out.println("View_Purchase_Book results: " + result.size() + " rows");
-        
+
+        // Use a set to track seen invoice numbers and skip duplicates
+        java.util.HashSet<String> seenInvoiceIds = new java.util.HashSet<>();
         for (Object[] row : result) {
+            String invoiceId = row[0] != null ? row[0].toString() : "";
+            if (seenInvoiceIds.contains(invoiceId)) {
+            continue; // Skip duplicate invoice ids
+            }
+            seenInvoiceIds.add(invoiceId);
+
             data.add(new PurchaseRecord(
-                row[0] != null ? row[0].toString() : "",
-                row[1] != null ? row[1].toString() : "",
-                row[2] != null ? row[2].toString() : "",
-                row[3] != null ? Double.parseDouble(row[3].toString()) : 0.0,
-                row[4] != null ? Double.parseDouble(row[4].toString()) : 0.0,
-                row[5] != null ? Double.parseDouble(row[5].toString()) : 0.0
+            invoiceId, // raw_purchase_invoice_id
+            row[1] != null ? row[1].toString() : "", // invoice_number
+            row[2] != null ? row[2].toString() : "", // supplier_name
+            row[3] != null ? row[3].toString() : "", // invoice_date (string)
+            row[4] != null ? row[4].toString() : "", // item_name
+            row[5] != null ? row[5].toString() : "", // brand_name
+            row[6] != null ? row[6].toString() : "", // manufacturer_name
+            row[7] != null ? Double.parseDouble(row[7].toString()) : 0.0, // quantity
+            row[8] != null ? Double.parseDouble(row[8].toString()) : 0.0, // unit_price
+            row[9] != null ? Double.parseDouble(row[9].toString()) : 0.0, // item_total
+            row[10] != null ? Double.parseDouble(row[10].toString()) : 0.0, // total_amount
+            row[11] != null ? Double.parseDouble(row[11].toString()) : 0.0, // discount_amount
+            row[12] != null ? Double.parseDouble(row[12].toString()) : 0.0, // paid_amount
+            row[13] != null ? Double.parseDouble(row[13].toString()) : 0.0 // balance_due
             ));
         }
     } catch (Exception e) {
         showAlert("Database Error", "Failed to load purchase data: " + e.getMessage());
         e.printStackTrace();
     }
-    
+
     table.setItems(data);
-    
+
     // Debug output
     System.out.println("Table items count: " + table.getItems().size());
     if (!table.getItems().isEmpty()) {
@@ -890,7 +913,7 @@ private static void exportReport(String reportName, ObservableList<?> data) {
             for (Object record : data) {
                 PurchaseRecord pr = (PurchaseRecord) record;
                 items.add(new Item(
-                    pr.getSupplier() + " (Invoice: " + pr.getInvoiceNumber() + ")",
+                    pr.getSupplierName() + " (Invoice: " + pr.getInvoiceNumber() + ")",
                     1, 
                     pr.getAmount(), 
                     pr.getDiscount() / pr.getAmount() * 100
@@ -979,37 +1002,75 @@ private static void exportReport(String reportName, ObservableList<?> data) {
     }
 
     return new InvoiceData(invoiceNumber, date, customerName, customerAddress, previousBalance, items);
-}    static class PurchaseRecord {
+}   
+
+
        
-    private final StringProperty invoiceNumber = new SimpleStringProperty();
-        private final StringProperty date = new SimpleStringProperty();
-        private final StringProperty supplier = new SimpleStringProperty();
-        private final SimpleDoubleProperty amount = new SimpleDoubleProperty();
-        private final SimpleDoubleProperty discount = new SimpleDoubleProperty();
-        private final SimpleDoubleProperty paid = new SimpleDoubleProperty();
+    // Assumed PurchaseRecord class
+static class PurchaseRecord {
+    private final SimpleStringProperty rawPurchaseInvoiceId;
+    private final SimpleStringProperty invoiceNumber;
+    private final SimpleStringProperty supplierName;
+    private final SimpleStringProperty invoiceDate;
+    private final SimpleStringProperty itemName;
+    private final SimpleStringProperty brandName;
+    private final SimpleStringProperty manufacturerName;
+    private final SimpleDoubleProperty quantity;
+    private final SimpleDoubleProperty unitPrice;
+    private final SimpleDoubleProperty itemTotal;
+    private final SimpleDoubleProperty totalAmount;
+    private final SimpleDoubleProperty discountAmount;
+    private final SimpleDoubleProperty paidAmount;
+    private final SimpleDoubleProperty balanceDue;
 
-        PurchaseRecord(String invoiceNumber, String date, String supplier, double amount, double discount, double paid) {
-            this.invoiceNumber.set(invoiceNumber);
-            this.date.set(date);
-            this.supplier.set(supplier);
-            this.amount.set(amount);
-            this.discount.set(discount);
-            this.paid.set(paid);
-        }
-
-        StringProperty invoiceNumberProperty() { return invoiceNumber; }
-        StringProperty dateProperty() { return date; }
-        StringProperty supplierProperty() { return supplier; }
-        SimpleDoubleProperty amountProperty() { return amount; }
-        SimpleDoubleProperty discountProperty() { return discount; }
-        SimpleDoubleProperty paidProperty() { return paid; }
-        String getInvoiceNumber() { return invoiceNumber.get(); }
-        String getDate() { return date.get(); }
-        String getSupplier() { return supplier.get(); }
-        double getAmount() { return amount.get(); }
-        double getDiscount() { return discount.get(); }
-        double getPaid() { return paid.get(); }
+    public PurchaseRecord(String rawPurchaseInvoiceId, String invoiceNumber, String supplierName, 
+                         String invoiceDate, String itemName, String brandName, String manufacturerName,
+                         double quantity, double unitPrice, double itemTotal, double totalAmount,
+                         double discountAmount, double paidAmount, double balanceDue) {
+        this.rawPurchaseInvoiceId = new SimpleStringProperty(rawPurchaseInvoiceId);
+        this.invoiceNumber = new SimpleStringProperty(invoiceNumber);
+        this.supplierName = new SimpleStringProperty(supplierName);
+        this.invoiceDate = new SimpleStringProperty(invoiceDate);
+        this.itemName = new SimpleStringProperty(itemName);
+        this.brandName = new SimpleStringProperty(brandName);
+        this.manufacturerName = new SimpleStringProperty(manufacturerName);
+        this.quantity = new SimpleDoubleProperty(quantity);
+        this.unitPrice = new SimpleDoubleProperty(unitPrice);
+        this.itemTotal = new SimpleDoubleProperty(itemTotal);
+        this.totalAmount = new SimpleDoubleProperty(totalAmount);
+        this.discountAmount = new SimpleDoubleProperty(discountAmount);
+        this.paidAmount = new SimpleDoubleProperty(paidAmount);
+        this.balanceDue = new SimpleDoubleProperty(balanceDue);
     }
+
+    // Property methods for TableView columns
+    public SimpleStringProperty invoiceNumberProperty() { return invoiceNumber; }
+    public SimpleStringProperty dateProperty() { return invoiceDate; }
+    public SimpleStringProperty supplierProperty() { return supplierName; }
+
+    // Getters (used by TableView columns)
+    public String getRawPurchaseInvoiceId() { return rawPurchaseInvoiceId.get(); }
+    public String getInvoiceNumber() { return invoiceNumber.get(); }
+    public String getSupplierName() { return supplierName.get(); }
+    public String getInvoiceDate() { return invoiceDate.get(); }
+    public String getItemName() { return itemName.get(); }
+    public String getBrandName() { return brandName.get(); }
+    public String getManufacturerName() { return manufacturerName.get(); }
+    public Double getQuantity() { return quantity.get(); }
+    public Double getUnitPrice() { return unitPrice.get(); }
+    public Double getItemTotal() { return itemTotal.get(); }
+    public Double getTotalAmount() { return totalAmount.get(); }
+    public Double getDiscountAmount() { return discountAmount.get(); }
+    public Double getPaidAmount() { return paidAmount.get(); }
+    public Double getBalanceDue() { return balanceDue.get(); }
+
+    // Additional getters for TableView columns
+    public Double getAmount() { return getTotalAmount(); }
+    public Double getDiscount() { return getDiscountAmount(); }
+    public Double getPaid() { return getPaidAmount(); }
+}
+
+
 
     static class ReturnPurchaseRecord {
         private final StringProperty returnInvoice = new SimpleStringProperty();

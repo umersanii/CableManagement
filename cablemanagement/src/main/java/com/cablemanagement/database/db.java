@@ -176,6 +176,8 @@ public interface db {
                                           double totalAmount, double discountAmount, double paidAmount, 
                                           List<RawStockPurchaseItem> items);
 
+    boolean ensureBrandExists(String brandName, int tehsilId);
+
     // --------------------------
     // Raw Purchase Return Invoice Operations
     // --------------------------
