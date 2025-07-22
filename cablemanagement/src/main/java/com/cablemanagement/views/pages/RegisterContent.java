@@ -168,9 +168,11 @@ public class RegisterContent {
         ComboBox<String> tehsilBox = new ComboBox<>();
         tehsilBox.getStyleClass().add("form-input");
 
-        // Load provinces from database
+        // Load provinces and all tehsils from database
         if (config.database != null && config.database.isConnected()) {
             provinceBox.getItems().addAll(config.database.getAllProvinces());
+            // Also populate all tehsils initially for easier selection
+            tehsilBox.getItems().addAll(config.database.getAllTehsils());
         }
 
         // Province selection handler
@@ -860,13 +862,22 @@ public class RegisterContent {
         // Input fields
         TextField nameField = new TextField();
         TextField contactField = new TextField();
+        ComboBox<String> tehsilBox = new ComboBox<>();
         nameField.getStyleClass().add("form-input");
         contactField.getStyleClass().add("form-input");
+        tehsilBox.getStyleClass().add("form-input");
+
+        // Load all tehsils from database
+        if (config.database != null && config.database.isConnected()) {
+            tehsilBox.getItems().addAll(config.database.getAllTehsils());
+        }
 
         Label nameLabel = new Label("Customer Name:");
         Label contactLabel = new Label("Contact:");
+        Label tehsilLabel = new Label("Tehsil:");
         nameLabel.getStyleClass().add("form-label");
         contactLabel.getStyleClass().add("form-label");
+        tehsilLabel.getStyleClass().add("form-label");
 
         HBox nameRow = new HBox(10, nameLabel, nameField);
         nameRow.setAlignment(Pos.CENTER_LEFT);
@@ -875,6 +886,10 @@ public class RegisterContent {
         HBox contactRow = new HBox(10, contactLabel, contactField);
         contactRow.setAlignment(Pos.CENTER_LEFT);
         contactRow.getStyleClass().add("form-row");
+
+        HBox tehsilRow = new HBox(10, tehsilLabel, tehsilBox);
+        tehsilRow.setAlignment(Pos.CENTER_LEFT);
+        tehsilRow.getStyleClass().add("form-row");
 
         Button submitBtn = new Button("Submit Customer");
         submitBtn.getStyleClass().add("form-submit");
@@ -901,7 +916,10 @@ public class RegisterContent {
         TableColumn<Customer, String> contactCol = new TableColumn<>("Contact");
         contactCol.setCellValueFactory(data -> data.getValue().contactProperty());
 
-        table.getColumns().addAll(nameCol, contactCol);
+        TableColumn<Customer, String> tehsilCol = new TableColumn<>("Tehsil");
+        tehsilCol.setCellValueFactory(data -> data.getValue().tehsilProperty());
+
+        table.getColumns().addAll(nameCol, contactCol, tehsilCol);
 
         // Load existing customers from database
         if (config.database != null && config.database.isConnected()) {
@@ -912,13 +930,26 @@ public class RegisterContent {
         submitBtn.setOnAction(e -> {
             String name = nameField.getText().trim();
             String contact = contactField.getText().trim();
+            String tehsil = tehsilBox.getValue();
+            
             if (!name.isEmpty()) {
                 if (config.database != null && config.database.isConnected()) {
-                    if (config.database.insertCustomer(name, contact)) {
-                        Customer customer = new Customer(name, contact);
+                    boolean success = false;
+                    Customer customer = null;
+                    
+                    if (tehsil != null && !tehsil.trim().isEmpty()) {
+                        success = config.database.insertCustomer(name, contact, tehsil);
+                        customer = new Customer(name, contact, tehsil);
+                    } else {
+                        success = config.database.insertCustomer(name, contact);
+                        customer = new Customer(name, contact, "");
+                    }
+                    
+                    if (success) {
                         table.getItems().add(customer);
                         nameField.clear();
                         contactField.clear();
+                        tehsilBox.setValue(null);
                         showAlert("Success", "Customer added successfully!");
                     } else {
                         showAlert("Error", "Failed to add customer to database!");
@@ -954,6 +985,7 @@ public class RegisterContent {
             heading,
             nameRow,
             contactRow,
+            tehsilRow,
             buttonRow,
             tableHeading,
             table
@@ -973,19 +1005,34 @@ public class RegisterContent {
         // Input fields
         TextField nameField = new TextField();
         TextField contactField = new TextField();
+        ComboBox<String> tehsilBox = new ComboBox<>();
         nameField.getStyleClass().add("form-input");
         contactField.getStyleClass().add("form-input");
+        tehsilBox.getStyleClass().add("form-input");
+
+        // Load all tehsils from database
+        if (config.database != null && config.database.isConnected()) {
+            tehsilBox.getItems().addAll(config.database.getAllTehsils());
+        }
 
         Label nameLabel = new Label("Supplier Name:");
         Label contactLabel = new Label("Contact:");
+        Label tehsilLabel = new Label("Tehsil:");
         nameLabel.getStyleClass().add("form-label");
         contactLabel.getStyleClass().add("form-label");
+        tehsilLabel.getStyleClass().add("form-label");
 
         HBox nameRow = new HBox(10, nameLabel, nameField);
         nameRow.setAlignment(Pos.CENTER_LEFT);
         nameRow.getStyleClass().add("form-row");
 
         HBox contactRow = new HBox(10, contactLabel, contactField);
+        contactRow.setAlignment(Pos.CENTER_LEFT);
+        contactRow.getStyleClass().add("form-row");
+
+        HBox tehsilRow = new HBox(10, tehsilLabel, tehsilBox);
+        tehsilRow.setAlignment(Pos.CENTER_LEFT);
+        tehsilRow.getStyleClass().add("form-row");
         contactRow.setAlignment(Pos.CENTER_LEFT);
         contactRow.getStyleClass().add("form-row");
 
@@ -1014,7 +1061,10 @@ public class RegisterContent {
         TableColumn<Supplier, String> contactCol = new TableColumn<>("Contact");
         contactCol.setCellValueFactory(data -> data.getValue().contactProperty());
 
-        table.getColumns().addAll(nameCol, contactCol);
+        TableColumn<Supplier, String> tehsilCol = new TableColumn<>("Tehsil");
+        tehsilCol.setCellValueFactory(data -> data.getValue().tehsilProperty());
+
+        table.getColumns().addAll(nameCol, contactCol, tehsilCol);
 
         // Load existing suppliers from database
         if (config.database != null && config.database.isConnected()) {
@@ -1025,13 +1075,26 @@ public class RegisterContent {
         submitBtn.setOnAction(e -> {
             String name = nameField.getText().trim();
             String contact = contactField.getText().trim();
+            String tehsil = tehsilBox.getValue();
+            
             if (!name.isEmpty()) {
                 if (config.database != null && config.database.isConnected()) {
-                    if (config.database.insertSupplier(name, contact)) {
-                        Supplier supplier = new Supplier(name, contact);
+                    boolean success = false;
+                    Supplier supplier = null;
+                    
+                    if (tehsil != null && !tehsil.trim().isEmpty()) {
+                        success = config.database.insertSupplier(name, contact, tehsil);
+                        supplier = new Supplier(name, contact, tehsil);
+                    } else {
+                        success = config.database.insertSupplier(name, contact);
+                        supplier = new Supplier(name, contact, "");
+                    }
+                    
+                    if (success) {
                         table.getItems().add(supplier);
                         nameField.clear();
                         contactField.clear();
+                        tehsilBox.setValue(null);
                         showAlert("Success", "Supplier added successfully!");
                     } else {
                         showAlert("Error", "Failed to add supplier to database!");
@@ -1067,6 +1130,7 @@ public class RegisterContent {
             heading,
             nameRow,
             contactRow,
+            tehsilRow,
             buttonRow,
             tableHeading,
             table

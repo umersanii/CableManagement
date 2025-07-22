@@ -1055,7 +1055,10 @@ private boolean bankExists(int bankId) throws SQLException {
     @Override
     public List<Customer> getAllCustomers() {
         List<Customer> customers = new ArrayList<>();
-        String query = "SELECT customer_name, customer_contact FROM Customer ORDER BY customer_name";
+        String query = "SELECT c.customer_name, c.customer_contact, t.tehsil_name " +
+                      "FROM Customer c " +
+                      "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                      "ORDER BY c.customer_name";
         
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
@@ -1063,7 +1066,9 @@ private boolean bankExists(int bankId) throws SQLException {
             while (rs.next()) {
                 String name = rs.getString("customer_name");
                 String contact = rs.getString("customer_contact");
-                customers.add(new Customer(name, contact));
+                String tehsil = rs.getString("tehsil_name");
+                if (tehsil == null) tehsil = "";
+                customers.add(new Customer(name, contact, tehsil));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -1097,6 +1102,33 @@ private boolean bankExists(int bankId) throws SQLException {
     }
 
     @Override
+    public boolean insertCustomer(String name, String contact, String tehsilName) {
+        String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
+        String insertQuery = "INSERT INTO Customer (customer_name, customer_contact, tehsil_id) VALUES (?, ?, ?)";
+        
+        try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
+            getTehsilStmt.setString(1, tehsilName);
+            
+            try (ResultSet rs = getTehsilStmt.executeQuery()) {
+                if (rs.next()) {
+                    int tehsilId = rs.getInt("tehsil_id");
+                    
+                    try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+                        insertStmt.setString(1, name);
+                        insertStmt.setString(2, contact);
+                        insertStmt.setInt(3, tehsilId);
+                        
+                        return insertStmt.executeUpdate() > 0;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
     public boolean customerExists(String name) {
         String query = "SELECT COUNT(*) FROM Customer WHERE customer_name = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
@@ -1116,7 +1148,10 @@ private boolean bankExists(int bankId) throws SQLException {
     @Override
     public List<Supplier> getAllSuppliers() {
         List<Supplier> suppliers = new ArrayList<>();
-        String query = "SELECT supplier_name, supplier_contact FROM Supplier ORDER BY supplier_name";
+        String query = "SELECT s.supplier_name, s.supplier_contact, t.tehsil_name " +
+                      "FROM Supplier s " +
+                      "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                      "ORDER BY s.supplier_name";
         
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
@@ -1124,7 +1159,9 @@ private boolean bankExists(int bankId) throws SQLException {
             while (rs.next()) {
                 String name = rs.getString("supplier_name");
                 String contact = rs.getString("supplier_contact");
-                suppliers.add(new Supplier(name, contact));
+                String tehsil = rs.getString("tehsil_name");
+                if (tehsil == null) tehsil = "";
+                suppliers.add(new Supplier(name, contact, tehsil));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -1149,6 +1186,33 @@ private boolean bankExists(int bankId) throws SQLException {
                     insertStmt.setInt(3, tehsilId);
                     
                     return insertStmt.executeUpdate() > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean insertSupplier(String name, String contact, String tehsilName) {
+        String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
+        String insertQuery = "INSERT INTO Supplier (supplier_name, supplier_contact, tehsil_id) VALUES (?, ?, ?)";
+        
+        try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
+            getTehsilStmt.setString(1, tehsilName);
+            
+            try (ResultSet rs = getTehsilStmt.executeQuery()) {
+                if (rs.next()) {
+                    int tehsilId = rs.getInt("tehsil_id");
+                    
+                    try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+                        insertStmt.setString(1, name);
+                        insertStmt.setString(2, contact);
+                        insertStmt.setInt(3, tehsilId);
+                        
+                        return insertStmt.executeUpdate() > 0;
+                    }
                 }
             }
         } catch (SQLException e) {
@@ -2512,47 +2576,110 @@ public List<Object[]> getAllCashTransactions() {
     // Delete Methods
     @Override
     public boolean deleteCategory(String categoryName) {
-        return true;
+        String query = "DELETE FROM Category WHERE category_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, categoryName);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     @Override
     public boolean deleteManufacturer(String name) {
-        return true;
+        String query = "DELETE FROM Manufacturer WHERE manufacturer_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     @Override
     public boolean deleteBrand(String name) {
-        return true;
+        String query = "DELETE FROM Brand WHERE brand_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     @Override
     public boolean deleteProvince(String provinceName) {
-        return true;
+        String query = "DELETE FROM Province WHERE province_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, provinceName);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     @Override
     public boolean deleteDistrict(String districtName) {
-        return true;
+        String query = "DELETE FROM District WHERE district_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, districtName);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     @Override
     public boolean deleteTehsil(String tehsilName) {
-        return true;
+        String query = "DELETE FROM Tehsil WHERE tehsil_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, tehsilName);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     @Override
     public boolean deleteUnit(String unitName) {
-        return true;
+        String query = "DELETE FROM Unit WHERE unit_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, unitName);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     @Override
     public boolean deleteCustomer(String name) {
-        return true;
+        String query = "DELETE FROM Customer WHERE customer_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     @Override
     public boolean deleteSupplier(String name) {
-        return true;
+        String query = "DELETE FROM Supplier WHERE supplier_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     // --------------------------

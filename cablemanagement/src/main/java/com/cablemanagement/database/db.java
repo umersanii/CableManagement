@@ -107,6 +107,8 @@ public interface db {
     List<Customer> getAllCustomers();
 
     boolean insertCustomer(String name, String contact);
+    
+    boolean insertCustomer(String name, String contact, String tehsil);
 
     boolean customerExists(String name);
 
@@ -116,6 +118,8 @@ public interface db {
     List<Supplier> getAllSuppliers();
 
     boolean insertSupplier(String name, String contact) ;
+    
+    boolean insertSupplier(String name, String contact, String tehsil);
 
     boolean supplierExists(String name) ;
 
