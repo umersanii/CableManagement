@@ -864,7 +864,6 @@ private static void exportReport(String reportName, ObservableList<?> data) {
         return;
     }
 
-    // Create exports directory if it doesn't exist
     File exportDir = new File(EXPORT_PATH);
     if (!exportDir.exists()) {
         exportDir.mkdirs();
@@ -875,14 +874,22 @@ private static void exportReport(String reportName, ObservableList<?> data) {
     
     try {
         InvoiceData invoiceData = createInvoiceData(reportName, data);
+        if (invoiceData.getItems() == null || invoiceData.getItems().isEmpty()) {
+            showAlert("Error", "No items to export in the report!");
+            return;
+        }
+        System.out.println("invoice data size: " + invoiceData.getItems().size());
+        for (Item item : invoiceData.getItems()) {
+            System.out.println("Item: " + item.getName() + ", Qty: " + item.getQuantity() + 
+                              ", Price: " + item.getUnitPrice() + ", Discount: " + item.getDiscountPercent());
+        }
         InvoiceGenerator.generatePDF(invoiceData, filename);
         showAlert("Success", "Report successfully exported to:\n" + new File(filename).getAbsolutePath());
     } catch (Exception e) {
         showAlert("Error", "Failed to export report: " + e.getMessage());
         e.printStackTrace();
     }
-} 
-
+}
     private static void printReport(String reportName, ObservableList<?> data) {
         if (data.isEmpty()) {
             showAlert("Error", "No data to print!");
@@ -893,18 +900,18 @@ private static void exportReport(String reportName, ObservableList<?> data) {
         InvoiceData invoiceData = createInvoiceData(reportName, data);
         try {
             InvoiceGenerator.generatePDF(invoiceData, filename);
-            InvoiceGenerator.printPDF(filename);
+            //InvoiceGenerator.printPDF(filename);
             showAlert("Success", "Report sent to printer!");
         } catch (Exception e) {
             showAlert("Error", "Failed to print report: " + e.getMessage());
         }
     }
 
-    private static InvoiceData createInvoiceData(String reportName, ObservableList<?> data) {
+private static InvoiceData createInvoiceData(String reportName, ObservableList<?> data) {
     List<Item> items = new ArrayList<>();
     String customerName = "General Report";
     String customerAddress = "N/A";
-    String invoiceNumber = reportName + "_" + System.currentTimeMillis();
+    String invoiceNumber = reportName + "_Report"; // Generic identifier for the report
     String date = LocalDate.now().format(DATE_FORMATTER);
     double previousBalance = 0.0;
 
@@ -912,12 +919,21 @@ private static void exportReport(String reportName, ObservableList<?> data) {
         case "PurchaseBook":
             for (Object record : data) {
                 PurchaseRecord pr = (PurchaseRecord) record;
+                double discountPercentage = pr.getAmount() != 0 ? pr.getDiscount() / pr.getAmount() * 100 : 0.0;
                 items.add(new Item(
                     pr.getSupplierName() + " (Invoice: " + pr.getInvoiceNumber() + ")",
                     1, 
                     pr.getAmount(), 
-                    pr.getDiscount() / pr.getAmount() * 100
+                    discountPercentage
                 ));
+                System.out.println("Item: " + pr.getItemName() + ", Brand: " + pr.getBrandName() + 
+                                  ", Manufacturer: " + pr.getManufacturerName() + 
+                                  ", Qty: " + pr.getQuantity() + ", Unit Price: " + pr.getUnitPrice() + 
+                                  ", Item Total: " + pr.getItemTotal());
+                // Use first invoice number if needed
+                if (items.size() == 1) {
+                    invoiceNumber = pr.getInvoiceNumber();
+                }
             }
             break;
         case "ReturnPurchaseBook":
@@ -929,6 +945,9 @@ private static void exportReport(String reportName, ObservableList<?> data) {
                     rpr.getAmount(), 
                     0.0
                 ));
+                if (items.size() == 1) {
+                    invoiceNumber = rpr.getReturnInvoice();
+                }
             }
             break;
         case "RawStockBook":
@@ -940,6 +959,9 @@ private static void exportReport(String reportName, ObservableList<?> data) {
                     0.0, 
                     0.0
                 ));
+                if (items.size() == 1) {
+                    invoiceNumber = rsr.getReference();
+                }
             }
             break;
         case "ReturnRawStockBook":
@@ -951,6 +973,10 @@ private static void exportReport(String reportName, ObservableList<?> data) {
                     rrsr.getUnitPrice(), 
                     0.0
                 ));
+                // ReturnRawStockRecord may not have a direct invoice number; keep generic or use another field
+                if (items.size() == 1) {
+                    invoiceNumber = reportName + "_Report"; // No specific invoice number
+                }
             }
             break;
         case "ProductionBook":
@@ -962,6 +988,9 @@ private static void exportReport(String reportName, ObservableList<?> data) {
                     0.0, 
                     0.0
                 ));
+                if (items.size() == 1) {
+                    invoiceNumber = reportName + "_Report"; // No specific invoice number
+                }
             }
             break;
         case "ReturnProductionBook":
@@ -973,17 +1002,24 @@ private static void exportReport(String reportName, ObservableList<?> data) {
                     0.0, 
                     0.0
                 ));
+                if (items.size() == 1) {
+                    invoiceNumber = rpr.getReference();
+                }
             }
             break;
         case "SalesBook":
             for (Object record : data) {
                 SalesRecord sr = (SalesRecord) record;
+                double discountPercentage = sr.getAmount() != 0 ? sr.getDiscount() / sr.getAmount() * 100 : 0.0;
                 items.add(new Item(
                     sr.getCustomer() + " (Invoice: " + sr.getInvoiceNumber() + ")",
                     1, 
                     sr.getAmount(), 
-                    sr.getDiscount() / sr.getAmount() * 100
+                    discountPercentage
                 ));
+                if (items.size() == 1) {
+                    invoiceNumber = sr.getInvoiceNumber();
+                }
             }
             break;
         case "ReturnSalesBook":
@@ -995,16 +1031,30 @@ private static void exportReport(String reportName, ObservableList<?> data) {
                     rsr.getAmount(), 
                     0.0
                 ));
+                if (items.size() == 1) {
+                    invoiceNumber = rsr.getReturnInvoice();
+                }
             }
             break;
         default:
             break;
     }
 
+    System.out.println("Invoice Data:");
+    System.out.println("Invoice Number: " + invoiceNumber);
+    System.out.println("Date: " + date);
+    System.out.println("Customer Name: " + customerName);
+    System.out.println("Customer Address: " + customerAddress);
+    System.out.println("Previous Balance: " + previousBalance);
+    System.out.println("Items:");
+    for (Item item : items) {
+        System.out.println("  Name: " + item.getName() +
+                          ", Quantity: " + item.getQuantity() +
+                          ", Unit Price: " + item.getUnitPrice() +
+                          ", Discount %: " + item.getDiscountPercent());
+    }
     return new InvoiceData(invoiceNumber, date, customerName, customerAddress, previousBalance, items);
-}   
-
-
+}
        
     // Assumed PurchaseRecord class
 static class PurchaseRecord {

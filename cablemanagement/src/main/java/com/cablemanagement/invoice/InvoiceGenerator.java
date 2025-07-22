@@ -1,12 +1,11 @@
 package com.cablemanagement.invoice;
 
 import com.itextpdf.text.*;
-import com.itextpdf.text.pdf.PdfPCell;
-import com.itextpdf.text.pdf.PdfPTable;
-import com.itextpdf.text.pdf.PdfWriter;
+import com.itextpdf.text.pdf.*;
+import com.itextpdf.text.pdf.draw.DottedLineSeparator;
+
 import java.io.FileOutputStream;
 import java.util.List;
-// import java.awt.print.PrinterJob; // Removed due to accessibility issue
 
 public class InvoiceGenerator {
     public static void generatePDF(InvoiceData data, String filename) {
@@ -15,50 +14,62 @@ public class InvoiceGenerator {
             PdfWriter.getInstance(document, new FileOutputStream(filename));
             document.open();
 
+            // Fonts
             Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, BaseColor.BLACK);
-            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.DARK_GRAY);
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.BLACK);
             Font regularFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.BLACK);
 
+            // Logo (Optional - comment out if no logo)
+            Image logo = Image.getInstance("CableManagement/cablemanagement/src/main/java/com/cablemanagement/invoice/logo.png");
+            logo.scaleToFit(100, 100);
+            logo.setAlignment(Element.ALIGN_CENTER);
+            document.add(logo);
+
+            // Header
             Paragraph header = new Paragraph("HASEEB WIRE & CABLES", titleFont);
             header.setAlignment(Element.ALIGN_CENTER);
             document.add(header);
 
-            Paragraph contact = new Paragraph("Khalil Abad, Amangarh, Nowshera\n0923-265138 / 0333-9265587\n", regularFont);
+            Paragraph subHeader = new Paragraph("Purchase Return Invoice", headerFont);
+            subHeader.setAlignment(Element.ALIGN_CENTER);
+            document.add(subHeader);
+
+            Paragraph contact = new Paragraph("Khalil Abad, Amangarh, Nowshera\n0333-4100520 / 0333-9260587\n", regularFont);
             contact.setAlignment(Element.ALIGN_CENTER);
             document.add(contact);
-
-            PdfPTable detailsTable = new PdfPTable(3);
-            detailsTable.setWidthPercentage(100);
-            detailsTable.setWidths(new float[]{3f, 3f, 3f});
-
-            PdfPCell leftCell = new PdfPCell(new Phrase("Acc #: 155\nCustomer: " + data.getCustomerName() + "\nAddress: " + data.getCustomerAddress(), regularFont));
-            leftCell.setBorder(Rectangle.NO_BORDER);
-            detailsTable.addCell(leftCell);
-
-            PdfPCell middleCell = new PdfPCell(new Phrase(" "));
-            middleCell.setBorder(Rectangle.NO_BORDER);
-            detailsTable.addCell(middleCell);
-
-            PdfPCell rightCell = new PdfPCell(new Phrase("Invoice #: " + data.getInvoiceNumber() + "\nDate: " + data.getDate() + "\nOperator: admin", regularFont));
-            rightCell.setBorder(Rectangle.NO_BORDER);
-            detailsTable.addCell(rightCell);
-
-            document.add(detailsTable);
+            document.add(new Chunk(new DottedLineSeparator()));
             document.add(Chunk.NEWLINE);
 
+            // Supplier & Invoice Info
+            PdfPTable infoTable = new PdfPTable(2);
+            infoTable.setWidthPercentage(100);
+            infoTable.setWidths(new float[]{6f, 4f});
+
+            PdfPCell supplierCell = new PdfPCell(new Phrase(
+                    "Supplier: RawMetals Pvt Ltd\n" +
+                    "Address: Model Town, Lahore,\nPunjab", regularFont));
+            supplierCell.setBorder(Rectangle.NO_BORDER);
+
+            PdfPCell invoiceCell = new PdfPCell(new Phrase(
+                    "Invoice #: " + data.getInvoiceNumber() + "\n" +
+                    "Date: " + data.getDate() + "\n" +
+                    "Original Invoice #: " + data.getInvoiceNumber() + "\n" +
+                    "Operator: admin", regularFont));
+            invoiceCell.setBorder(Rectangle.NO_BORDER);
+
+            infoTable.addCell(supplierCell);
+            infoTable.addCell(invoiceCell);
+            document.add(infoTable);
+            document.add(Chunk.NEWLINE);
+
+            // Item Table
             PdfPTable table = new PdfPTable(6);
             table.setWidthPercentage(100);
-            table.setWidths(new int[]{1, 4, 2, 3, 2, 3});
+            table.setWidths(new float[]{1, 4, 2, 3, 2, 3});
 
-            PdfPCell[] headers = {
-                new PdfPCell(new Phrase("#", headerFont)),
-                new PdfPCell(new Phrase("Item", headerFont)),
-                new PdfPCell(new Phrase("Qty", headerFont)),
-                new PdfPCell(new Phrase("Unit Price", headerFont)),
-                new PdfPCell(new Phrase("Discount %", headerFont)),
-                new PdfPCell(new Phrase("Net Price", headerFont))
-            };
-            for (PdfPCell cell : headers) {
+            String[] headers = {"#", "Item", "Qty", "Unit Price", "Discount %", "Net Price"};
+            for (String h : headers) {
+                PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
                 cell.setBackgroundColor(BaseColor.LIGHT_GRAY);
                 cell.setHorizontalAlignment(Element.ALIGN_CENTER);
                 table.addCell(cell);
@@ -84,61 +95,71 @@ public class InvoiceGenerator {
             document.add(table);
             document.add(Chunk.NEWLINE);
 
-            PdfPTable summaryTable = new PdfPTable(3);
-            summaryTable.setWidthPercentage(100);
-            summaryTable.setWidths(new float[]{3f, 3f, 3f});
-            summaryTable.setHorizontalAlignment(Element.ALIGN_RIGHT);
-
+            // Summary Table
             double totalDiscount = items.stream().mapToDouble(i -> i.getQuantity() * i.getUnitPrice() * i.getDiscountPercent() / 100.0).sum();
             double totalBalance = total + data.getPreviousBalance();
             int totalQuantity = items.stream().mapToInt(Item::getQuantity).sum();
 
-            PdfPCell leftSummaryCell = new PdfPCell(new Phrase(
-                "Bill: " + String.format("%.2f", total + totalDiscount) + "\n" +
-                "Discount: " + String.format("%.2f", totalDiscount) + "\n" +
-                "Current Net Bill: " + String.format("%.2f", total) + "\n" +
-                "Previous Balance: " + String.format("%.2f", data.getPreviousBalance()) + "\n" +
-                "Total Quantity: " + totalQuantity,
-                regularFont));
-            leftSummaryCell.setBorder(Rectangle.NO_BORDER);
-            summaryTable.addCell(leftSummaryCell);
+            PdfPTable summaryHeadingTable = new PdfPTable(1);
+            summaryHeadingTable.setWidthPercentage(100);
 
-            PdfPCell middleSummaryCell = new PdfPCell(new Phrase(" "));
-            middleSummaryCell.setBorder(Rectangle.NO_BORDER);
-            summaryTable.addCell(middleSummaryCell);
+            PdfPCell summaryHeading = new PdfPCell(new Phrase("Invoice Summary", headerFont));
+            summaryHeading.setBackgroundColor(BaseColor.LIGHT_GRAY);
+            summaryHeading.setHorizontalAlignment(Element.ALIGN_CENTER);
+            summaryHeading.setPadding(5);
+            summaryHeading.setBorder(Rectangle.BOX);
 
-            PdfPCell rightSummaryCell = new PdfPCell(new Phrase(
-                "Total Balance: " + String.format("%.2f", totalBalance) + "\n" +
-                "Other Discount: 0.00\n" +
-                "Paid: 0.00\n" +
-                "Net Balance: " + String.format("%.2f", totalBalance),
-                regularFont));
-            rightSummaryCell.setBorder(Rectangle.NO_BORDER);
-            summaryTable.addCell(rightSummaryCell);
+            summaryHeadingTable.addCell(summaryHeading);
+            document.add(summaryHeadingTable);
 
-            document.add(summaryTable);
 
+            PdfPTable summary = new PdfPTable(4);
+            summary.setWidthPercentage(100);
+            summary.setWidths(new float[]{3f, 3f, 3f, 3f});
+            summary.setSpacingBefore(10f);
+
+            summary.addCell(new Phrase("Bill:", regularFont));
+            summary.addCell(new Phrase(String.format("%.2f", total + totalDiscount), regularFont));
+            summary.addCell(new Phrase("Discount:", regularFont));
+            summary.addCell(new Phrase(String.format("%.2f", totalDiscount), regularFont));
+
+            summary.addCell(new Phrase("Current Net Bill:", regularFont));
+            summary.addCell(new Phrase(String.format("%.2f", total), regularFont));
+            summary.addCell(new Phrase("Previous Balance:", regularFont));
+            summary.addCell(new Phrase(String.format("%.2f", data.getPreviousBalance()), regularFont));
+
+            summary.addCell(new Phrase("Total Quantity:", regularFont));
+            summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
+            summary.addCell(new Phrase("Total Balance:", regularFont));
+            summary.addCell(new Phrase(String.format("%.2f", totalBalance), regularFont));
+
+            summary.addCell(new Phrase("Paid:", regularFont));
+            summary.addCell(new Phrase("0.00", regularFont));
+            summary.addCell(new Phrase("Net Balance:", regularFont));
+            summary.addCell(new Phrase(String.format("%.2f", totalBalance), regularFont));
+
+            document.add(summary);
             document.add(Chunk.NEWLINE);
 
+            // Signature Section
             PdfPTable signatureTable = new PdfPTable(2);
             signatureTable.setWidthPercentage(100);
 
-            PdfPCell signatureCell = new PdfPCell(new Phrase("Signature: ______________________", regularFont));
-            signatureCell.setBorder(Rectangle.NO_BORDER);
-            signatureCell.setHorizontalAlignment(Element.ALIGN_LEFT);
+            PdfPCell leftSig = new PdfPCell(new Phrase("Signature: ____________________", regularFont));
+            leftSig.setBorder(Rectangle.NO_BORDER);
+            leftSig.setHorizontalAlignment(Element.ALIGN_LEFT);
 
-            PdfPCell customerSignatureCell = new PdfPCell(new Phrase("Customer Signature: ______________________", regularFont));
-            customerSignatureCell.setBorder(Rectangle.NO_BORDER);
-            customerSignatureCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            PdfPCell rightSig = new PdfPCell(new Phrase("Supplier Signature: ____________________", regularFont));
+            rightSig.setBorder(Rectangle.NO_BORDER);
+            rightSig.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
-            signatureTable.addCell(signatureCell);
-            signatureTable.addCell(customerSignatureCell);
-
+            signatureTable.addCell(leftSig);
+            signatureTable.addCell(rightSig);
             document.add(signatureTable);
             document.add(Chunk.NEWLINE);
             document.add(Chunk.NEWLINE);
 
-            Paragraph thankYou = new Paragraph("THANK YOU!", titleFont);
+            Paragraph thankYou = new Paragraph("THANK YOU!", headerFont);
             thankYou.setAlignment(Element.ALIGN_CENTER);
             document.add(thankYou);
 
@@ -147,11 +168,5 @@ public class InvoiceGenerator {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    // Placeholder printPDF method
-    public static void printPDF(String filename) {
-        // Printing functionality is not available due to inaccessible PrinterJob.
-        System.out.println("Printing is not supported in this environment.");
     }
 }

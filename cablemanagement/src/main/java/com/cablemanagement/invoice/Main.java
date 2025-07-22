@@ -9,7 +9,7 @@ public class Main {
         Item i3 = new Item("Wase Cabel 7/36", 2, 11374, 9);
 
         InvoiceData data = new InvoiceData(
-            297,
+            "297",
             "MIYA ELECTRICSTORE",
             "AKORA KHATTAK",
             "2025-06-30",
