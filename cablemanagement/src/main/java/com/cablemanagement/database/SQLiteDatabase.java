@@ -497,7 +497,25 @@ private boolean bankExists(int bankId) throws SQLException {
                     "FOREIGN KEY (raw_purchase_return_invoice_id) REFERENCES Raw_Purchase_Return_Invoice(raw_purchase_return_invoice_id)," +
                     "FOREIGN KEY (raw_stock_id) REFERENCES Raw_Stock(stock_id)" +
                     ")",
-                    
+                    // Production_Stock_Raw_Usage table
+                    "CREATE TABLE IF NOT EXISTS Production_Stock_Raw_Usage (" +
+                    "usage_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "production_invoice_id INTEGER NOT NULL," +
+                    "raw_stock_id INTEGER NOT NULL," +
+                    "quantity_used REAL NOT NULL," +
+                    "FOREIGN KEY (production_invoice_id) REFERENCES Production_Invoice(production_invoice_id)," +
+                    "FOREIGN KEY (raw_stock_id) REFERENCES Raw_Stock(stock_id)" +
+                    ")",
+
+                    // Raw Stock Usage table
+                    "CREATE TABLE IF NOT EXISTS Raw_Stock_Usage (" +
+                    "raw_stock_usage_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "raw_stock_id INTEGER NOT NULL," +
+                    "usage_date TEXT NOT NULL," +
+                    "quantity_used REAL NOT NULL," +
+                    "reference TEXT," +
+                    "FOREIGN KEY (raw_stock_id) REFERENCES Raw_Stock(stock_id)" +
+                    ")",
                     // Production Stock table
                     "CREATE TABLE IF NOT EXISTS ProductionStock (" +
                     "production_id INTEGER PRIMARY KEY AUTOINCREMENT," +
