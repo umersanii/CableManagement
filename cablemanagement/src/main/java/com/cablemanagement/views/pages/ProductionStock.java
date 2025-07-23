@@ -1190,6 +1190,22 @@ public class ProductionStock {
         return -1;
     }
 
+    // Helper method to get production stock unit cost by production ID
+    private static double getProductionStockUnitCost(int productionId) {
+        try {
+            List<Object[]> productionStocks = database.getAllProductionStocksForDropdown();
+            for (Object[] stock : productionStocks) {
+                if (((Integer) stock[0]).equals(productionId)) {
+                    // stock[5] contains unit_cost based on getAllProductionStocksForDropdown structure
+                    return (Double) stock[5]; // unit_cost
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0.0;
+    }
+
     // Handle return production invoice submission
     private static void handleSubmitReturnProductionInvoice(String returnInvoiceNumber, LocalDate returnDate, 
                                                           String selectedProductionInvoice, ObservableList<String> returnItems,
@@ -1220,53 +1236,67 @@ public class ProductionStock {
             
             // Create return invoice record
             String formattedDate = returnDate.format(DATE_FORMATTER);
-            String reference = "Return for Invoice #" + productionInvoiceId;
-            int totalQuantity = Integer.parseInt(totalReturnQuantity);
+            String notes = "Return for Invoice #" + productionInvoiceId;
+            double totalQuantity = Double.parseDouble(totalReturnQuantity);
+            int originalProductionInvoiceId = Integer.parseInt(productionInvoiceId);
             
-            // Insert return invoice and get ID
-            int returnInvoiceId = sqliteDatabase.insertProductionReturnInvoiceAndGetId(formattedDate, reference, totalQuantity, Integer.parseInt(productionInvoiceId));
+            // First, prepare return invoice items and calculate totals
+            List<Object[]> returnInvoiceItems = new ArrayList<>();
+            double totalAmount = 0.0;
             
-            if (returnInvoiceId > 0) {
-                // Prepare return invoice items
-                List<Object[]> returnInvoiceItems = new ArrayList<>();
-                
-                for (String returnItem : returnItems) {
-                    try {
-                        // Parse item format: "ProductName - BrandName - Quantity: X (Return Qty: Y)"
-                        String[] parts = returnItem.split(" \\(Return Qty: ");
-                        if (parts.length == 2) {
-                            String productPart = parts[0]; // "ProductName - BrandName - Quantity: X"
-                            String returnQtyPart = parts[1].replace(")", ""); // "Y"
-                            
-                            // Extract product name and brand name (everything before " - Quantity:")
-                            String[] productParts = productPart.split(" - Quantity:");
-                            if (productParts.length == 2) {
-                                String fullProductInfo = productParts[0]; // "ProductName - BrandName"
-                                String[] productInfoParts = fullProductInfo.split(" - ");
-                                if (productInfoParts.length >= 2) {
-                                    String productName = productInfoParts[0];
-                                    int returnQuantity = Integer.parseInt(returnQtyPart);
+            for (String returnItem : returnItems) {
+                try {
+                    // Parse item format: "ProductName - BrandName - Quantity: X (Return Qty: Y)"
+                    String[] parts = returnItem.split(" \\(Return Qty: ");
+                    if (parts.length == 2) {
+                        String productPart = parts[0]; // "ProductName - BrandName - Quantity: X"
+                        String returnQtyPart = parts[1].replace(")", ""); // "Y"
+                        
+                        // Extract product name and brand name (everything before " - Quantity:")
+                        String[] productParts = productPart.split(" - Quantity:");
+                        if (productParts.length == 2) {
+                            String fullProductInfo = productParts[0]; // "ProductName - BrandName"
+                            String[] productInfoParts = fullProductInfo.split(" - ");
+                            if (productInfoParts.length >= 2) {
+                                String productName = productInfoParts[0];
+                                double returnQuantity = Double.parseDouble(returnQtyPart);
+                                
+                                // Get production stock ID and unit cost by name
+                                int productionStockId = getProductionStockIdByName(productName);
+                                if (productionStockId > 0) {
+                                    double unitCost = getProductionStockUnitCost(productionStockId);
+                                    double totalCost = returnQuantity * unitCost;
+                                    totalAmount += totalCost;
                                     
-                                    // Get production stock ID by name
-                                    int productionStockId = getProductionStockIdByName(productName);
-                                    if (productionStockId > 0) {
-                                        returnInvoiceItems.add(new Object[]{
-                                            returnInvoiceId,
-                                            productionStockId,
-                                            returnQuantity
-                                        });
-                                    }
+                                    returnInvoiceItems.add(new Object[]{
+                                        productionStockId,  // production_id
+                                        returnQuantity,     // quantity_returned (Double)
+                                        unitCost,          // unit_cost (Double)
+                                        totalCost          // total_cost (Double)
+                                    });
                                 }
                             }
                         }
-                    } catch (Exception e) {
-                        System.err.println("Error parsing return item: " + returnItem + " - " + e.getMessage());
                     }
+                } catch (Exception e) {
+                    System.err.println("Error parsing return item: " + returnItem + " - " + e.getMessage());
                 }
-                
+            }
+            
+            // Insert return invoice and get ID
+            int returnInvoiceId = sqliteDatabase.insertProductionReturnInvoiceAndGetId(
+                returnInvoiceNumber, 
+                originalProductionInvoiceId, 
+                formattedDate, 
+                totalQuantity, 
+                totalAmount, 
+                notes
+            );
+            
+            if (returnInvoiceId > 0) {
                 // Insert return invoice items
                 if (!returnInvoiceItems.isEmpty()) {
-                    sqliteDatabase.insertProductionReturnInvoiceItems(returnInvoiceId, Integer.parseInt(productionInvoiceId), returnInvoiceItems);
+                    sqliteDatabase.insertProductionReturnInvoiceItems(returnInvoiceId, returnInvoiceItems);
                     
                     showAlert("Success", "Return production invoice saved successfully!\nReturn Invoice Number: " + returnInvoiceNumber);
                     

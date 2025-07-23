@@ -557,6 +557,30 @@ public class SQLiteDatabase implements db {
                     "FOREIGN KEY (production_id) REFERENCES ProductionStock(production_id)" +
                     ")",
 
+                    // Production Return Invoice table
+                    "CREATE TABLE IF NOT EXISTS Production_Return_Invoice (" +
+                    "production_return_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "return_invoice_number TEXT NOT NULL UNIQUE," +
+                    "original_production_invoice_id INTEGER NOT NULL," +
+                    "return_date TEXT NOT NULL," +
+                    "total_return_quantity REAL NOT NULL," +
+                    "total_return_amount REAL NOT NULL," +
+                    "notes TEXT," +
+                    "FOREIGN KEY (original_production_invoice_id) REFERENCES Production_Invoice(production_invoice_id)" +
+                    ")",
+
+                    // Production Return Invoice Item table
+                    "CREATE TABLE IF NOT EXISTS Production_Return_Invoice_Item (" +
+                    "production_return_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "production_return_invoice_id INTEGER NOT NULL," +
+                    "production_id INTEGER NOT NULL," +
+                    "quantity_returned REAL NOT NULL," +
+                    "unit_cost REAL NOT NULL," +
+                    "total_cost REAL NOT NULL," +
+                    "FOREIGN KEY (production_return_invoice_id) REFERENCES Production_Return_Invoice(production_return_invoice_id)," +
+                    "FOREIGN KEY (production_id) REFERENCES ProductionStock(production_id)" +
+                    ")",
+
                     // --- ADDED: Correct Cash_Transaction table ---
                     "CREATE TABLE IF NOT EXISTS Cash_Transaction (" +
                     "cash_transaction_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -2682,6 +2706,63 @@ public class SQLiteDatabase implements db {
         }
         return "PRI-0001";
     }
+
+    /**
+     * Complete production return invoice transaction
+     * This method handles the complete flow: insert return invoice, insert items, and update stock
+     */
+    public boolean processProductionReturnInvoice(int originalProductionInvoiceId, String returnDate,
+                                                 String notes, List<Object[]> returnItems) {
+        try {
+            connection.setAutoCommit(false);
+            
+            // Calculate totals
+            double totalQuantity = 0;
+            double totalAmount = 0;
+            for (Object[] item : returnItems) {
+                totalQuantity += (Double) item[1]; // quantity_returned
+                totalAmount += (Double) item[3]; // total_cost
+            }
+            
+            // Generate return invoice number
+            String returnInvoiceNumber = generateProductionReturnInvoiceNumber();
+            
+            // Insert return invoice
+            int returnInvoiceId = insertProductionReturnInvoiceAndGetId(
+                returnInvoiceNumber, originalProductionInvoiceId, returnDate, 
+                totalQuantity, totalAmount, notes
+            );
+            
+            if (returnInvoiceId == -1) {
+                connection.rollback();
+                connection.setAutoCommit(true);
+                return false;
+            }
+            
+            // Insert return items
+            boolean itemsInserted = insertProductionReturnInvoiceItems(returnInvoiceId, returnItems);
+            
+            if (!itemsInserted) {
+                connection.rollback();
+                connection.setAutoCommit(true);
+                return false;
+            }
+            
+            connection.commit();
+            connection.setAutoCommit(true);
+            return true;
+            
+        } catch (SQLException e) {
+            try {
+                connection.rollback();
+                connection.setAutoCommit(true);
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
+            e.printStackTrace();
+            return false;
+        }
+    }
     
     /**
      * Get all production invoices for dropdown selection
@@ -2744,20 +2825,21 @@ public class SQLiteDatabase implements db {
     /**
      * Insert production return invoice and return the generated ID
      */
-    public int insertProductionReturnInvoiceAndGetId(String returnDate, String reference, 
-                                                    double totalReturnQuantity, int originalProductionInvoiceId) {
-        // First generate the return invoice number
-        String returnInvoiceNumber = generateProductionReturnInvoiceNumber();
-        
-        String query = "INSERT INTO Production_Return_Invoice (return_invoice_number, original_production_invoice_id, return_date, reference, total_return_quantity) " +
-                      "VALUES (?, ?, ?, ?, ?)";
+    public int insertProductionReturnInvoiceAndGetId(String returnInvoiceNumber, int originalProductionInvoiceId,
+                                                    String returnDate, double totalReturnQuantity, 
+                                                    double totalReturnAmount, String notes) {
+        String query = "INSERT INTO Production_Return_Invoice " +
+                      "(return_invoice_number, original_production_invoice_id, return_date, " +
+                      "total_return_quantity, total_return_amount, notes) " +
+                      "VALUES (?, ?, ?, ?, ?, ?)";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setString(1, returnInvoiceNumber);
             pstmt.setInt(2, originalProductionInvoiceId);
             pstmt.setString(3, returnDate);
-            pstmt.setString(4, reference);
-            pstmt.setDouble(5, totalReturnQuantity);
+            pstmt.setDouble(4, totalReturnQuantity);
+            pstmt.setDouble(5, totalReturnAmount);
+            pstmt.setString(6, notes);
             
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows > 0) {
@@ -2776,25 +2858,25 @@ public class SQLiteDatabase implements db {
     /**
      * Insert production return invoice items
      */
-    public boolean insertProductionReturnInvoiceItems(int returnInvoiceId, int originalInvoiceId,
+    public boolean insertProductionReturnInvoiceItems(int returnInvoiceId, 
                                                      List<Object[]> returnItems) {
         String query = "INSERT INTO Production_Return_Invoice_Item " +
-                      "(production_return_invoice_id, production_stock_id, quantity_returned, unit_price) " +
-                      "VALUES (?, ?, ?, ?)";
+                      "(production_return_invoice_id, production_id, quantity_returned, unit_cost, total_cost) " +
+                      "VALUES (?, ?, ?, ?, ?)";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             connection.setAutoCommit(false);
             
             for (Object[] item : returnItems) {
                 pstmt.setInt(1, returnInvoiceId);
-                pstmt.setInt(2, (Integer) item[1]); // production_id (using as production_stock_id)
-                pstmt.setDouble(3, (Double) item[2]); // quantity_returned
-                
-                // Get the unit price from ProductionStock table
-                double unitPrice = getProductionStockPrice((Integer) item[1]);
-                pstmt.setDouble(4, unitPrice);
-                
+                pstmt.setInt(2, (Integer) item[0]); // production_id
+                pstmt.setDouble(3, (Double) item[1]); // quantity_returned
+                pstmt.setDouble(4, (Double) item[2]); // unit_cost
+                pstmt.setDouble(5, (Double) item[3]); // total_cost
                 pstmt.addBatch();
+                
+                // Update production stock quantity
+                updateProductionStockAfterReturn((Integer) item[0], (Double) item[1]);
             }
             
             int[] results = pstmt.executeBatch();
@@ -2873,9 +2955,11 @@ public class SQLiteDatabase implements db {
      */
     public List<Object[]> getAllProductionReturnInvoices() {
         List<Object[]> returnInvoices = new ArrayList<>();
-        String query = "SELECT pri.production_return_invoice_id, pri.return_date, pri.reference, " +
-                      "pri.total_return_quantity " +
+        String query = "SELECT pri.production_return_invoice_id, pri.return_invoice_number, pri.return_date, " +
+                      "pri.total_return_quantity, pri.total_return_amount, pri.notes, " +
+                      "pi.production_date as original_production_date " +
                       "FROM Production_Return_Invoice pri " +
+                      "JOIN Production_Invoice pi ON pri.original_production_invoice_id = pi.production_invoice_id " +
                       "ORDER BY pri.return_date DESC";
         
         try (Statement stmt = connection.createStatement();
@@ -2884,9 +2968,12 @@ public class SQLiteDatabase implements db {
             while (rs.next()) {
                 Object[] row = {
                     rs.getInt("production_return_invoice_id"),
+                    rs.getString("return_invoice_number"),
                     rs.getString("return_date"),
-                    rs.getString("reference"),
-                    rs.getDouble("total_return_quantity")
+                    rs.getDouble("total_return_quantity"),
+                    rs.getDouble("total_return_amount"),
+                    rs.getString("notes"),
+                    rs.getString("original_production_date")
                 };
                 returnInvoices.add(row);
             }
@@ -2894,6 +2981,87 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return returnInvoices;
+    }
+
+    /**
+     * Update production stock quantity after return
+     */
+    public boolean updateProductionStockAfterReturn(int productionId, double returnedQuantity) {
+        String query = "UPDATE ProductionStock SET quantity = quantity - ? WHERE production_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDouble(1, returnedQuantity);
+            pstmt.setInt(2, productionId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get production return invoice details by ID
+     */
+    public Object[] getProductionReturnInvoiceById(int returnInvoiceId) {
+        String query = "SELECT pri.production_return_invoice_id, pri.return_invoice_number, pri.return_date, " +
+                      "pri.total_return_quantity, pri.total_return_amount, pri.notes, " +
+                      "pi.production_date as original_production_date " +
+                      "FROM Production_Return_Invoice pri " +
+                      "JOIN Production_Invoice pi ON pri.original_production_invoice_id = pi.production_invoice_id " +
+                      "WHERE pri.production_return_invoice_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, returnInvoiceId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return new Object[] {
+                    rs.getInt("production_return_invoice_id"),
+                    rs.getString("return_invoice_number"),
+                    rs.getString("return_date"),
+                    rs.getDouble("total_return_quantity"),
+                    rs.getDouble("total_return_amount"),
+                    rs.getString("notes"),
+                    rs.getString("original_production_date")
+                };
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Get production return invoice items by return invoice ID
+     */
+    public List<Object[]> getProductionReturnInvoiceItems(int returnInvoiceId) {
+        List<Object[]> items = new ArrayList<>();
+        String query = "SELECT prii.production_return_invoice_item_id, prii.production_id, " +
+                      "ps.product_name, b.brand_name, prii.quantity_returned, " +
+                      "prii.unit_cost, prii.total_cost " +
+                      "FROM Production_Return_Invoice_Item prii " +
+                      "JOIN ProductionStock ps ON prii.production_id = ps.production_id " +
+                      "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                      "WHERE prii.production_return_invoice_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, returnInvoiceId);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("production_return_invoice_item_id"),
+                    rs.getInt("production_id"),
+                    rs.getString("product_name"),
+                    rs.getString("brand_name"),
+                    rs.getDouble("quantity_returned"),
+                    rs.getDouble("unit_cost"),
+                    rs.getDouble("total_cost")
+                };
+                items.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return items;
     }
 
     @Override
