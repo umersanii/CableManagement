@@ -94,62 +94,63 @@ public class SQLiteDatabase implements db {
         return false;
     }
 
-public boolean insertBankTransaction(BankTransaction transaction) {
-    String query = "INSERT INTO Bank_Transaction (bank_id, transaction_date, transaction_type, amount, description, related_bank_id) " +
-                   "VALUES (?, ?, ?, ?, ?, ?)";
-    
-    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+    public boolean insertBankTransaction(BankTransaction transaction) {
+        String query = "INSERT INTO Bank_Transaction (bank_id, transaction_date, transaction_type, amount, description, related_bank_id) " +
+                    "VALUES (?, ?, ?, ?, ?, ?)";
         
-        // Verify bank_id exists first
-        if (!bankExists(transaction.getBankId())) {
-            System.err.println("Bank ID " + transaction.getBankId() + " doesn't exist");
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            
+            // Verify bank_id exists first
+            if (!bankExists(transaction.getBankId())) {
+                System.err.println("Bank ID " + transaction.getBankId() + " doesn't exist");
+                return false;
+            }
+            
+            // Verify related_bank_id exists if specified
+            if (transaction.getRelatedBankId() != 0 && !bankExists(transaction.getRelatedBankId())) {
+                System.err.println("Related Bank ID " + transaction.getRelatedBankId() + " doesn't exist");
+                return false;
+            }
+            
+            pstmt.setInt(1, transaction.getBankId());
+            pstmt.setString(2, transaction.getTransactionDate());
+            pstmt.setString(3, transaction.getTransactionType());
+            pstmt.setDouble(4, transaction.getAmount());
+            pstmt.setString(5, transaction.getDescription());
+            
+            // Handle null related_bank_id
+            if (transaction.getRelatedBankId() != 0) {
+                pstmt.setInt(6, transaction.getRelatedBankId());
+            } else {
+                pstmt.setNull(6, Types.INTEGER);
+            }
+            
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error inserting transaction: " + e.getMessage());
             return false;
         }
-        
-        // Verify related_bank_id exists if specified
-        if (transaction.getRelatedBankId() != 0 && !bankExists(transaction.getRelatedBankId())) {
-            System.err.println("Related Bank ID " + transaction.getRelatedBankId() + " doesn't exist");
-            return false;
-        }
-        
-        pstmt.setInt(1, transaction.getBankId());
-        pstmt.setString(2, transaction.getTransactionDate());
-        pstmt.setString(3, transaction.getTransactionType());
-        pstmt.setDouble(4, transaction.getAmount());
-        pstmt.setString(5, transaction.getDescription());
-        
-        // Handle null related_bank_id
-        if (transaction.getRelatedBankId() != 0) {
-            pstmt.setInt(6, transaction.getRelatedBankId());
-        } else {
-            pstmt.setNull(6, Types.INTEGER);
-        }
-        
-        return pstmt.executeUpdate() > 0;
-    } catch (SQLException e) {
-        System.err.println("Error inserting transaction: " + e.getMessage());
-        return false;
     }
-}
 
-private boolean bankExists(int bankId) throws SQLException {
-    String query = "SELECT 1 FROM Bank WHERE bank_id = ?";
-    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-        pstmt.setInt(1, bankId);
-        try (ResultSet rs = pstmt.executeQuery()) {
-            return rs.next();
+    private boolean bankExists(int bankId) throws SQLException {
+        String query = "SELECT 1 FROM Bank WHERE bank_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, bankId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next();
+            }
         }
     }
-}
+        
     public SQLiteDatabase() {
-        this.databasePath = "cable_management.db";
-        // Auto-connect when instantiated
-        connect(null, null, null);
-        // Initialize all required tables
-        initializeDatabase();
-        // Migrate schema if needed
-        migrateSchema();
-    }
+            this.databasePath = "cable_management.db";
+            // Auto-connect when instantiated
+            connect(null, null, null);
+            // Initialize all required tables
+            initializeDatabase();
+            // Migrate schema if needed
+            migrateSchema();
+        }
     
     public SQLiteDatabase(String databasePath) {
         this.databasePath = databasePath;
@@ -305,7 +306,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "province_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "province_name TEXT NOT NULL UNIQUE" +
                     ")",
-                    
+
                     // District table
                     "CREATE TABLE IF NOT EXISTS District (" +
                     "district_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -313,7 +314,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "province_id INTEGER NOT NULL," +
                     "FOREIGN KEY (province_id) REFERENCES Province(province_id)" +
                     ")",
-                    
+
                     // Tehsil table
                     "CREATE TABLE IF NOT EXISTS Tehsil (" +
                     "tehsil_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -321,19 +322,19 @@ private boolean bankExists(int bankId) throws SQLException {
                     "district_id INTEGER NOT NULL," +
                     "FOREIGN KEY (district_id) REFERENCES District(district_id)" +
                     ")",
-                    
+
                     // Category table
                     "CREATE TABLE IF NOT EXISTS Category (" +
                     "category_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "category_name TEXT NOT NULL UNIQUE" +
                     ")",
-                    
+
                     // Designation table
                     "CREATE TABLE IF NOT EXISTS Designation (" +
                     "designation_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "designation_title TEXT NOT NULL UNIQUE" +
                     ")",
-                    
+
                     // Manufacturer table
                     "CREATE TABLE IF NOT EXISTS Manufacturer (" +
                     "manufacturer_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -341,7 +342,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "tehsil_id INTEGER NOT NULL," +
                     "FOREIGN KEY (tehsil_id) REFERENCES Tehsil(tehsil_id)" +
                     ")",
-                    
+
                     // Brand table
                     "CREATE TABLE IF NOT EXISTS Brand (" +
                     "brand_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -349,7 +350,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "manufacturer_id INTEGER NOT NULL," +
                     "FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id)" +
                     ")",
-                    
+
                     // Customer table
                     "CREATE TABLE IF NOT EXISTS Customer (" +
                     "customer_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -359,7 +360,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "tehsil_id INTEGER NOT NULL," +
                     "FOREIGN KEY (tehsil_id) REFERENCES Tehsil(tehsil_id)" +
                     ")",
-                    
+
                     // Supplier table
                     "CREATE TABLE IF NOT EXISTS Supplier (" +
                     "supplier_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -369,7 +370,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "tehsil_id INTEGER NOT NULL," +
                     "FOREIGN KEY (tehsil_id) REFERENCES Tehsil(tehsil_id)" +
                     ")",
-                    
+
                     // Bank table
                     "CREATE TABLE IF NOT EXISTS Bank (" +
                     "bank_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -378,7 +379,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "branch_name TEXT," +
                     "balance REAL DEFAULT 0.0" +
                     ")",
-                    
+
                     // Employee table
                     "CREATE TABLE IF NOT EXISTS Employee (" +
                     "employee_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -393,7 +394,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "is_active INTEGER DEFAULT 1," +
                     "FOREIGN KEY (designation_id) REFERENCES Designation(designation_id)" +
                     ")",
-                    
+
                     // Employee Attendance table
                     "CREATE TABLE IF NOT EXISTS Employee_Attendance (" +
                     "attendance_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -403,7 +404,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "working_hours REAL DEFAULT 0," +
                     "FOREIGN KEY (employee_id) REFERENCES Employee(employee_id)" +
                     ")",
-                    
+
                     // Employee Advance Salary table
                     "CREATE TABLE IF NOT EXISTS Employee_Advance_Salary (" +
                     "advance_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -415,7 +416,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "created_date TEXT DEFAULT CURRENT_TIMESTAMP," +
                     "FOREIGN KEY (employee_id) REFERENCES Employee(employee_id)" +
                     ")",
-                    
+
                     // Employee Loan table
                     "CREATE TABLE IF NOT EXISTS Employee_Loan (" +
                     "loan_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -429,7 +430,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "created_date TEXT DEFAULT CURRENT_TIMESTAMP," +
                     "FOREIGN KEY (employee_id) REFERENCES Employee(employee_id)" +
                     ")",
-                    
+
                     // Salesman table
                     "CREATE TABLE IF NOT EXISTS Salesman (" +
                     "salesman_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -438,7 +439,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "address TEXT," +
                     "commission_rate REAL DEFAULT 0.0" +
                     ")",
-                    
+
                     // Raw Stock table
                     "CREATE TABLE IF NOT EXISTS Raw_Stock (" +
                     "stock_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -452,7 +453,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "FOREIGN KEY (brand_id) REFERENCES Brand(brand_id)," +
                     "FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id)" +
                     ")",
-                    
+
                     // Raw Purchase Invoice table
                     "CREATE TABLE IF NOT EXISTS Raw_Purchase_Invoice (" +
                     "raw_purchase_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -464,7 +465,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "paid_amount REAL DEFAULT 0," +
                     "FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id)" +
                     ")",
-                    
+
                     // Raw Purchase Invoice Item table
                     "CREATE TABLE IF NOT EXISTS Raw_Purchase_Invoice_Item (" +
                     "raw_purchase_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -498,6 +499,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "FOREIGN KEY (raw_purchase_return_invoice_id) REFERENCES Raw_Purchase_Return_Invoice(raw_purchase_return_invoice_id)," +
                     "FOREIGN KEY (raw_stock_id) REFERENCES Raw_Stock(stock_id)" +
                     ")",
+
                     // Production_Stock_Raw_Usage table
                     "CREATE TABLE IF NOT EXISTS Production_Stock_Raw_Usage (" +
                     "usage_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -517,6 +519,7 @@ private boolean bankExists(int bankId) throws SQLException {
                     "reference TEXT," +
                     "FOREIGN KEY (raw_stock_id) REFERENCES Raw_Stock(stock_id)" +
                     ")",
+
                     // Production Stock table
                     "CREATE TABLE IF NOT EXISTS ProductionStock (" +
                     "production_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -528,39 +531,20 @@ private boolean bankExists(int bankId) throws SQLException {
                     "production_date TEXT DEFAULT CURRENT_TIMESTAMP," +
                     "FOREIGN KEY (brand_id) REFERENCES Brand(brand_id)" +
                     ")",
-                    
-                    // Cash Transaction table
+
+                    // Unit table
                     "CREATE TABLE IF NOT EXISTS Unit (" +
                     "unit_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "unit_name TEXT NOT NULL UNIQUE" +
                     ")",
-                    
-                    "CREATE TABLE IF NOT EXISTS Cash_Transaction (" +
-                    "transaction_id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                    "description TEXT NOT NULL," +
-                    "amount REAL NOT NULL," +
-                    "transaction_type TEXT NOT NULL," +
-                    "date TEXT DEFAULT CURRENT_TIMESTAMP" +
-                    ")",
-                    
-                    // Bank Transaction table
-                    "CREATE TABLE IF NOT EXISTS Bank_Transaction (" +
-                    "transaction_id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                    "bank_id INTEGER NOT NULL," +
-                    "description TEXT NOT NULL," +
-                    "amount REAL NOT NULL," +
-                    "transaction_type TEXT NOT NULL," +
-                    "date TEXT DEFAULT CURRENT_TIMESTAMP," +
-                    "FOREIGN KEY (bank_id) REFERENCES Bank(bank_id)" +
-                    ")",
-                    
+
                     // Production Invoice table
                     "CREATE TABLE IF NOT EXISTS Production_Invoice (" +
                     "production_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "production_date TEXT NOT NULL," +
                     "notes TEXT" +
                     ")",
-                    
+
                     // Production Invoice Item table
                     "CREATE TABLE IF NOT EXISTS Production_Invoice_Item (" +
                     "production_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -569,6 +553,28 @@ private boolean bankExists(int bankId) throws SQLException {
                     "quantity_produced REAL NOT NULL," +
                     "FOREIGN KEY (production_invoice_id) REFERENCES Production_Invoice(production_invoice_id)," +
                     "FOREIGN KEY (production_id) REFERENCES ProductionStock(production_id)" +
+                    ")",
+
+                    // --- ADDED: Correct Cash_Transaction table ---
+                    "CREATE TABLE IF NOT EXISTS Cash_Transaction (" +
+                    "cash_transaction_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "transaction_date TEXT NOT NULL," +
+                    "transaction_type TEXT NOT NULL CHECK(transaction_type IN ('cash_in', 'cash_out', 'transfer_to_bank', 'transfer_from_bank'))," +
+                    "amount REAL NOT NULL," +
+                    "description TEXT" +
+                    ")",
+
+                    // --- ADDED: Correct Bank_Transaction table ---
+                    "CREATE TABLE IF NOT EXISTS Bank_Transaction (" +
+                    "bank_transaction_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "bank_id INTEGER NOT NULL," +
+                    "transaction_date TEXT NOT NULL," +
+                    "transaction_type TEXT NOT NULL CHECK(transaction_type IN ('deposit', 'withdraw', 'transfer_in', 'transfer_out', 'invoice_payment'))," +
+                    "amount REAL NOT NULL," +
+                    "description TEXT," +
+                    "related_bank_id INTEGER," +
+                    "FOREIGN KEY (bank_id) REFERENCES Bank(bank_id)," +
+                    "FOREIGN KEY (related_bank_id) REFERENCES Bank(bank_id)" +
                     ")"
                 };
                 
@@ -1431,55 +1437,55 @@ private boolean bankExists(int bankId) throws SQLException {
         return rawStocks;
     }
 
-@Override
-public boolean insertRawStock(String name, String category, String brand, String unit, 
-                             double openingQty, double purchasePrice, double reorderLevel) {
-    if (name == null || name.trim().isEmpty()) {
-        System.err.println("Invalid item name for insertRawStock: null or empty");
-        return false;
-    }
-    double totalCost = openingQty * purchasePrice;
-    int quantity = (int) Math.round(openingQty);
-    
-    String query = "INSERT INTO Raw_Stock (item_name, brand_id, quantity, unit_price, total_cost, supplier_id) " +
-                  "SELECT ?, b.brand_id, ?, ?, ?, ? FROM Brand b WHERE b.brand_name = ?";
-    
-    try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
-        pstmt.setString(1, name);
-        pstmt.setInt(2, quantity);
-        pstmt.setDouble(3, purchasePrice);
-        pstmt.setDouble(4, totalCost);
-        pstmt.setInt(5, 1); // Use supplier_id = 1 (matches 'rewf')
-        pstmt.setString(6, brand);
-        
-        System.out.println("Attempting to insert Raw_Stock: item_name=" + name + ", brand=" + brand + 
-                          ", quantity=" + quantity + ", unit_price=" + purchasePrice + ", supplier_id=1");
-        
-        int rowsAffected = pstmt.executeUpdate();
-        if (rowsAffected == 0) {
-            System.err.println("Failed to insert Raw_Stock: no rows affected for item " + name + " with brand " + brand);
+    @Override
+    public boolean insertRawStock(String name, String category, String brand, String unit, 
+                                double openingQty, double purchasePrice, double reorderLevel) {
+        if (name == null || name.trim().isEmpty()) {
+            System.err.println("Invalid item name for insertRawStock: null or empty");
             return false;
         }
+        double totalCost = openingQty * purchasePrice;
+        int quantity = (int) Math.round(openingQty);
         
-        try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-            if (generatedKeys.next()) {
-                int stockId = generatedKeys.getInt(1);
-                System.out.println("Successfully inserted Raw_Stock with stock_id: " + stockId);
-                return true;
-            } else {
-                System.err.println("No generated key returned for Raw_Stock: " + name);
+        String query = "INSERT INTO Raw_Stock (item_name, brand_id, quantity, unit_price, total_cost, supplier_id) " +
+                    "SELECT ?, b.brand_id, ?, ?, ?, ? FROM Brand b WHERE b.brand_name = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, name);
+            pstmt.setInt(2, quantity);
+            pstmt.setDouble(3, purchasePrice);
+            pstmt.setDouble(4, totalCost);
+            pstmt.setInt(5, 1); // Use supplier_id = 1 (matches 'rewf')
+            pstmt.setString(6, brand);
+            
+            System.out.println("Attempting to insert Raw_Stock: item_name=" + name + ", brand=" + brand + 
+                            ", quantity=" + quantity + ", unit_price=" + purchasePrice + ", supplier_id=1");
+            
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected == 0) {
+                System.err.println("Failed to insert Raw_Stock: no rows affected for item " + name + " with brand " + brand);
                 return false;
             }
+            
+            try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    int stockId = generatedKeys.getInt(1);
+                    System.out.println("Successfully inserted Raw_Stock with stock_id: " + stockId);
+                    return true;
+                } else {
+                    System.err.println("No generated key returned for Raw_Stock: " + name);
+                    return false;
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error inserting Raw_Stock for item " + name + ": " + e.getMessage());
+            e.printStackTrace();
+            return false;
         }
-    } catch (SQLException e) {
-        System.err.println("Error inserting Raw_Stock for item " + name + ": " + e.getMessage());
-        e.printStackTrace();
-        return false;
     }
-}
-  
+    
 
-@Override
+    @Override
     public boolean insertRawPurchaseInvoice(String invoiceNumber, int supplierId, String invoiceDate, 
                                            double totalAmount, double discountAmount, double paidAmount) {
         String query = "INSERT INTO Raw_Purchase_Invoice (invoice_number, supplier_id, invoice_date, " +
@@ -1614,284 +1620,284 @@ public boolean insertRawStock(String name, String category, String brand, String
         return -1; // Return -1 if not found
     }
     
-public int getRawStockIdByName(String itemName) {
-    if (itemName == null || itemName.trim().isEmpty()) {
-        System.err.println("Invalid item name provided to getRawStockIdByName: null or empty");
-        return -1;
-    }
-    String query = "SELECT stock_id FROM Raw_Stock WHERE item_name = ?";
-    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-        pstmt.setString(1, itemName);
-        ResultSet rs = pstmt.executeQuery();
-        if (rs.next()) {
-            int stockId = rs.getInt("stock_id");
-            System.out.println("Found stock_id: " + stockId + " for item_name: " + itemName);
-            return stockId;
-        } else {
-            System.out.println("No stock_id found for item_name: " + itemName);
+    public int getRawStockIdByName(String itemName) {
+        if (itemName == null || itemName.trim().isEmpty()) {
+            System.err.println("Invalid item name provided to getRawStockIdByName: null or empty");
             return -1;
         }
-    } catch (SQLException e) {
-        System.err.println("Error retrieving stock_id for item_name " + itemName + ": " + e.getMessage());
-        e.printStackTrace();
-        return -1;
-    }
-}
-
-
-@Override
-public boolean ensureBrandExists(String brandName, int tehsilId) {
-    String checkBrandQuery = "SELECT brand_id FROM Brand WHERE brand_name = ?";
-    try (PreparedStatement pstmt = connection.prepareStatement(checkBrandQuery)) {
-        pstmt.setString(1, brandName);
-        ResultSet rs = pstmt.executeQuery();
-        if (rs.next()) {
-            return true; // Brand exists
-        }
-    } catch (SQLException e) {
-        System.err.println("Error checking brand existence: " + e.getMessage());
-        return false;
-    }
-
-    // Insert Default Brand with a default manufacturer_id
-    String insertBrandQuery = "INSERT INTO Brand (brand_name, manufacturer_id, tehsil_id) VALUES (?, ?, ?)";
-    try (PreparedStatement pstmt = connection.prepareStatement(insertBrandQuery)) {
-        pstmt.setString(1, brandName);
-        pstmt.setInt(2, 1); // Assume manufacturer_id = 1 exists; adjust as needed
-        pstmt.setInt(3, tehsilId);
-        int rowsAffected = pstmt.executeUpdate();
-        System.out.println("Inserted Default Brand: " + brandName);
-        return rowsAffected > 0;
-    } catch (SQLException e) {
-        System.err.println("Failed to insert brand " + brandName + ": " + e.getMessage());
-        return false;
-    }
-}
-
-@Override
-public boolean insertSimpleRawPurchaseInvoice(String invoiceNumber, String supplierName, String invoiceDate,
-                                             double totalAmount, double discountAmount, double paidAmount,
-                                             List<RawStockPurchaseItem> items) {
-    try {
-        connection.setAutoCommit(false); // Start transaction
-        System.out.println("Starting insertSimpleRawPurchaseInvoice: invoiceNumber=" + invoiceNumber);
-
-        // 1. Validate inputs
-        if (items == null || items.isEmpty()) {
-            System.err.println("Error: Items list is null or empty for invoice " + invoiceNumber);
-            connection.rollback();
-            return false;
-        }
-        System.out.println("Items list size: " + items.size());
-        for (int i = 0; i < items.size(); i++) {
-            RawStockPurchaseItem item = items.get(i);
-            System.out.println("Item " + (i + 1) + ": name=" + (item != null ? item.getRawStockName() : "null") + 
-                              ", quantity=" + (item != null ? item.getQuantity() : "null") + 
-                              ", unit_price=" + (item != null ? item.getUnitPrice() : "null"));
-        }
-
-        // 2. Get supplier_id
-        int supplierId = getSupplierIdByName(supplierName);
-        if (supplierId == -1) {
-            System.err.println("Supplier not found: " + supplierName);
-            connection.rollback();
-            return false;
-        }
-        System.out.println("Found supplier_id: " + supplierId + " for supplier: " + supplierName);
-
-        // 3. Get a valid tehsil_id
-        int tehsilId = -1;
-        String getTehsilQuery = "SELECT tehsil_id FROM Tehsil LIMIT 1";
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(getTehsilQuery)) {
+        String query = "SELECT stock_id FROM Raw_Stock WHERE item_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, itemName);
+            ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                tehsilId = rs.getInt("tehsil_id");
-                System.out.println("Found tehsil_id: " + tehsilId);
+                int stockId = rs.getInt("stock_id");
+                System.out.println("Found stock_id: " + stockId + " for item_name: " + itemName);
+                return stockId;
             } else {
-                System.err.println("No tehsil found in Tehsil table");
-                connection.rollback();
-                return false;
+                System.out.println("No stock_id found for item_name: " + itemName);
+                return -1;
             }
+        } catch (SQLException e) {
+            System.err.println("Error retrieving stock_id for item_name " + itemName + ": " + e.getMessage());
+            e.printStackTrace();
+            return -1;
         }
+    }
 
-        // 4. Ensure Default Brand exists
-        if (!ensureBrandExists("Default Brand", tehsilId)) {
-            System.err.println("Failed to ensure Default Brand exists");
-            connection.rollback();
+
+    @Override
+    public boolean ensureBrandExists(String brandName, int tehsilId) {
+        String checkBrandQuery = "SELECT brand_id FROM Brand WHERE brand_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(checkBrandQuery)) {
+            pstmt.setString(1, brandName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return true; // Brand exists
+            }
+        } catch (SQLException e) {
+            System.err.println("Error checking brand existence: " + e.getMessage());
             return false;
         }
 
-        // 5. Insert into Raw_Purchase_Invoice
-        String insertInvoiceQuery = "INSERT INTO Raw_Purchase_Invoice (invoice_number, supplier_id, invoice_date, total_amount, discount_amount, paid_amount) " +
-                                   "VALUES (?, ?, ?, ?, ?, ?)";
-        int rawPurchaseInvoiceId;
-        try (PreparedStatement pstmt = connection.prepareStatement(insertInvoiceQuery, Statement.RETURN_GENERATED_KEYS)) {
-            pstmt.setString(1, invoiceNumber);
-            pstmt.setInt(2, supplierId);
-            pstmt.setString(3, invoiceDate);
-            pstmt.setDouble(4, totalAmount);
-            pstmt.setDouble(5, discountAmount);
-            pstmt.setDouble(6, paidAmount);
+        // Insert Default Brand with a default manufacturer_id
+        String insertBrandQuery = "INSERT INTO Brand (brand_name, manufacturer_id, tehsil_id) VALUES (?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(insertBrandQuery)) {
+            pstmt.setString(1, brandName);
+            pstmt.setInt(2, 1); // Assume manufacturer_id = 1 exists; adjust as needed
+            pstmt.setInt(3, tehsilId);
+            int rowsAffected = pstmt.executeUpdate();
+            System.out.println("Inserted Default Brand: " + brandName);
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            System.err.println("Failed to insert brand " + brandName + ": " + e.getMessage());
+            return false;
+        }
+    }
 
-            System.out.println("Inserting Raw_Purchase_Invoice: invoiceNumber=" + invoiceNumber + ", supplierId=" + supplierId +
-                              ", invoiceDate=" + invoiceDate + ", totalAmount=" + totalAmount +
-                              ", discountAmount=" + discountAmount + ", paidAmount=" + paidAmount);
+    @Override
+    public boolean insertSimpleRawPurchaseInvoice(String invoiceNumber, String supplierName, String invoiceDate,
+                                                double totalAmount, double discountAmount, double paidAmount,
+                                                List<RawStockPurchaseItem> items) {
+        try {
+            connection.setAutoCommit(false); // Start transaction
+            System.out.println("Starting insertSimpleRawPurchaseInvoice: invoiceNumber=" + invoiceNumber);
 
-            int affectedRows = pstmt.executeUpdate();
-            if (affectedRows == 0) {
-                System.err.println("Failed to insert into Raw_Purchase_Invoice");
+            // 1. Validate inputs
+            if (items == null || items.isEmpty()) {
+                System.err.println("Error: Items list is null or empty for invoice " + invoiceNumber);
+                connection.rollback();
+                return false;
+            }
+            System.out.println("Items list size: " + items.size());
+            for (int i = 0; i < items.size(); i++) {
+                RawStockPurchaseItem item = items.get(i);
+                System.out.println("Item " + (i + 1) + ": name=" + (item != null ? item.getRawStockName() : "null") + 
+                                ", quantity=" + (item != null ? item.getQuantity() : "null") + 
+                                ", unit_price=" + (item != null ? item.getUnitPrice() : "null"));
+            }
+
+            // 2. Get supplier_id
+            int supplierId = getSupplierIdByName(supplierName);
+            if (supplierId == -1) {
+                System.err.println("Supplier not found: " + supplierName);
+                connection.rollback();
+                return false;
+            }
+            System.out.println("Found supplier_id: " + supplierId + " for supplier: " + supplierName);
+
+            // 3. Get a valid tehsil_id
+            int tehsilId = -1;
+            String getTehsilQuery = "SELECT tehsil_id FROM Tehsil LIMIT 1";
+            try (Statement stmt = connection.createStatement();
+                ResultSet rs = stmt.executeQuery(getTehsilQuery)) {
+                if (rs.next()) {
+                    tehsilId = rs.getInt("tehsil_id");
+                    System.out.println("Found tehsil_id: " + tehsilId);
+                } else {
+                    System.err.println("No tehsil found in Tehsil table");
+                    connection.rollback();
+                    return false;
+                }
+            }
+
+            // 4. Ensure Default Brand exists
+            if (!ensureBrandExists("Default Brand", tehsilId)) {
+                System.err.println("Failed to ensure Default Brand exists");
                 connection.rollback();
                 return false;
             }
 
-            try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    rawPurchaseInvoiceId = generatedKeys.getInt(1);
-                    System.out.println("Inserted Raw_Purchase_Invoice with ID: " + rawPurchaseInvoiceId);
-                } else {
-                    System.err.println("Failed to retrieve generated invoice ID");
+            // 5. Insert into Raw_Purchase_Invoice
+            String insertInvoiceQuery = "INSERT INTO Raw_Purchase_Invoice (invoice_number, supplier_id, invoice_date, total_amount, discount_amount, paid_amount) " +
+                                    "VALUES (?, ?, ?, ?, ?, ?)";
+            int rawPurchaseInvoiceId;
+            try (PreparedStatement pstmt = connection.prepareStatement(insertInvoiceQuery, Statement.RETURN_GENERATED_KEYS)) {
+                pstmt.setString(1, invoiceNumber);
+                pstmt.setInt(2, supplierId);
+                pstmt.setString(3, invoiceDate);
+                pstmt.setDouble(4, totalAmount);
+                pstmt.setDouble(5, discountAmount);
+                pstmt.setDouble(6, paidAmount);
+
+                System.out.println("Inserting Raw_Purchase_Invoice: invoiceNumber=" + invoiceNumber + ", supplierId=" + supplierId +
+                                ", invoiceDate=" + invoiceDate + ", totalAmount=" + totalAmount +
+                                ", discountAmount=" + discountAmount + ", paidAmount=" + paidAmount);
+
+                int affectedRows = pstmt.executeUpdate();
+                if (affectedRows == 0) {
+                    System.err.println("Failed to insert into Raw_Purchase_Invoice");
                     connection.rollback();
                     return false;
                 }
-            }
-        }
 
-        // 6. Insert items into Raw_Purchase_Invoice_Item
-        String insertItemQuery = "INSERT INTO Raw_Purchase_Invoice_Item (raw_purchase_invoice_id, raw_stock_id, quantity, unit_price) " +
-                    "VALUES (?, ?, ?, ?)";
-        // Print all items that are going to be inserted
-        System.out.println("Items to be inserted into Raw_Purchase_Invoice_Item:");
-        for (RawStockPurchaseItem item : items) {
-            System.out.println("Raw Purchase Invoice ID: " + rawPurchaseInvoiceId +
-            ", Raw Stock ID: " + (item != null ? item.getRawStockId() : "null") +
-            ", Quantity: " + (item != null ? item.getQuantity() : "null") +
-            ", Unit Price: " + (item != null ? item.getUnitPrice() : "null"));
-        }
-                // Disable foreign key checks
-        try (Statement stmt = connection.createStatement()) {
-            stmt.execute("PRAGMA foreign_keys = OFF");
-        }
-        try (PreparedStatement pstmt = connection.prepareStatement(insertItemQuery)) {
-            for (RawStockPurchaseItem item : items) {
-                try {
-                    if (item == null || item.getRawStockName() == null || item.getRawStockName().trim().isEmpty()) {
-                        System.err.println("Invalid item: null or empty RawStockName");
+                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        rawPurchaseInvoiceId = generatedKeys.getInt(1);
+                        System.out.println("Inserted Raw_Purchase_Invoice with ID: " + rawPurchaseInvoiceId);
+                    } else {
+                        System.err.println("Failed to retrieve generated invoice ID");
                         connection.rollback();
                         return false;
                     }
-                    System.out.println("Processing item: " + item.getRawStockName() + ", quantity=" + item.getQuantity() + 
-                                      ", unit_price=" + item.getUnitPrice());
+                }
+            }
 
-                    int rawStockId = getRawStockIdByName(item.getRawStockName());
-                    System.out.println("Initial getRawStockIdByName for " + item.getRawStockName() + ": " + rawStockId);
-                    if (rawStockId == -1) {
-                        boolean inserted = insertRawStock(item.getRawStockName(), "General", "Default Brand", "Piece", 0, item.getUnitPrice(), 0);
-                        if (!inserted) {
-                            System.err.println("Failed to insert new raw stock: " + item.getRawStockName());
+            // 6. Insert items into Raw_Purchase_Invoice_Item
+            String insertItemQuery = "INSERT INTO Raw_Purchase_Invoice_Item (raw_purchase_invoice_id, raw_stock_id, quantity, unit_price) " +
+                        "VALUES (?, ?, ?, ?)";
+            // Print all items that are going to be inserted
+            System.out.println("Items to be inserted into Raw_Purchase_Invoice_Item:");
+            for (RawStockPurchaseItem item : items) {
+                System.out.println("Raw Purchase Invoice ID: " + rawPurchaseInvoiceId +
+                ", Raw Stock ID: " + (item != null ? item.getRawStockId() : "null") +
+                ", Quantity: " + (item != null ? item.getQuantity() : "null") +
+                ", Unit Price: " + (item != null ? item.getUnitPrice() : "null"));
+            }
+                    // Disable foreign key checks
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("PRAGMA foreign_keys = OFF");
+            }
+            try (PreparedStatement pstmt = connection.prepareStatement(insertItemQuery)) {
+                for (RawStockPurchaseItem item : items) {
+                    try {
+                        if (item == null || item.getRawStockName() == null || item.getRawStockName().trim().isEmpty()) {
+                            System.err.println("Invalid item: null or empty RawStockName");
                             connection.rollback();
                             return false;
                         }
-                        rawStockId = getRawStockIdByName(item.getRawStockName());
-                        System.out.println("Post-insert getRawStockIdByName for " + item.getRawStockName() + ": " + rawStockId);
+                        System.out.println("Processing item: " + item.getRawStockName() + ", quantity=" + item.getQuantity() + 
+                                        ", unit_price=" + item.getUnitPrice());
+
+                        int rawStockId = getRawStockIdByName(item.getRawStockName());
+                        System.out.println("Initial getRawStockIdByName for " + item.getRawStockName() + ": " + rawStockId);
                         if (rawStockId == -1) {
-                            System.err.println("Failed to retrieve new raw stock ID for: " + item.getRawStockName());
-                            connection.rollback();
-                            return false;
+                            boolean inserted = insertRawStock(item.getRawStockName(), "General", "Default Brand", "Piece", 0, item.getUnitPrice(), 0);
+                            if (!inserted) {
+                                System.err.println("Failed to insert new raw stock: " + item.getRawStockName());
+                                connection.rollback();
+                                return false;
+                            }
+                            rawStockId = getRawStockIdByName(item.getRawStockName());
+                            System.out.println("Post-insert getRawStockIdByName for " + item.getRawStockName() + ": " + rawStockId);
+                            if (rawStockId == -1) {
+                                System.err.println("Failed to retrieve new raw stock ID for: " + item.getRawStockName());
+                                connection.rollback();
+                                return false;
+                            }
                         }
-                    }
 
-                    // Verify raw_stock_id exists in Raw_Stock
-                    String verifyStockQuery = "SELECT stock_id FROM Raw_Stock WHERE stock_id = ?";
-                    try (PreparedStatement verifyStmt = connection.prepareStatement(verifyStockQuery)) {
-                        verifyStmt.setInt(1, rawStockId);
-                        ResultSet rs = verifyStmt.executeQuery();
-                        if (!rs.next()) {
-                            System.err.println("Invalid raw_stock_id: " + rawStockId + " does not exist in Raw_Stock for item: " + item.getRawStockName());
-                            connection.rollback();
-                            return false;
+                        // Verify raw_stock_id exists in Raw_Stock
+                        String verifyStockQuery = "SELECT stock_id FROM Raw_Stock WHERE stock_id = ?";
+                        try (PreparedStatement verifyStmt = connection.prepareStatement(verifyStockQuery)) {
+                            verifyStmt.setInt(1, rawStockId);
+                            ResultSet rs = verifyStmt.executeQuery();
+                            if (!rs.next()) {
+                                System.err.println("Invalid raw_stock_id: " + rawStockId + " does not exist in Raw_Stock for item: " + item.getRawStockName());
+                                connection.rollback();
+                                return false;
+                            }
                         }
-                    }
 
-                    pstmt.setInt(1, rawPurchaseInvoiceId);
-                    pstmt.setInt(2, rawStockId);
-                    pstmt.setInt(3, item.getQuantity().intValue());
-                    pstmt.setDouble(4, item.getUnitPrice());
-                    System.out.println("Adding batch for Raw_Purchase_Invoice_Item: raw_purchase_invoice_id=" + rawPurchaseInvoiceId +
-                                      ", raw_stock_id=" + rawStockId + ", quantity=" + item.getQuantity() +
-                                      ", unit_price=" + item.getUnitPrice());
-                    pstmt.addBatch();
-                } catch (SQLException e) {
-                    System.err.println("SQLException in item loop for " + item.getRawStockName() + ": " + e.getMessage());
-                    e.printStackTrace();
-                    connection.rollback();
-                    return false;
-                }
-            }
-            System.out.println("Executing batch insert for Raw_Purchase_Invoice_Item");
-            pstmt.executeBatch();
-        }
-        try (Statement stmt = connection.createStatement()) {
-            stmt.execute("PRAGMA foreign_keys = ON");
-        }
-
-        // 7. Update Raw_Stock quantities
-        String updateStockQuery = "UPDATE Raw_Stock SET quantity = quantity + ?, total_cost = total_cost + ? WHERE stock_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(updateStockQuery)) {
-            for (RawStockPurchaseItem item : items) {
-                try {
-                    if (item == null || item.getRawStockName() == null || item.getRawStockName().trim().isEmpty()) {
-                        System.err.println("Invalid item for stock update: null or empty RawStockName");
+                        pstmt.setInt(1, rawPurchaseInvoiceId);
+                        pstmt.setInt(2, rawStockId);
+                        pstmt.setInt(3, item.getQuantity().intValue());
+                        pstmt.setDouble(4, item.getUnitPrice());
+                        System.out.println("Adding batch for Raw_Purchase_Invoice_Item: raw_purchase_invoice_id=" + rawPurchaseInvoiceId +
+                                        ", raw_stock_id=" + rawStockId + ", quantity=" + item.getQuantity() +
+                                        ", unit_price=" + item.getUnitPrice());
+                        pstmt.addBatch();
+                    } catch (SQLException e) {
+                        System.err.println("SQLException in item loop for " + item.getRawStockName() + ": " + e.getMessage());
+                        e.printStackTrace();
                         connection.rollback();
                         return false;
                     }
-                    int rawStockId = getRawStockIdByName(item.getRawStockName());
-                    if (rawStockId == -1) {
-                        System.err.println("Raw stock ID not found for update: " + item.getRawStockName());
+                }
+                System.out.println("Executing batch insert for Raw_Purchase_Invoice_Item");
+                pstmt.executeBatch();
+            }
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute("PRAGMA foreign_keys = ON");
+            }
+
+            // 7. Update Raw_Stock quantities
+            String updateStockQuery = "UPDATE Raw_Stock SET quantity = quantity + ?, total_cost = total_cost + ? WHERE stock_id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(updateStockQuery)) {
+                for (RawStockPurchaseItem item : items) {
+                    try {
+                        if (item == null || item.getRawStockName() == null || item.getRawStockName().trim().isEmpty()) {
+                            System.err.println("Invalid item for stock update: null or empty RawStockName");
+                            connection.rollback();
+                            return false;
+                        }
+                        int rawStockId = getRawStockIdByName(item.getRawStockName());
+                        if (rawStockId == -1) {
+                            System.err.println("Raw stock ID not found for update: " + item.getRawStockName());
+                            connection.rollback();
+                            return false;
+                        }
+                        double totalCost = item.getQuantity() * item.getUnitPrice();
+                        System.out.println("Updating stock for item: " + item.getRawStockName() + 
+                                        ", Quantity: " + item.getQuantity() + ", Total Cost: " + totalCost);
+
+                        pstmt.setInt(1, item.getQuantity().intValue());
+                        pstmt.setDouble(2, totalCost);
+                        pstmt.setInt(3, rawStockId);
+                        pstmt.addBatch();
+                    } catch (SQLException e) {
+                        System.err.println("SQLException in stock update loop for " + item.getRawStockName() + ": " + e.getMessage());
+                        e.printStackTrace();
                         connection.rollback();
                         return false;
                     }
-                    double totalCost = item.getQuantity() * item.getUnitPrice();
-                    System.out.println("Updating stock for item: " + item.getRawStockName() + 
-                                      ", Quantity: " + item.getQuantity() + ", Total Cost: " + totalCost);
-
-                    pstmt.setInt(1, item.getQuantity().intValue());
-                    pstmt.setDouble(2, totalCost);
-                    pstmt.setInt(3, rawStockId);
-                    pstmt.addBatch();
-                } catch (SQLException e) {
-                    System.err.println("SQLException in stock update loop for " + item.getRawStockName() + ": " + e.getMessage());
-                    e.printStackTrace();
-                    connection.rollback();
-                    return false;
                 }
+                System.out.println("Executing batch update for Raw_Stock");
+                pstmt.executeBatch();
             }
-            System.out.println("Executing batch update for Raw_Stock");
-            pstmt.executeBatch();
-        }
 
-        connection.commit();
-        System.out.println("Successfully inserted Raw_Purchase_Invoice and items for invoice: " + invoiceNumber);
-        return true;
-    } catch (SQLException e) {
-        System.err.println("SQLException during insertSimpleRawPurchaseInvoice: " + e.getMessage());
-        e.printStackTrace();
-        try {
-            connection.rollback();
-            System.err.println("Rolled back transaction due to error");
-        } catch (SQLException rollbackEx) {
-            System.err.println("Failed to rollback transaction: " + rollbackEx.getMessage());
-        }
-        return false;
-    } finally {
-        try {
-            connection.setAutoCommit(true);
+            connection.commit();
+            System.out.println("Successfully inserted Raw_Purchase_Invoice and items for invoice: " + invoiceNumber);
+            return true;
         } catch (SQLException e) {
-            System.err.println("Failed to restore auto-commit: " + e.getMessage());
+            System.err.println("SQLException during insertSimpleRawPurchaseInvoice: " + e.getMessage());
+            e.printStackTrace();
+            try {
+                connection.rollback();
+                System.err.println("Rolled back transaction due to error");
+            } catch (SQLException rollbackEx) {
+                System.err.println("Failed to rollback transaction: " + rollbackEx.getMessage());
+            }
+            return false;
+        } finally {
+            try {
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                System.err.println("Failed to restore auto-commit: " + e.getMessage());
+            }
         }
     }
-}
-@
-Override
+    
+    @Override
     public List<Object[]> getAllRawPurchaseInvoices() {
         List<Object[]> invoices = new ArrayList<>();
         String query = "SELECT rpi.invoice_number, rpi.invoice_date, s.supplier_name, " +
@@ -2807,45 +2813,64 @@ Override
         return transactions;
     }
 
-@Override
-public List<Object[]> getAllCashTransactions() {
-    List<Object[]> transactions = new ArrayList<>();
-    String query = "SELECT " +
-                 "    transaction_date AS date, " +
-                 "    transaction_type, " +
-                 "    amount, " +
-                 "    description, " +
-                 "    'cash' AS source " +
-                 "FROM Cash_Transaction " +
-                 "UNION ALL " +
-                 "SELECT " +
-                 "    transaction_date AS date, " +
-                 "    transaction_type, " +
-                 "    amount, " +
-                 "    description, " +
-                 "    'bank' AS source " +
-                 "FROM Bank_Transaction " +
-                 "ORDER BY date DESC";
 
-    try (Statement stmt = connection.createStatement();
-         ResultSet rs = stmt.executeQuery(query)) {
-        
-        while (rs.next()) {
-            Object[] row = new Object[] {
-                rs.getString("date"),
-                rs.getString("transaction_type"),
-                rs.getDouble("amount"),
-                rs.getString("description"),
-                rs.getString("source")
-            };
-            transactions.add(row);
+    @Override
+    public List<Object[]> getAllCashTransactions() {
+        List<Object[]> transactions = new ArrayList<>();
+
+        // Use correct column names for each table
+        String cashQuery = "SELECT date AS date, transaction_type, amount, description, 'cash' AS source " +
+                        "FROM Cash_Transaction";
+        String bankQuery = "SELECT transaction_date AS date, transaction_type, amount, description, 'bank' AS source " +
+                        "FROM Bank_Transaction";
+
+        try {
+            // Cash transactions
+            try (Statement stmt = connection.createStatement();
+                ResultSet rs = stmt.executeQuery(cashQuery)) {
+                while (rs.next()) {
+                    Object[] row = new Object[] {
+                        rs.getString("date"),
+                        rs.getString("transaction_type"),
+                        rs.getDouble("amount"),
+                        rs.getString("description"),
+                        rs.getString("source")
+                    };
+                    transactions.add(row);
+                }
+            }
+
+            // Bank transactions
+            try (Statement stmt = connection.createStatement();
+                ResultSet rs = stmt.executeQuery(bankQuery)) {
+                while (rs.next()) {
+                    Object[] row = new Object[] {
+                        rs.getString("date"),
+                        rs.getString("transaction_type"),
+                        rs.getDouble("amount"),
+                        rs.getString("description"),
+                        rs.getString("source")
+                    };
+                    transactions.add(row);
+                }
+            }
+
+            // Sort by date descending
+            transactions.sort((a, b) -> {
+                String dateA = (String) a[0];
+                String dateB = (String) b[0];
+                return dateB.compareTo(dateA);
+            });
+
+        } catch (SQLException e) {
+            System.err.println("Error loading transactions: " + e.getMessage());
+            e.printStackTrace();
         }
-    } catch (SQLException e) {
-        System.err.println("Error loading transactions: " + e.getMessage());
+        return transactions;
     }
-    return transactions;
-}
-@Override
+        
+
+    @Override
     public double getCurrentCashBalance() {
         String query = "SELECT " +
                       "IFNULL(SUM(CASE WHEN transaction_type IN ('cash_in', 'transfer_from_bank') THEN amount ELSE 0 END), 0) - " +
@@ -3648,108 +3673,110 @@ public List<Object[]> getAllCashTransactions() {
         return false;
     }
 
-public List<Object[]> getViewData(String viewName, Map<String, String> filters) {
-    List<Object[]> results = new ArrayList<>();
-    StringBuilder query = new StringBuilder("SELECT * FROM " + viewName);
-    List<String> values = new ArrayList<>();
+    public List<Object[]> getViewData(String viewName, Map<String, String> filters) {
+        List<Object[]> results = new ArrayList<>();
+        StringBuilder query = new StringBuilder("SELECT * FROM " + viewName);
+        List<String> values = new ArrayList<>();
 
-    // Map view names to their respective date columns
-    Map<String, String> dateColumnMap = new HashMap<>();
-    dateColumnMap.put("View_Purchase_Book", "invoice_date");
-    dateColumnMap.put("View_Raw_Stock_Book", "usage_date");
-    // Add other views and their date columns as needed
+        // Map view names to their respective date columns
+        Map<String, String> dateColumnMap = new HashMap<>();
+        dateColumnMap.put("View_Purchase_Book", "invoice_date");
+        dateColumnMap.put("View_Raw_Stock_Book", "usage_date");
+        // Add other views and their date columns as needed
 
-    String dateColumn = dateColumnMap.getOrDefault(viewName, "date"); // Default to 'date' if view not mapped
+        String dateColumn = dateColumnMap.getOrDefault(viewName, "date"); // Default to 'date' if view not mapped
 
-    System.out.println("View Name: " + viewName);
-    if (filters != null && !filters.isEmpty()) {
-        query.append(" WHERE ");
-        List<String> clauses = new ArrayList<>();
+        System.out.println("View Name: " + viewName);
+        if (filters != null && !filters.isEmpty()) {
+            query.append(" WHERE ");
+            List<String> clauses = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry : filters.entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue();
+            for (Map.Entry<String, String> entry : filters.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
 
-            if (key.equals("fromDate")) {
-                clauses.add(dateColumn + " >= ?");
-                values.add(value);
-            } else if (key.equals("toDate")) {
-                clauses.add(dateColumn + " <= ?");
-                values.add(value);
-            } else {
-                clauses.add(key + " LIKE ?");
-                values.add("%" + value + "%");
-            }
-        }
-        query.append(String.join(" AND ", clauses));
-    }
-
-    System.out.println("Query: " + query.toString() + ", Values: " + values);
-    try (PreparedStatement stmt = connection.prepareStatement(query.toString())) {
-        for (int i = 0; i < values.size(); i++) {
-            stmt.setString(i + 1, values.get(i));
-        }
-        try (ResultSet rs = stmt.executeQuery()) {
-            int columnCount = rs.getMetaData().getColumnCount();
-            while (rs.next()) {
-                Object[] row = new Object[columnCount];
-                for (int i = 0; i < columnCount; i++) {
-                    row[i] = rs.getObject(i + 1);
+                if (key.equals("fromDate")) {
+                    clauses.add(dateColumn + " >= ?");
+                    values.add(value);
+                } else if (key.equals("toDate")) {
+                    clauses.add(dateColumn + " <= ?");
+                    values.add(value);
+                } else {
+                    clauses.add(key + " LIKE ?");
+                    values.add("%" + value + "%");
                 }
-                results.add(row);
             }
+            query.append(String.join(" AND ", clauses));
         }
-    } catch (SQLException e) {
-        System.err.println("SQL Error: " + e.getMessage());
-        e.printStackTrace();
+
+        System.out.println("Query: " + query.toString() + ", Values: " + values);
+        try (PreparedStatement stmt = connection.prepareStatement(query.toString())) {
+            for (int i = 0; i < values.size(); i++) {
+                stmt.setString(i + 1, values.get(i));
+            }
+            try (ResultSet rs = stmt.executeQuery()) {
+                int columnCount = rs.getMetaData().getColumnCount();
+                while (rs.next()) {
+                    Object[] row = new Object[columnCount];
+                    for (int i = 0; i < columnCount; i++) {
+                        row[i] = rs.getObject(i + 1);
+                    }
+                    results.add(row);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("SQL Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+        System.out.println("Rows returned: " + results.size());
+        System.out.println("View_" + viewName + " results: " + results.size() + " rows");
+        System.out.println("Table items count: " + results.size());
+        return results;
     }
-    System.out.println("Rows returned: " + results.size());
-    System.out.println("View_" + viewName + " results: " + results.size() + " rows");
-    System.out.println("Table items count: " + results.size());
-    return results;
-}
-@Override
-    public List<Object[]> getAllProductionStock() {
-        // Dummy implementation: returns an empty list
-        return new ArrayList<>();
-    }
+    @Override
+        public List<Object[]> getAllProductionStock() {
+            // Dummy implementation: returns an empty list
+            return new ArrayList<>();
+        }
+
+        @Override
+        public List<Object[]> getAllRawStock() {
+            // Dummy implementation: returns an empty list
+            return new ArrayList<>();
+        }
 
     @Override
-    public List<Object[]> getAllRawStock() {
-        // Dummy implementation: returns an empty list
-        return new ArrayList<>();
-    }
-
-@Override
-public List<Object[]> getInvoiceItemsByID(Integer invoiceID) {
-    List<Object[]> items = new ArrayList<>();
-    String query = "SELECT rpii.raw_stock_id, rs.item_name, b.brand_name, rpii.quantity, rpii.unit_price " +
-                   "FROM Raw_Purchase_Invoice_Item rpii " +
-                   "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
-                   "JOIN Brand b ON rs.brand_id = b.brand_id " +
-                   "JOIN Raw_Purchase_Invoice rpi ON rpii.raw_purchase_invoice_id = rpi.raw_purchase_invoice_id " +
-                   "WHERE rpi.raw_purchase_invoice_id = ?";
-    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-        pstmt.setInt(1, invoiceID);
-        System.out.println("Executing query: " + query + " with invoiceID: " + invoiceID);
-        try (ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                Object[] row = {
-                    rs.getInt("raw_stock_id"),
-                    rs.getString("item_name"),
-                    rs.getString("brand_name"),
-                    rs.getDouble("quantity"),
-                    rs.getDouble("unit_price")
-                };
-                System.out.println("Fetched row: " + Arrays.toString(row));
-                items.add(row);
+    public List<Object[]> getInvoiceItemsByID(Integer invoiceID) {
+        List<Object[]> items = new ArrayList<>();
+        String query = "SELECT rpii.raw_stock_id, rs.item_name, b.brand_name, rpii.quantity, rpii.unit_price " +
+                    "FROM Raw_Purchase_Invoice_Item rpii " +
+                    "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                    "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                    "JOIN Raw_Purchase_Invoice rpi ON rpii.raw_purchase_invoice_id = rpi.raw_purchase_invoice_id " +
+                    "WHERE rpi.raw_purchase_invoice_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, invoiceID);
+            System.out.println("Executing query: " + query + " with invoiceID: " + invoiceID);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Object[] row = {
+                        rs.getInt("raw_stock_id"),
+                        rs.getString("item_name"),
+                        rs.getString("brand_name"),
+                        rs.getDouble("quantity"),
+                        rs.getDouble("unit_price")
+                    };
+                    System.out.println("Fetched row: " + Arrays.toString(row));
+                    items.add(row);
+                }
+                System.out.println("Total items fetched: " + items.size());
             }
-            System.out.println("Total items fetched: " + items.size());
+        } catch (SQLException e) {
+            System.err.println("SQL Error for invoiceID " + invoiceID + ": " + e.getMessage());
+            e.printStackTrace();
         }
-    } catch (SQLException e) {
-        System.err.println("SQL Error for invoiceID " + invoiceID + ": " + e.getMessage());
-        e.printStackTrace();
-    }
-    return items;
-}  
+        return items;
+    }  
+
+
 }
