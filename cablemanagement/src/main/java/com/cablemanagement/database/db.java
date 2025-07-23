@@ -1,5 +1,7 @@
 package com.cablemanagement.database;
 
+import java.sql.Date;
+import java.sql.ResultSet;
 import java.util.List;
 import java.util.Map;
 
@@ -315,4 +317,25 @@ List<Object[]> getViewData(String viewName, Map<String, String> filters);
 List<Object[]> getInvoiceItemsByID(Integer invoiceID);
  List<Object[]> getAllRawStock();
     List<Object[]> getAllProductionStock();
+    ///////////////////////////////////////////////////////////////////////////////
+    /// ///                   reports Methods
+    ///////////////////////////////////////////////////////////////////////////////
+    List<Object[]> getPurchaseReportList(Date fromDate, Date toDate);
+    ResultSet getPurchaseReport(Date fromDate, Date toDate);
+    ResultSet getSalesReport(Date fromDate, Date toDate);
+    ResultSet getReturnPurchaseReport(Date fromDate, Date toDate);
+    ResultSet getReturnSalesReport(Date fromDate, Date toDate);
+    ResultSet getBankTransferReport(Date fromDate, Date toDate);
+    ResultSet getProfitReport(Date fromDate, Date toDate);
+    ResultSet getSummaryReport(Date fromDate, Date toDate);
+    ResultSet getBalanceSheet();
+    ResultSet getCustomersReport();
+    ResultSet getSuppliersReport();
+    ResultSet getAreaWiseReport();
+    ResultSet getBrandSalesReport(Date fromDate, Date toDate);
+    ResultSet getBrandProfitReport(Date fromDate, Date toDate);
+    ResultSet getCustomerSalesReport(int customerId, Date fromDate, Date toDate);
+    ResultSet getSupplierSalesReport(int supplierId, Date fromDate, Date toDate);
+    ResultSet getAttendanceReport(int employeeId, Date fromDate, Date toDate);
+
 }

@@ -2,6 +2,7 @@ package com.cablemanagement.database;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -9,6 +10,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -737,8 +739,8 @@ public class SQLiteDatabase implements db {
         rs = stmt.executeQuery("SELECT COUNT(*) FROM Brand");
         rs.next();
         if (rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO Brand (brand_name, manufacturer_id, tehsil_id) VALUES " +
-                        "('PowerFlex', 1, 1), ('ABC', 2, 1), ('aa', 3, 1)");
+            stmt.execute("INSERT INTO Brand (brand_name, manufacturer_id) VALUES " +
+                        "('PowerFlex', 1), ('ABC', 2), ('aa', 3)");
         }
         rs.close();
     }
@@ -1051,33 +1053,15 @@ public class SQLiteDatabase implements db {
         
     @Override
     public boolean insertBrand(String name, String province, String district, String tehsil) {
-        String getIdsQuery = "SELECT m.manufacturer_id, t.tehsil_id FROM Manufacturer m " +
-                            "JOIN Tehsil t ON m.tehsil_id = t.tehsil_id " +
-                            "JOIN District d ON t.district_id = d.district_id " +
-                            "JOIN Province p ON d.province_id = p.province_id " +
-                            "WHERE p.province_name = ? AND d.district_name = ? AND t.tehsil_name = ? " +
-                            "LIMIT 1";
-        String insertQuery = "INSERT INTO Brand (brand_name, manufacturer_id, tehsil_id) VALUES (?, ?, ?)";
+        // For now, use a simple approach since Brand table doesn't have tehsil_id
+        // We'll just use the first available manufacturer or default manufacturer
+        String insertQuery = "INSERT INTO Brand (brand_name, manufacturer_id) VALUES (?, ?)";
         
-        try (PreparedStatement getStmt = connection.prepareStatement(getIdsQuery)) {
-            getStmt.setString(1, province);
-            getStmt.setString(2, district);
-            getStmt.setString(3, tehsil);
+        try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+            insertStmt.setString(1, name);
+            insertStmt.setInt(2, 1); // Use default manufacturer_id = 1
             
-            try (ResultSet rs = getStmt.executeQuery()) {
-                if (rs.next()) {
-                    int manufacturerId = rs.getInt("manufacturer_id");
-                    int tehsilId = rs.getInt("tehsil_id");
-                    
-                    try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
-                        insertStmt.setString(1, name);
-                        insertStmt.setInt(2, manufacturerId);
-                        insertStmt.setInt(3, tehsilId);
-                        
-                        return insertStmt.executeUpdate() > 0;
-                    }
-                }
-            }
+            return insertStmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -1659,12 +1643,11 @@ public class SQLiteDatabase implements db {
             return false;
         }
 
-        // Insert Default Brand with a default manufacturer_id
-        String insertBrandQuery = "INSERT INTO Brand (brand_name, manufacturer_id, tehsil_id) VALUES (?, ?, ?)";
+        // Insert Default Brand with a default manufacturer_id (no tehsil_id needed)
+        String insertBrandQuery = "INSERT INTO Brand (brand_name, manufacturer_id) VALUES (?, ?)";
         try (PreparedStatement pstmt = connection.prepareStatement(insertBrandQuery)) {
             pstmt.setString(1, brandName);
             pstmt.setInt(2, 1); // Assume manufacturer_id = 1 exists; adjust as needed
-            pstmt.setInt(3, tehsilId);
             int rowsAffected = pstmt.executeUpdate();
             System.out.println("Inserted Default Brand: " + brandName);
             return rowsAffected > 0;
@@ -3777,6 +3760,335 @@ public class SQLiteDatabase implements db {
         }
         return items;
     }  
+
+
+    /////////////////////////////////////////////////////////////////////////////
+    ///                       reports                                        ////
+    //////////////////////////////////////////////////////////////////////////////
+
+    public List<Object[]> getPurchaseReportList(Date fromDate, Date toDate) {
+        List<Object[]> reports = new ArrayList<>();
+        String query = "SELECT " +
+                "rpi.invoice_number AS invoiceNumber, " +
+                "rpi.invoice_date AS invoiceDate, " +
+                "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
+                "rpi.total_amount AS totalAmount, " +
+                "rpi.discount_amount AS discountAmount, " +
+                "rpi.paid_amount AS paidAmount " +
+                "FROM Raw_Purchase_Invoice rpi " +
+                "LEFT JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
+                "WHERE rpi.invoice_date BETWEEN ? AND ? " +
+                "ORDER BY rpi.invoice_date DESC";
+                
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            String fromDateStr = sdf.format(fromDate);
+            String toDateStr = sdf.format(toDate);
+            
+            // Debug logging
+            System.out.println("DEBUG: getPurchaseReportList called with dates:");
+            System.out.println("DEBUG: fromDate: " + fromDate + " -> " + fromDateStr);
+            System.out.println("DEBUG: toDate: " + toDate + " -> " + toDateStr);
+            System.out.println("DEBUG: Query: " + query);
+            
+            pstmt.setString(1, fromDateStr);
+            pstmt.setString(2, toDateStr);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Object[] row = {
+                        rs.getString("invoiceNumber"),
+                        rs.getString("invoiceDate"),
+                        rs.getString("supplierName"),
+                        rs.getDouble("totalAmount"),
+                        rs.getDouble("discountAmount"),
+                        rs.getDouble("paidAmount")
+                    };
+                    reports.add(row);
+                }
+                System.out.println("DEBUG: Loaded " + reports.size() + " purchase report rows");
+            }
+        } catch (SQLException e) {
+            System.err.println("DEBUG: SQLException in getPurchaseReportList: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return reports;
+    }
+
+    @Override
+    public ResultSet getPurchaseReport(Date fromDate, Date toDate) {
+        String query = "SELECT " +
+                "rpi.invoice_number AS invoiceNumber, " +
+                "rpi.invoice_date AS invoiceDate, " +
+                "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
+                "rpi.total_amount AS totalAmount, " +
+                "rpi.discount_amount AS discountAmount, " +
+                "rpi.paid_amount AS paidAmount " +
+                "FROM Raw_Purchase_Invoice rpi " +
+                "LEFT JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
+                "WHERE rpi.invoice_date BETWEEN ? AND ? " +
+                "ORDER BY rpi.invoice_date DESC";
+        try {
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            String fromDateStr = sdf.format(fromDate);
+            String toDateStr = sdf.format(toDate);
+            
+            // Debug logging
+            System.out.println("DEBUG: getPurchaseReport called with dates:");
+            System.out.println("DEBUG: fromDate: " + fromDate + " -> " + fromDateStr);
+            System.out.println("DEBUG: toDate: " + toDate + " -> " + toDateStr);
+            System.out.println("DEBUG: Query: " + query);
+            
+            pstmt.setString(1, fromDateStr);
+            pstmt.setString(2, toDateStr);
+            
+            ResultSet rs = pstmt.executeQuery();
+            
+            // Debug: Just log that we're returning the ResultSet
+            System.out.println("DEBUG: Returning ResultSet from getPurchaseReport");
+            
+            return rs;
+        } catch (SQLException e) {
+            System.err.println("DEBUG: SQLException in getPurchaseReport: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getSalesReport(Date fromDate, Date toDate) {
+        String query = "SELECT * FROM Sales_Invoice WHERE invoice_date BETWEEN ? AND ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDate(1, fromDate);
+            pstmt.setDate(2, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getReturnPurchaseReport(Date fromDate, Date toDate) {
+        String query = "SELECT " +
+                "rpri.return_invoice_number AS invoiceNumber, " +
+                "rpri.return_date AS invoiceDate, " +
+                "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
+                "rpri.total_return_amount AS totalAmount, " +
+                "0.00 AS discountAmount, " +
+                "rpri.total_return_amount AS paidAmount " +
+                "FROM Raw_Purchase_Return_Invoice rpri " +
+                "LEFT JOIN Supplier s ON rpri.supplier_id = s.supplier_id " +
+                "WHERE rpri.return_date BETWEEN ? AND ? " +
+                "ORDER BY rpri.return_date DESC";
+        try {
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            String fromDateStr = sdf.format(fromDate);
+            String toDateStr = sdf.format(toDate);
+            
+            // Debug logging
+            System.out.println("DEBUG: getReturnPurchaseReport called with dates:");
+            System.out.println("DEBUG: fromDate: " + fromDate + " -> " + fromDateStr);
+            System.out.println("DEBUG: toDate: " + toDate + " -> " + toDateStr);
+            System.out.println("DEBUG: Query: " + query);
+            
+            pstmt.setString(1, fromDateStr);
+            pstmt.setString(2, toDateStr);
+            
+            ResultSet rs = pstmt.executeQuery();
+            
+            // Debug: Just log that we're returning the ResultSet
+            System.out.println("DEBUG: Returning ResultSet from getReturnPurchaseReport");
+            
+            return rs;
+        } catch (SQLException e) {
+            System.err.println("DEBUG: SQLException in getReturnPurchaseReport: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getReturnSalesReport(Date fromDate, Date toDate) {
+        String query = "SELECT * FROM Sales_Return_Invoice WHERE return_date BETWEEN ? AND ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDate(1, fromDate);
+            pstmt.setDate(2, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getBankTransferReport(Date fromDate, Date toDate) {
+        String query = "SELECT * FROM Bank_Transaction WHERE transaction_type IN ('transfer_in', 'transfer_out') AND transaction_date BETWEEN ? AND ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDate(1, fromDate);
+            pstmt.setDate(2, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getProfitReport(Date fromDate, Date toDate) {
+        String query = "SELECT product_name, SUM(quantity) AS total_sold, SUM(quantity * unit_cost) AS cost, SUM(quantity * unit_price) AS revenue, " +
+                    "(SUM(quantity * unit_price) - SUM(quantity * unit_cost)) AS profit " +
+                    "FROM Sales_Invoice_Item WHERE invoice_date BETWEEN ? AND ? GROUP BY product_name";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDate(1, fromDate);
+            pstmt.setDate(2, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getSummaryReport(Date fromDate, Date toDate) {
+        String query = "SELECT " +
+                    "(SELECT SUM(total_amount) FROM Raw_Purchase_Invoice WHERE invoice_date BETWEEN ? AND ?) AS total_purchases, " +
+                    "(SELECT SUM(total_amount) FROM Sales_Invoice WHERE invoice_date BETWEEN ? AND ?) AS total_sales";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDate(1, fromDate);
+            pstmt.setDate(2, toDate);
+            pstmt.setDate(3, fromDate);
+            pstmt.setDate(4, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getBalanceSheet() {
+        String query = "SELECT bank_name, balance FROM Bank";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getCustomersReport() {
+        String query = "SELECT * FROM Customer";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getSuppliersReport() {
+        String query = "SELECT * FROM Supplier";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getBrandSalesReport(Date fromDate, Date toDate) {
+        String query = "SELECT b.brand_name, SUM(s.quantity) AS total_sold FROM Brand b " +
+                    "JOIN Sales_Invoice_Item s ON b.brand_id = s.brand_id " +
+                    "WHERE s.invoice_date BETWEEN ? AND ? GROUP BY b.brand_name";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDate(1, fromDate);
+            pstmt.setDate(2, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getBrandProfitReport(Date fromDate, Date toDate) {
+        String query = "SELECT b.brand_name, SUM(s.quantity * s.unit_price - r.unit_cost) AS profit " +
+                    "FROM Brand b JOIN Sales_Invoice_Item s ON b.brand_id = s.brand_id " +
+                    "JOIN Raw_Stock r ON s.raw_stock_id = r.stock_id " +
+                    "WHERE s.invoice_date BETWEEN ? AND ? GROUP BY b.brand_name";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDate(1, fromDate);
+            pstmt.setDate(2, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getCustomerSalesReport(int customerId, Date fromDate, Date toDate) {
+        String query = "SELECT * FROM Sales_Invoice WHERE customer_id = ? AND invoice_date BETWEEN ? AND ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, customerId);
+            pstmt.setDate(2, fromDate);
+            pstmt.setDate(3, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getSupplierSalesReport(int supplierId, Date fromDate, Date toDate) {
+        String query = "SELECT * FROM Raw_Purchase_Invoice WHERE supplier_id = ? AND invoice_date BETWEEN ? AND ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, supplierId);
+            pstmt.setDate(2, fromDate);
+            pstmt.setDate(3, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getAttendanceReport(int employeeId, Date fromDate, Date toDate) {
+        String query = "SELECT * FROM Employee_Attendance WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, employeeId);
+            pstmt.setDate(2, fromDate);
+            pstmt.setDate(3, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getAreaWiseReport() {
+        String query = "SELECT t.tehsil_name, COUNT(c.customer_id) AS total_customers " +
+                    "FROM Tehsil t LEFT JOIN Customer c ON t.tehsil_id = c.tehsil_id GROUP BY t.tehsil_name";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
 
 
 }

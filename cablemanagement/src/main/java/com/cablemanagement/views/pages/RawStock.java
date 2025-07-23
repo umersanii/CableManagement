@@ -1055,15 +1055,15 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         nameCol.setPrefWidth(150);
 
         TableColumn<RawStockPurchaseItem, String> categoryCol = new TableColumn<>("Category");
-        categoryCol.setCellValueFactory(new PropertyValueFactory<>("category"));
+        categoryCol.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
         categoryCol.setPrefWidth(100);
 
         TableColumn<RawStockPurchaseItem, String> brandCol = new TableColumn<>("Brand");
-        brandCol.setCellValueFactory(new PropertyValueFactory<>("brand"));
+        brandCol.setCellValueFactory(new PropertyValueFactory<>("brandName"));
         brandCol.setPrefWidth(100);
 
         TableColumn<RawStockPurchaseItem, String> unitCol = new TableColumn<>("Unit");
-        unitCol.setCellValueFactory(new PropertyValueFactory<>("unit"));
+        unitCol.setCellValueFactory(new PropertyValueFactory<>("unitName"));
         unitCol.setPrefWidth(60);
 
         TableColumn<RawStockPurchaseItem, Double> qtyCol = new TableColumn<>("Quantity");
