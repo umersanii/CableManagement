@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -1813,7 +1814,7 @@ public boolean insertSimpleRawPurchaseInvoice(String invoiceNumber, String suppl
 
                     pstmt.setInt(1, rawPurchaseInvoiceId);
                     pstmt.setInt(2, rawStockId);
-                    pstmt.setInt(3, (int) item.getQuantity());
+                    pstmt.setInt(3, item.getQuantity().intValue());
                     pstmt.setDouble(4, item.getUnitPrice());
                     System.out.println("Adding batch for Raw_Purchase_Invoice_Item: raw_purchase_invoice_id=" + rawPurchaseInvoiceId +
                                       ", raw_stock_id=" + rawStockId + ", quantity=" + item.getQuantity() +
@@ -1853,7 +1854,7 @@ public boolean insertSimpleRawPurchaseInvoice(String invoiceNumber, String suppl
                     System.out.println("Updating stock for item: " + item.getRawStockName() + 
                                       ", Quantity: " + item.getQuantity() + ", Total Cost: " + totalCost);
 
-                    pstmt.setInt(1, (int) item.getQuantity());
+                    pstmt.setInt(1, item.getQuantity().intValue());
                     pstmt.setDouble(2, totalCost);
                     pstmt.setInt(3, rawStockId);
                     pstmt.addBatch();
@@ -2001,11 +2002,10 @@ Override
      */
     public List<Object[]> getRawStockItemsByInvoiceId(int invoiceId) {
         List<Object[]> items = new ArrayList<>();
-        String query = "SELECT rpii.raw_stock_id, rs.raw_stock_name, c.category_name, " +
+        String query = "SELECT rpii.raw_stock_id, rs.item_name, c.category_name, " +
                       "b.brand_name, u.unit_name, rpii.quantity, rpii.unit_price " +
                       "FROM Raw_Purchase_Invoice_Item rpii " +
-                      "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.raw_stock_id " +
-                      "JOIN Category c ON rs.category_id = c.category_id " +
+                      "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
                       "JOIN Brand b ON rs.brand_id = b.brand_id " +
                       "JOIN Unit u ON rs.unit_id = u.unit_id " +
                       "WHERE rpii.raw_purchase_invoice_id = ?";
@@ -3720,5 +3720,36 @@ public List<Object[]> getViewData(String viewName, Map<String, String> filters) 
         return new ArrayList<>();
     }
 
-
+@Override
+public List<Object[]> getInvoiceItemsByID(Integer invoiceID) {
+    List<Object[]> items = new ArrayList<>();
+    String query = "SELECT rpii.raw_stock_id, rs.item_name, b.brand_name, rpii.quantity, rpii.unit_price " +
+                   "FROM Raw_Purchase_Invoice_Item rpii " +
+                   "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                   "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                   "JOIN Raw_Purchase_Invoice rpi ON rpii.raw_purchase_invoice_id = rpi.raw_purchase_invoice_id " +
+                   "WHERE rpi.raw_purchase_invoice_id = ?";
+    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        pstmt.setInt(1, invoiceID);
+        System.out.println("Executing query: " + query + " with invoiceID: " + invoiceID);
+        try (ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("raw_stock_id"),
+                    rs.getString("item_name"),
+                    rs.getString("brand_name"),
+                    rs.getDouble("quantity"),
+                    rs.getDouble("unit_price")
+                };
+                System.out.println("Fetched row: " + Arrays.toString(row));
+                items.add(row);
+            }
+            System.out.println("Total items fetched: " + items.size());
+        }
+    } catch (SQLException e) {
+        System.err.println("SQL Error for invoiceID " + invoiceID + ": " + e.getMessage());
+        e.printStackTrace();
+    }
+    return items;
+}  
 }

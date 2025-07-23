@@ -371,62 +371,131 @@ public class RawStock {
         return form;
     }
 
-    private static VBox createRawStockReturnPurchaseInvoiceForm() {
-        VBox form = new VBox(20);
-        form.setPadding(new Insets(30));
-        form.getStyleClass().add("form-container");
+    private static ScrollPane createRawStockReturnPurchaseInvoiceForm() {
+        VBox mainContainer = new VBox(20);
+        mainContainer.setPadding(new Insets(30));
+        mainContainer.getStyleClass().add("form-container");
 
         Label heading = createHeading("Create Raw Stock Return Purchase Invoice");
 
-        // Auto-generated return invoice number (read-only)
+        // Components
         TextField returnInvoiceNumberField = createTextField("Return Invoice Number");
         returnInvoiceNumberField.setEditable(false);
         returnInvoiceNumberField.setText(database.generateReturnInvoiceNumber());
 
-        // Dropdown for selecting original invoice
         ComboBox<String> originalInvoiceComboBox = new ComboBox<>();
         originalInvoiceComboBox.setPromptText("Select Original Invoice");
         originalInvoiceComboBox.setPrefWidth(250);
-        
-        // Dropdown for suppliers (automatically populated when original invoice is selected)
+
         ComboBox<String> supplierComboBox = new ComboBox<>();
         supplierComboBox.setPromptText("Supplier (Auto-selected)");
         supplierComboBox.setPrefWidth(250);
         supplierComboBox.setDisable(true);
 
-        // Return date picker
         DatePicker returnDatePicker = new DatePicker();
         returnDatePicker.setValue(LocalDate.now());
 
-        // Table for selecting multiple stock items
-        TableView<RawStockPurchaseItem> availableItemsTable = createAvailableItemsTable();
-        TableView<RawStockPurchaseItem> selectedItemsTable = createSelectedReturnItemsTable();
-        
-        // Total amount field (auto-calculated)
         TextField totalReturnAmountField = createTextField("Total Return Amount");
         totalReturnAmountField.setEditable(false);
         totalReturnAmountField.setText("0.00");
 
-        // Buttons
         Button addItemsBtn = createSubmitButton("Add Selected Items →");
         Button removeItemsBtn = createSubmitButton("← Remove Selected Items");
         Button submitReturnInvoiceBtn = createSubmitButton("Submit Return Invoice");
-        
-        // Load original invoices into dropdown
+
+        TableView<RawStockPurchaseItem> availableItemsTable = createAvailableItemsTable();
+        TableView<RawStockPurchaseItem> selectedItemsTable = createSelectedReturnItemsTable();
+
+        // Grid Layout
+        GridPane formGrid = new GridPane();
+        formGrid.setHgap(20);
+        formGrid.setVgap(15);
+        formGrid.setPadding(new Insets(10));
+        ColumnConstraints col1 = new ColumnConstraints();
+        col1.setPercentWidth(25);
+        ColumnConstraints col2 = new ColumnConstraints();
+        col2.setPercentWidth(75);
+        formGrid.getColumnConstraints().addAll(col1, col2);
+
+        formGrid.add(new Label("Return Invoice Number:"), 0, 0);
+        formGrid.add(returnInvoiceNumberField, 1, 0);
+
+        formGrid.add(new Label("Original Invoice:"), 0, 1);
+        formGrid.add(originalInvoiceComboBox, 1, 1);
+
+        formGrid.add(new Label("Supplier:"), 0, 2);
+        formGrid.add(supplierComboBox, 1, 2);
+
+        formGrid.add(new Label("Return Date:"), 0, 3);
+        formGrid.add(returnDatePicker, 1, 3);
+
+        formGrid.add(new Label("Total Return Amount:"), 0, 4);
+        formGrid.add(totalReturnAmountField, 1, 4);
+
+        // Button and Table Layout
+        HBox buttonBox = new HBox(10, addItemsBtn, removeItemsBtn);
+        buttonBox.setAlignment(Pos.CENTER);
+
+        VBox tableContainer = new VBox(10,
+            createSubheading("Available Items from Original Invoice:"),
+            availableItemsTable,
+            buttonBox,
+            createSubheading("Selected Return Items:"),
+            selectedItemsTable
+        );
+
+        // Return Invoices List
+        Label listHeading = createSubheading("Previous Return Purchase Invoices:");
+        TableView<Object[]> returnInvoicesTable = createReturnInvoicesTable();
+        loadReturnInvoicesIntoTable(returnInvoicesTable);
+
+        // Add all to main container
+        mainContainer.getChildren().addAll(
+            heading,
+            formGrid,
+            tableContainer,
+            submitReturnInvoiceBtn,
+            listHeading,
+            returnInvoicesTable
+        );
+
+        // Populate original invoices
         loadOriginalInvoicesIntoDropdown(originalInvoiceComboBox);
-        
-        // Event handlers
+
+        // Handle original invoice selection
         originalInvoiceComboBox.setOnAction(e -> {
             String selectedInvoice = originalInvoiceComboBox.getValue();
             if (selectedInvoice != null) {
-                handleOriginalInvoiceSelection(selectedInvoice, supplierComboBox, availableItemsTable);
+                List<Object[]> invoices = database.getAllRawPurchaseInvoicesForDropdown();
+                int invoiceId = -1;
+                String supplierName = "";
+                for (Object[] invoice : invoices) {
+                    String displayText = String.format("%s - %s (%.2f)", 
+                        invoice[1], invoice[2], (Double) invoice[4]);
+                    if (displayText.equals(selectedInvoice)) {
+                        invoiceId = (Integer) invoice[0];
+                        supplierName = (String) invoice[2];
+                        break;
+                    }
+                }
+                if (invoiceId != -1) {
+                    supplierComboBox.setValue(supplierName);
+                    List<Object[]> items = database.getInvoiceItemsByID(invoiceId);
+                    ObservableList<RawStockPurchaseItem> itemsList = FXCollections.observableArrayList();
+                    for (Object[] item : items) {
+                        itemsList.add(new RawStockPurchaseItem(
+                            (Integer) item[0], (String) item[1], (String) item[2],
+                            (Double) item[3], (Double) item[4]
+                        ));
+                    }
+                    availableItemsTable.setItems(itemsList);
+                }
             }
         });
 
         addItemsBtn.setOnAction(e -> {
             ObservableList<RawStockPurchaseItem> selected = availableItemsTable.getSelectionModel().getSelectedItems();
             for (RawStockPurchaseItem item : new ArrayList<>(selected)) {
-                // Create a dialog to get return quantity and price
                 RawStockPurchaseItem returnItem = showReturnItemDialog(item);
                 if (returnItem != null) {
                     selectedItemsTable.getItems().add(returnItem);
@@ -446,38 +515,11 @@ public class RawStock {
                     returnDatePicker, selectedItemsTable, totalReturnAmountField);
         });
 
-        // Layout
-        HBox buttonBox = new HBox(10, addItemsBtn, removeItemsBtn);
-        buttonBox.setAlignment(Pos.CENTER);
-
-        VBox tableContainer = new VBox(10);
-        tableContainer.getChildren().addAll(
-            createSubheading("Available Items from Original Invoice:"),
-            availableItemsTable,
-            buttonBox,
-            createSubheading("Selected Return Items:"),
-            selectedItemsTable
-        );
-
-        // Previous return invoices list
-        Label listHeading = createSubheading("Previous Return Purchase Invoices:");
-        TableView<Object[]> returnInvoicesTable = createReturnInvoicesTable();
-        loadReturnInvoicesIntoTable(returnInvoicesTable);
-
-        form.getChildren().addAll(
-            heading,
-            createFormRow("Return Invoice Number:", returnInvoiceNumberField),
-            createFormRow("Original Invoice:", originalInvoiceComboBox),
-            createFormRow("Supplier:", supplierComboBox),
-            createFormRow("Return Date:", returnDatePicker),
-            tableContainer,
-            createFormRow("Total Return Amount:", totalReturnAmountField),
-            submitReturnInvoiceBtn,
-            listHeading,
-            returnInvoicesTable
-        );
-        
-        return form;
+        // Wrap the main container in a ScrollPane for better scrolling support
+        ScrollPane scrollPane = new ScrollPane(mainContainer);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(false);
+        return scrollPane;
     }
 
     private static void loadOriginalInvoicesIntoDropdown(ComboBox<String> comboBox) {
@@ -497,89 +539,68 @@ public class RawStock {
             showAlert("Error", "Failed to load original invoices");
         }
     }
-
-    private static void handleOriginalInvoiceSelection(String selectedInvoice, 
-                                                     ComboBox<String> supplierComboBox,
-                                                     TableView<RawStockPurchaseItem> availableItemsTable) {
-        try {
-            // Extract invoice ID from the selected text
-            List<Object[]> invoices = database.getAllRawPurchaseInvoicesForDropdown();
-            int invoiceId = -1;
-            String supplierName = "";
-            
-            for (Object[] invoice : invoices) {
-                String displayText = String.format("%s - %s (%.2f)", 
-                    invoice[1], invoice[2], (Double) invoice[4]);
-                if (displayText.equals(selectedInvoice)) {
-                    invoiceId = (Integer) invoice[0];
-                    supplierName = (String) invoice[2];
-                    break;
-                }
+private static void handleOriginalInvoiceSelection(String selectedInvoice, 
+                                                 ComboBox<String> supplierComboBox,
+                                                 TableView<RawStockPurchaseItem> availableItemsTable) {
+    try {
+        List<Object[]> invoices = database.getAllRawPurchaseInvoicesForDropdown();
+        int invoiceId = -1;
+        String supplierName = "";
+        for (Object[] invoice : invoices) {
+            String displayText = String.format("%s - %s (%.2f)", 
+                invoice[1], invoice[2], (Double) invoice[4]);
+            if (displayText.equals(selectedInvoice)) {
+                invoiceId = (Integer) invoice[0];
+                supplierName = (String) invoice[2];
+                break;
             }
-            
-            if (invoiceId != -1) {
-                // Set supplier
-                supplierComboBox.setValue(supplierName);
-                
-                // Load items from the selected invoice
-                List<Object[]> items = database.getRawStockItemsByInvoiceId(invoiceId);
-                ObservableList<RawStockPurchaseItem> itemsList = FXCollections.observableArrayList();
-                
-                for (Object[] item : items) {
-                    RawStockPurchaseItem purchaseItem = new RawStockPurchaseItem(
-                        (Integer) item[0], // raw_stock_id
-                        (String) item[1],  // raw_stock_name  
-                        (String) item[2],  // category_name
-                        (String) item[3],  // brand_name
-                        (String) item[4],  // unit_name
-                        (Double) item[5],  // quantity
-                        (Double) item[6]   // unit_price
-                    );
-                    itemsList.add(purchaseItem);
-                }
-                
-                availableItemsTable.setItems(itemsList);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            showAlert("Error", "Failed to load invoice items");
         }
+        if (invoiceId != -1) {
+            supplierComboBox.setValue(supplierName);
+            List<Object[]> items = database.getInvoiceItemsByID(invoiceId); // Use getInvoiceItemsByID
+            ObservableList<RawStockPurchaseItem> itemsList = FXCollections.observableArrayList();
+            for (Object[] item : items) {
+                RawStockPurchaseItem purchaseItem = new RawStockPurchaseItem(
+                    (Integer) item[0],  // raw_stock_id
+                    (String) item[1],   // raw_stock_name
+                    (String) item[2],   // brand_name
+                    (Double) item[3],   // quantity
+                    (Double) item[4]    // unit_price
+                );
+                itemsList.add(purchaseItem);
+            }
+            availableItemsTable.setItems(itemsList);
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+        showAlert("Error", "Failed to load invoice items: " + e.getMessage());
     }
-
-    private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
-        TableView<RawStockPurchaseItem> table = new TableView<>();
-        table.setPrefHeight(200);
-        
-        TableColumn<RawStockPurchaseItem, String> nameCol = new TableColumn<>("Item Name");
-        nameCol.setCellValueFactory(new PropertyValueFactory<>("rawStockName"));
-        nameCol.setPrefWidth(150);
-        
-        TableColumn<RawStockPurchaseItem, String> categoryCol = new TableColumn<>("Category");
-        categoryCol.setCellValueFactory(new PropertyValueFactory<>("category"));
-        categoryCol.setPrefWidth(100);
-        
-        TableColumn<RawStockPurchaseItem, String> brandCol = new TableColumn<>("Brand");
-        brandCol.setCellValueFactory(new PropertyValueFactory<>("brand"));
-        brandCol.setPrefWidth(100);
-        
-        TableColumn<RawStockPurchaseItem, String> unitCol = new TableColumn<>("Unit");
-        unitCol.setCellValueFactory(new PropertyValueFactory<>("unit"));
-        unitCol.setPrefWidth(80);
-        
-        TableColumn<RawStockPurchaseItem, Double> quantityCol = new TableColumn<>("Orig. Qty");
-        quantityCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
-        quantityCol.setPrefWidth(80);
-        
-        TableColumn<RawStockPurchaseItem, Double> unitPriceCol = new TableColumn<>("Unit Price");
-        unitPriceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
-        unitPriceCol.setPrefWidth(80);
-        
-        table.getColumns().addAll(nameCol, categoryCol, brandCol, unitCol, quantityCol, unitPriceCol);
-        table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        
-        return table;
-    }
-
+}
+private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
+    TableView<RawStockPurchaseItem> table = new TableView<>();
+    table.setPrefHeight(200);
+    
+    TableColumn<RawStockPurchaseItem, String> nameCol = new TableColumn<>("Item Name");
+    nameCol.setCellValueFactory(new PropertyValueFactory<>("rawStockName"));
+    nameCol.setPrefWidth(150);
+    
+    TableColumn<RawStockPurchaseItem, String> brandCol = new TableColumn<>("Brand");
+    brandCol.setCellValueFactory(new PropertyValueFactory<>("brandName"));
+    brandCol.setPrefWidth(100);
+    
+    TableColumn<RawStockPurchaseItem, Double> quantityCol = new TableColumn<>("Orig. Qty");
+    quantityCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
+    quantityCol.setPrefWidth(80);
+    
+    TableColumn<RawStockPurchaseItem, Double> unitPriceCol = new TableColumn<>("Unit Price");
+    unitPriceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
+    unitPriceCol.setPrefWidth(80);
+    
+    table.getColumns().addAll(nameCol, brandCol, quantityCol, unitPriceCol);
+    table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+    
+    return table;
+}
     private static TableView<RawStockPurchaseItem> createSelectedReturnItemsTable() {
         TableView<RawStockPurchaseItem> table = new TableView<>();
         table.setPrefHeight(200);
@@ -645,9 +666,7 @@ public class RawStock {
                     return new RawStockPurchaseItem(
                         originalItem.getRawStockId(),
                         originalItem.getRawStockName(),
-                        originalItem.getCategory(),
-                        originalItem.getBrand(),
-                        originalItem.getUnit(),
+                        originalItem.getUnitName(),
                         returnQty,
                         unitPrice
                     );
@@ -834,8 +853,12 @@ public class RawStock {
         // Tables for Available and Selected Items (reduced heights)
         Label availableItemsLabel = createSubheading("Available Raw Stock Items:");
         TableView<RawStockUseItem> availableItemsTable = createRawStockItemsTable();
-        availableItemsTable.setPrefHeight(150); // Reduced from 200
-        availableItemsTable.setMaxHeight(150);
+        availableItemsTable.setPrefHeight(240); // Increased from 150
+        availableItemsTable.setMinHeight(240);
+        availableItemsTable.setMaxHeight(240);
+ 
+
+
         
         Label selectedItemsLabel = createSubheading("Selected Items for Use:");
         TableView<RawStockUseItem> selectedItemsTable = createSelectedUsageItemsTable();
@@ -1131,8 +1154,6 @@ public class RawStock {
                     (Integer) selectedStock[0],
                     (String) selectedStock[1],
                     (String) selectedStock[2],
-                    (String) selectedStock[3],
-                    (String) selectedStock[4],
                     quantity,
                     unitPrice
                 );

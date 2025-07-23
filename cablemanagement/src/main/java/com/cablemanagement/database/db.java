@@ -312,7 +312,7 @@ double getCashBalance();
 boolean updateBankBalance(double newBalance);
 
 List<Object[]> getViewData(String viewName, Map<String, String> filters);
-
+List<Object[]> getInvoiceItemsByID(Integer invoiceID);
  List<Object[]> getAllRawStock();
     List<Object[]> getAllProductionStock();
 }
