@@ -1017,3 +1017,73 @@ INSERT INTO User (username, password_hash, role) VALUES
 
 
 
+
+
+-- Sales Invoice Tables
+
+CREATE TABLE Sales_Invoice (
+    sales_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sales_invoice_number TEXT NOT NULL UNIQUE,
+    customer_id INTEGER NOT NULL,
+    sales_date TEXT NOT NULL,
+    total_amount REAL NOT NULL,
+    discount_amount REAL DEFAULT 0,
+    paid_amount REAL DEFAULT 0,
+    FOREIGN KEY (customer_id) REFERENCES Customer(customer_id)
+);
+
+CREATE TABLE Sales_Invoice_Item (
+    sales_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sales_invoice_id INTEGER NOT NULL,
+    production_stock_id INTEGER NOT NULL,
+    quantity REAL NOT NULL,
+    unit_price REAL NOT NULL,
+    FOREIGN KEY (sales_invoice_id) REFERENCES Sales_Invoice(sales_invoice_id),
+    FOREIGN KEY (production_stock_id) REFERENCES Production_Stock(production_stock_id)
+);
+
+-- Sales Return Invoice Tables
+
+CREATE TABLE Sales_Return_Invoice (
+    sales_return_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    return_invoice_number TEXT NOT NULL UNIQUE,
+    original_sales_invoice_id INTEGER NOT NULL,
+    customer_id INTEGER NOT NULL,
+    return_date TEXT NOT NULL,
+    total_return_amount REAL NOT NULL,
+    FOREIGN KEY (original_sales_invoice_id) REFERENCES Sales_Invoice(sales_invoice_id),
+    FOREIGN KEY (customer_id) REFERENCES Customer(customer_id)
+);
+
+CREATE TABLE Sales_Return_Invoice_Item (
+    sales_return_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sales_return_invoice_id INTEGER NOT NULL,
+    production_stock_id INTEGER NOT NULL,
+    quantity REAL NOT NULL,
+    unit_price REAL NOT NULL,
+    FOREIGN KEY (sales_return_invoice_id) REFERENCES Sales_Return_Invoice(sales_return_invoice_id),
+    FOREIGN KEY (production_stock_id) REFERENCES Production_Stock(production_stock_id)
+);
+
+-- Update the existing views to match the actual table structure
+DROP VIEW IF EXISTS View_Sales_Book;
+CREATE VIEW View_Sales_Book AS
+SELECT 
+    Sales_Invoice.sales_invoice_number,
+    Sales_Invoice.sales_date,
+    Customer.customer_name,
+    Sales_Invoice.total_amount,
+    Sales_Invoice.discount_amount,
+    Sales_Invoice.paid_amount
+FROM Sales_Invoice
+JOIN Customer ON Sales_Invoice.customer_id = Customer.customer_id;
+
+DROP VIEW IF EXISTS View_Return_Sales_Book;
+CREATE VIEW View_Return_Sales_Book AS
+SELECT 
+    Sales_Return_Invoice.return_invoice_number,
+    Sales_Return_Invoice.return_date,
+    Customer.customer_name,
+    Sales_Return_Invoice.total_return_amount
+FROM Sales_Return_Invoice
+JOIN Customer ON Sales_Return_Invoice.customer_id = Customer.customer_id;
