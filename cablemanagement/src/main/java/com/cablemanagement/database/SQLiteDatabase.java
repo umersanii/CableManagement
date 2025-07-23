@@ -1025,15 +1025,15 @@ public class SQLiteDatabase implements db {
     public List<Brand> getAllBrands() {
         List<Brand> brands = new ArrayList<>();
         String query = "SELECT b.brand_name, t.tehsil_name, d.district_name, p.province_name " +
-                      "FROM Brand b " +
-                      "JOIN Manufacturer m ON b.manufacturer_id = m.manufacturer_id " +
-                      "JOIN Tehsil t ON b.tehsil_id = t.tehsil_id " +
-                      "JOIN District d ON t.district_id = d.district_id " +
-                      "JOIN Province p ON d.province_id = p.province_id " +
-                      "ORDER BY b.brand_name";
+                    "FROM Brand b " +
+                    "JOIN Manufacturer m ON b.manufacturer_id = m.manufacturer_id " +
+                    "JOIN Tehsil t ON m.tehsil_id = t.tehsil_id " +
+                    "JOIN District d ON t.district_id = d.district_id " +
+                    "JOIN Province p ON d.province_id = p.province_id " +
+                    "ORDER BY b.brand_name";
         
         try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
+            ResultSet rs = stmt.executeQuery(query)) {
             
             while (rs.next()) {
                 String name = rs.getString("brand_name");
@@ -1048,7 +1048,7 @@ public class SQLiteDatabase implements db {
         }
         return brands;
     }
-
+        
     @Override
     public boolean insertBrand(String name, String province, String district, String tehsil) {
         String getIdsQuery = "SELECT m.manufacturer_id, t.tehsil_id FROM Manufacturer m " +
@@ -1101,20 +1101,19 @@ public class SQLiteDatabase implements db {
         return false;
     }
 
-    @Override
+
+
     public List<Customer> getAllCustomers() {
         List<Customer> customers = new ArrayList<>();
-        String query = "SELECT c.customer_name, c.customer_contact, t.tehsil_name " +
-                      "FROM Customer c " +
-                      "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
-                      "ORDER BY c.customer_name";
-        
+        String query = "SELECT c.customer_name, c.contact_number, t.tehsil_name " +
+                    "FROM Customer c " +
+                    "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                    "ORDER BY c.customer_name";
         try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
-            
+            ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
                 String name = rs.getString("customer_name");
-                String contact = rs.getString("customer_contact");
+                String contact = rs.getString("contact_number");
                 String tehsil = rs.getString("tehsil_name");
                 if (tehsil == null) tehsil = "";
                 customers.add(new Customer(name, contact, tehsil));
@@ -1128,7 +1127,7 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean insertCustomer(String name, String contact) {
         String getTehsilQuery = "SELECT tehsil_id FROM Tehsil LIMIT 1";
-        String insertQuery = "INSERT INTO Customer (customer_name, customer_contact, tehsil_id) VALUES (?, ?, ?)";
+        String insertQuery = "INSERT INTO Customer (customer_name, contact_number, tehsil_id) VALUES (?, ?, ?)";
         
         try (Statement getStmt = connection.createStatement();
              ResultSet rs = getStmt.executeQuery(getTehsilQuery)) {
@@ -1153,7 +1152,7 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean insertCustomer(String name, String contact, String tehsilName) {
         String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
-        String insertQuery = "INSERT INTO Customer (customer_name, customer_contact, tehsil_id) VALUES (?, ?, ?)";
+        String insertQuery = "INSERT INTO Customer (customer_name, contact_number, tehsil_id) VALUES (?, ?, ?)";
         
         try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
             getTehsilStmt.setString(1, tehsilName);
@@ -1194,20 +1193,21 @@ public class SQLiteDatabase implements db {
         return false;
     }
 
+
     @Override
     public List<Supplier> getAllSuppliers() {
         List<Supplier> suppliers = new ArrayList<>();
-        String query = "SELECT s.supplier_name, s.supplier_contact, t.tehsil_name " +
-                      "FROM Supplier s " +
-                      "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
-                      "ORDER BY s.supplier_name";
+        String query = "SELECT s.supplier_name, s.contact_number, t.tehsil_name " +
+                    "FROM Supplier s " +
+                    "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                    "ORDER BY s.supplier_name";
         
         try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
+            ResultSet rs = stmt.executeQuery(query)) {
             
             while (rs.next()) {
                 String name = rs.getString("supplier_name");
-                String contact = rs.getString("supplier_contact");
+                String contact = rs.getString("contact_number");
                 String tehsil = rs.getString("tehsil_name");
                 if (tehsil == null) tehsil = "";
                 suppliers.add(new Supplier(name, contact, tehsil));
@@ -1221,10 +1221,10 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean insertSupplier(String name, String contact) {
         String getTehsilQuery = "SELECT tehsil_id FROM Tehsil LIMIT 1";
-        String insertQuery = "INSERT INTO Supplier (supplier_name, supplier_contact, tehsil_id) VALUES (?, ?, ?)";
+        String insertQuery = "INSERT INTO Supplier (supplier_name, contact_number, tehsil_id) VALUES (?, ?, ?)";
         
         try (Statement getStmt = connection.createStatement();
-             ResultSet rs = getStmt.executeQuery(getTehsilQuery)) {
+            ResultSet rs = getStmt.executeQuery(getTehsilQuery)) {
             
             if (rs.next()) {
                 int tehsilId = rs.getInt("tehsil_id");
@@ -1246,7 +1246,7 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean insertSupplier(String name, String contact, String tehsilName) {
         String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
-        String insertQuery = "INSERT INTO Supplier (supplier_name, supplier_contact, tehsil_id) VALUES (?, ?, ?)";
+        String insertQuery = "INSERT INTO Supplier (supplier_name, contact_number, tehsil_id) VALUES (?, ?, ?)";
         
         try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
             getTehsilStmt.setString(1, tehsilName);
@@ -1269,7 +1269,7 @@ public class SQLiteDatabase implements db {
         }
         return false;
     }
-
+        
     @Override
     public boolean supplierExists(String name) {
         String query = "SELECT COUNT(*) FROM Supplier WHERE supplier_name = ?";
