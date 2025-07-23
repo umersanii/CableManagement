@@ -2532,6 +2532,182 @@ Override
         return invoices;
     }
 
+    // --------------------------
+    // Production Return Invoice Operations  
+    // --------------------------
+    
+    /**
+     * Generate auto-increment production return invoice number
+     */
+    public String generateProductionReturnInvoiceNumber() {
+        String query = "SELECT COUNT(*) FROM Production_Return_Invoice";
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            if (rs.next()) {
+                int count = rs.getInt(1) + 1;
+                return String.format("PRI-%04d", count);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return "PRI-0001";
+    }
+    
+    /**
+     * Get all production invoices for dropdown selection
+     */
+    public List<Object[]> getAllProductionInvoicesForDropdown() {
+        List<Object[]> invoices = new ArrayList<>();
+        String query = "SELECT pi.production_invoice_id, pi.production_date, pi.notes " +
+                      "FROM Production_Invoice pi " +
+                      "ORDER BY pi.production_date DESC";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("production_invoice_id"),
+                    rs.getString("production_date"),
+                    rs.getString("notes")
+                };
+                invoices.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return invoices;
+    }
+    
+    /**
+     * Get production items from a specific production invoice
+     */
+    public List<Object[]> getProductionItemsByInvoiceId(int productionInvoiceId) {
+        List<Object[]> items = new ArrayList<>();
+        String query = "SELECT pii.production_id, ps.product_name, b.brand_name, " +
+                      "pii.quantity_produced " +
+                      "FROM Production_Invoice_Item pii " +
+                      "JOIN ProductionStock ps ON pii.production_id = ps.production_id " +
+                      "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                      "WHERE pii.production_invoice_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, productionInvoiceId);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("production_id"),
+                    rs.getString("product_name"),
+                    rs.getString("brand_name"),
+                    rs.getDouble("quantity_produced")
+                };
+                items.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return items;
+    }
+    
+    /**
+     * Insert production return invoice and return the generated ID
+     */
+    public int insertProductionReturnInvoiceAndGetId(String returnDate, String reference, 
+                                                    double totalReturnQuantity) {
+        String query = "INSERT INTO Production_Return_Invoice (return_date, reference, total_return_quantity) " +
+                      "VALUES (?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, returnDate);
+            pstmt.setString(2, reference);
+            pstmt.setDouble(3, totalReturnQuantity);
+            
+            int affectedRows = pstmt.executeUpdate();
+            if (affectedRows > 0) {
+                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        return generatedKeys.getInt(1);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+    
+    /**
+     * Insert production return invoice items
+     */
+    public boolean insertProductionReturnInvoiceItems(int returnInvoiceId, int originalInvoiceId,
+                                                     List<Object[]> returnItems) {
+        String query = "INSERT INTO Production_Return_Invoice_Item " +
+                      "(production_return_invoice_id, production_invoice_id, production_id, quantity_returned) " +
+                      "VALUES (?, ?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            connection.setAutoCommit(false);
+            
+            for (Object[] item : returnItems) {
+                pstmt.setInt(1, returnInvoiceId);
+                pstmt.setInt(2, originalInvoiceId);
+                pstmt.setInt(3, (Integer) item[0]); // production_id
+                pstmt.setDouble(4, (Double) item[1]); // quantity_returned
+                pstmt.addBatch();
+            }
+            
+            int[] results = pstmt.executeBatch();
+            connection.commit();
+            connection.setAutoCommit(true);
+            
+            for (int result : results) {
+                if (result <= 0) {
+                    return false;
+                }
+            }
+            return true;
+            
+        } catch (SQLException e) {
+            try {
+                connection.rollback();
+                connection.setAutoCommit(true);
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * Get all production return invoices
+     */
+    public List<Object[]> getAllProductionReturnInvoices() {
+        List<Object[]> returnInvoices = new ArrayList<>();
+        String query = "SELECT pri.production_return_invoice_id, pri.return_date, pri.reference, " +
+                      "pri.total_return_quantity " +
+                      "FROM Production_Return_Invoice pri " +
+                      "ORDER BY pri.return_date DESC";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("production_return_invoice_id"),
+                    rs.getString("return_date"),
+                    rs.getString("reference"),
+                    rs.getDouble("total_return_quantity")
+                };
+                returnInvoices.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return returnInvoices;
+    }
+
     @Override
     public List<Object[]> getAllSalesInvoices() {
         List<Object[]> invoices = new ArrayList<>();
