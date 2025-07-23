@@ -244,6 +244,50 @@ public interface db {
     List<Object[]> getAllSalesInvoices();
 
     // --------------------------
+    // Sales Invoice Operations
+    // --------------------------
+    String generateSalesInvoiceNumber();
+    
+    List<Object[]> getAllCustomersForDropdown();
+    
+    int getCustomerIdByName(String customerName);
+    
+    List<Object[]> getAllProductionStocksWithPriceForDropdown();
+    
+    int getProductionStockIdByName(String productName);
+    
+    int insertSalesInvoiceAndGetId(String invoiceNumber, int customerId, String salesDate, 
+                                  double totalAmount, double discountAmount, double paidAmount);
+    
+    boolean insertSalesInvoiceItems(int salesInvoiceId, List<Object[]> items);
+    
+    boolean insertSalesInvoice(String invoiceNumber, int customerId, String salesDate, 
+                              double totalAmount, double discountAmount, double paidAmount, 
+                              List<Object[]> items);
+
+    // --------------------------
+    // Sales Return Invoice Operations
+    // --------------------------
+    String generateSalesReturnInvoiceNumber();
+    
+    List<Object[]> getAllSalesInvoicesForDropdown();
+    
+    List<Object[]> getSalesInvoiceItemsByInvoiceId(int salesInvoiceId);
+    
+    Object[] getSalesInvoiceById(int salesInvoiceId);
+    
+    int insertSalesReturnInvoiceAndGetId(String returnInvoiceNumber, int originalSalesInvoiceId, 
+                                        int customerId, String returnDate, double totalReturnAmount);
+    
+    boolean insertSalesReturnInvoiceItems(int salesReturnInvoiceId, List<Object[]> items);
+    
+    boolean insertSalesReturnInvoice(String returnInvoiceNumber, int originalSalesInvoiceId, 
+                                    int customerId, String returnDate, double totalReturnAmount, 
+                                    List<Object[]> items);
+    
+    List<Object[]> getAllSalesReturnInvoices();
+
+    // --------------------------
     // Bank Management Operations
     // --------------------------
     List<Object[]> getAllBanks();

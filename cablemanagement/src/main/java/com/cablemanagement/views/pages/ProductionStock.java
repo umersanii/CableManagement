@@ -11,6 +11,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
 import java.util.List;
@@ -491,23 +492,111 @@ public class ProductionStock {
         Label heading = createHeading("Create Sales Invoice");
 
         // Invoice header fields
-        TextField invoiceNumberField = createTextField("Invoice Number");
+        TextField invoiceNumberField = createTextField("Auto-generated");
+        invoiceNumberField.setEditable(false);
+        invoiceNumberField.setStyle("-fx-background-color: #f0f0f0;");
+        
+        // Auto-generate invoice number
+        String autoInvoiceNumber = database.generateSalesInvoiceNumber();
+        invoiceNumberField.setText(autoInvoiceNumber);
+        
         DatePicker salesDatePicker = new DatePicker();
         salesDatePicker.setValue(LocalDate.now());
-        TextField customerField = createTextField("Customer");
+        
+        // Customer dropdown
+        ComboBox<String> customerComboBox = new ComboBox<>();
+        customerComboBox.setPromptText("Select Customer");
+        customerComboBox.setEditable(false);
+        customerComboBox.setMaxWidth(Double.MAX_VALUE);
+        
+        // Load customers
+        List<Object[]> customers = database.getAllCustomersForDropdown();
+        ObservableList<String> customerNames = FXCollections.observableArrayList();
+        for (Object[] customer : customers) {
+            customerNames.add((String) customer[1]); // customer_name
+        }
+        customerComboBox.setItems(customerNames);
+        
         TextField discountField = createTextField("0", "Discount");
         TextField paidAmountField = createTextField("0", "Paid Amount");
         
-        // Invoice items
-        ListView<String> itemsList = createEnhancedListView();
+        // Invoice items table
+        TableView<SalesInvoiceItemUI> itemsTable = new TableView<>();
+        itemsTable.setPrefHeight(200);
+        
+        TableColumn<SalesInvoiceItemUI, String> productCol = new TableColumn<>("Product");
+        productCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
+        productCol.setPrefWidth(200);
+        
+        TableColumn<SalesInvoiceItemUI, Double> quantityCol = new TableColumn<>("Quantity");
+        quantityCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
+        quantityCol.setPrefWidth(100);
+        
+        TableColumn<SalesInvoiceItemUI, Double> priceCol = new TableColumn<>("Price");
+        priceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
+        priceCol.setPrefWidth(100);
+        
+        TableColumn<SalesInvoiceItemUI, Double> totalCol = new TableColumn<>("Total");
+        totalCol.setCellValueFactory(new PropertyValueFactory<>("totalPrice"));
+        totalCol.setPrefWidth(100);
+        
+        itemsTable.getColumns().addAll(productCol, quantityCol, priceCol, totalCol);
+        
+        ObservableList<SalesInvoiceItemUI> invoiceItems = FXCollections.observableArrayList();
+        itemsTable.setItems(invoiceItems);
         
         // Add item controls
         HBox addItemBox = new HBox(10);
-        TextField productField = createTextField("Product");
+        addItemBox.setAlignment(Pos.CENTER_LEFT);
+        
+        // Product dropdown
+        ComboBox<String> productComboBox = new ComboBox<>();
+        productComboBox.setPromptText("Select Product");
+        productComboBox.setEditable(false);
+        productComboBox.setPrefWidth(200);
+        
+        // Load production stock items
+        List<Object[]> products = database.getAllProductionStocksWithPriceForDropdown();
+        ObservableList<String> productNames = FXCollections.observableArrayList();
+        for (Object[] product : products) {
+            productNames.add((String) product[1]); // production_stock_name
+        }
+        productComboBox.setItems(productNames);
+        
         TextField quantityField = createTextField("Quantity");
+        quantityField.setPrefWidth(100);
+        
         TextField priceField = createTextField("Price");
+        priceField.setPrefWidth(100);
+        priceField.setEditable(false);
+        priceField.setStyle("-fx-background-color: #f0f0f0;");
+        
+        // Auto-fill price when product is selected
+        productComboBox.setOnAction(e -> {
+            String selectedProduct = productComboBox.getValue();
+            if (selectedProduct != null) {
+                for (Object[] product : products) {
+                    if (selectedProduct.equals(product[1])) {
+                        double salePrice = (Double) product[2];
+                        priceField.setText(String.valueOf(salePrice));
+                        break;
+                    }
+                }
+            }
+        });
+        
         Button addItemBtn = createActionButton("Add Item");
-        addItemBox.getChildren().addAll(productField, quantityField, priceField, addItemBtn);
+        Button removeItemBtn = createActionButton("Remove Item");
+        addItemBox.getChildren().addAll(
+            new Label("Product:"), productComboBox,
+            new Label("Qty:"), quantityField,
+            new Label("Price:"), priceField,
+            addItemBtn, removeItemBtn
+        );
+        
+        // Total amount label
+        Label totalAmountLabel = new Label("Total Amount: $0.00");
+        totalAmountLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
         
         // Action buttons
         HBox actionButtons = new HBox(10);
@@ -519,74 +608,145 @@ public class ProductionStock {
             heading,
             createFormRow("Invoice Number:", invoiceNumberField),
             createFormRow("Sales Date:", salesDatePicker),
-            createFormRow("Customer:", customerField),
+            createFormRow("Customer:", customerComboBox),
             createFormRow("Discount:", discountField),
             createFormRow("Paid Amount:", paidAmountField),
             createSubheading("Invoice Items:"),
             addItemBox,
-            itemsList,
+            itemsTable,
+            totalAmountLabel,
             actionButtons
         );
 
         // Event handlers
         addItemBtn.setOnAction(e -> {
-            String product = productField.getText().trim();
+            String selectedProduct = productComboBox.getValue();
             String quantity = quantityField.getText().trim();
             String price = priceField.getText().trim();
             
-            if (!product.isEmpty() && !quantity.isEmpty() && !price.isEmpty()) {
-                try {
-                    double qty = Double.parseDouble(quantity);
-                    double prc = Double.parseDouble(price);
-                    double total = qty * prc;
-                    itemsList.getItems().add(String.format("%s - %.2f x %.2f = %.2f", 
-                        product, qty, prc, total));
-                    productField.clear();
-                    quantityField.clear();
-                    priceField.clear();
-                } catch (NumberFormatException ex) {
-                    showAlert("Invalid Input", "Please enter valid numbers for quantity and price");
+            if (selectedProduct == null || quantity.isEmpty() || price.isEmpty()) {
+                showAlert("Missing Information", "Please select a product and enter quantity");
+                return;
+            }
+            
+            try {
+                double qty = Double.parseDouble(quantity);
+                double prc = Double.parseDouble(price);
+                
+                if (qty <= 0 || prc <= 0) {
+                    showAlert("Invalid Input", "Quantity and price must be positive numbers");
+                    return;
                 }
+                
+                // Check if product already exists in table
+                boolean productExists = false;
+                for (SalesInvoiceItemUI item : invoiceItems) {
+                    if (item.getProductName().equals(selectedProduct)) {
+                        item.setQuantity(item.getQuantity() + qty);
+                        productExists = true;
+                        break;
+                    }
+                }
+                
+                if (!productExists) {
+                    SalesInvoiceItemUI newItem = new SalesInvoiceItemUI(selectedProduct, qty, prc);
+                    invoiceItems.add(newItem);
+                }
+                
+                itemsTable.refresh();
+                updateTotalAmount(invoiceItems, totalAmountLabel);
+                
+                productComboBox.setValue(null);
+                quantityField.clear();
+                priceField.clear();
+                
+            } catch (NumberFormatException ex) {
+                showAlert("Invalid Input", "Please enter valid numbers for quantity");
+            }
+        });
+        
+        removeItemBtn.setOnAction(e -> {
+            SalesInvoiceItemUI selectedItem = itemsTable.getSelectionModel().getSelectedItem();
+            if (selectedItem != null) {
+                invoiceItems.remove(selectedItem);
+                updateTotalAmount(invoiceItems, totalAmountLabel);
+            } else {
+                showAlert("No Selection", "Please select an item to remove");
             }
         });
         
         clearBtn.setOnAction(e -> {
-            if (!itemsList.getItems().isEmpty()) {
+            if (!invoiceItems.isEmpty()) {
                 Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
                 alert.setTitle("Confirm Clear");
                 alert.setHeaderText("Clear all invoice items?");
                 
                 if (alert.showAndWait().get() == ButtonType.OK) {
-                    itemsList.getItems().clear();
+                    invoiceItems.clear();
+                    updateTotalAmount(invoiceItems, totalAmountLabel);
                 }
             }
         });
         
         submitBtn.setOnAction(e -> {
             String invoiceNumber = invoiceNumberField.getText().trim();
-            String customer = customerField.getText().trim();
+            String customer = customerComboBox.getValue();
             String date = salesDatePicker.getValue().format(DATE_FORMATTER);
+            String discountText = discountField.getText().trim();
+            String paidAmountText = paidAmountField.getText().trim();
             
-            if (invoiceNumber.isEmpty() || customer.isEmpty() || itemsList.getItems().isEmpty()) {
-                showAlert("Missing Information", "Please fill all fields and add at least one item");
+            if (customer == null || invoiceItems.isEmpty()) {
+                showAlert("Missing Information", "Please select a customer and add at least one item");
                 return;
             }
             
-            // In real app, save to database
-            System.out.println("Sales Invoice Submitted:");
-            System.out.println("Invoice #: " + invoiceNumber);
-            System.out.println("Date: " + date);
-            System.out.println("Customer: " + customer);
-            System.out.println("Items:");
-            itemsList.getItems().forEach(System.out::println);
-            
-            // Clear form
-            invoiceNumberField.clear();
-            salesDatePicker.setValue(LocalDate.now());
-            customerField.clear();
-            discountField.setText("0");
-            paidAmountField.setText("0");
-            itemsList.getItems().clear();
+            try {
+                double discount = discountText.isEmpty() ? 0.0 : Double.parseDouble(discountText);
+                double paidAmount = paidAmountText.isEmpty() ? 0.0 : Double.parseDouble(paidAmountText);
+                
+                // Calculate total amount
+                double totalAmount = invoiceItems.stream()
+                    .mapToDouble(SalesInvoiceItemUI::getTotalPrice)
+                    .sum() - discount;
+                
+                int customerId = database.getCustomerIdByName(customer);
+                if (customerId == -1) {
+                    showAlert("Error", "Customer not found in database");
+                    return;
+                }
+                
+                // Prepare invoice items for database
+                List<Object[]> items = new ArrayList<>();
+                for (SalesInvoiceItemUI item : invoiceItems) {
+                    int productId = database.getProductionStockIdByName(item.getProductName());
+                    if (productId != -1) {
+                        items.add(new Object[]{productId, item.getQuantity(), item.getUnitPrice()});
+                    }
+                }
+                
+                // Save to database
+                boolean success = database.insertSalesInvoice(invoiceNumber, customerId, date, 
+                    totalAmount, discount, paidAmount, items);
+                
+                if (success) {
+                    showAlert("Success", "Sales invoice created successfully!");
+                    
+                    // Clear form and generate new invoice number
+                    String newInvoiceNumber = database.generateSalesInvoiceNumber();
+                    invoiceNumberField.setText(newInvoiceNumber);
+                    salesDatePicker.setValue(LocalDate.now());
+                    customerComboBox.setValue(null);
+                    discountField.setText("0");
+                    paidAmountField.setText("0");
+                    invoiceItems.clear();
+                    updateTotalAmount(invoiceItems, totalAmountLabel);
+                } else {
+                    showAlert("Error", "Failed to create sales invoice. Please try again.");
+                }
+                
+            } catch (NumberFormatException ex) {
+                showAlert("Invalid Input", "Please enter valid numbers for discount and paid amount");
+            }
         });
 
         return form;
@@ -599,23 +759,109 @@ public class ProductionStock {
 
         Label heading = createHeading("Create Return Sales Invoice");
 
-        // Main form fields
-        TextField returnInvoiceNumberField = createTextField("Return Invoice Number");
-        TextField originalInvoiceField = createTextField("Original Invoice");
+        // Return invoice header fields
+        TextField returnInvoiceNumberField = createTextField("Auto-generated");
+        returnInvoiceNumberField.setEditable(false);
+        returnInvoiceNumberField.setStyle("-fx-background-color: #f0f0f0;");
+        
+        // Auto-generate return invoice number
+        String autoReturnInvoiceNumber = database.generateSalesReturnInvoiceNumber();
+        returnInvoiceNumberField.setText(autoReturnInvoiceNumber);
+        
+        // Original invoice dropdown
+        ComboBox<String> originalInvoiceComboBox = new ComboBox<>();
+        originalInvoiceComboBox.setPromptText("Select Original Invoice");
+        originalInvoiceComboBox.setEditable(false);
+        originalInvoiceComboBox.setMaxWidth(Double.MAX_VALUE);
+        
+        // Load sales invoices
+        List<Object[]> salesInvoices = database.getAllSalesInvoicesForDropdown();
+        ObservableList<String> invoiceNumbers = FXCollections.observableArrayList();
+        for (Object[] invoice : salesInvoices) {
+            String displayText = String.format("%s - %s (%s)", 
+                invoice[1], // invoice_number
+                invoice[2], // customer_name
+                invoice[3]  // sales_date
+            );
+            invoiceNumbers.add(displayText);
+        }
+        originalInvoiceComboBox.setItems(invoiceNumbers);
+        
         DatePicker returnDatePicker = new DatePicker();
         returnDatePicker.setValue(LocalDate.now());
+        
         TextField customerField = createTextField("Customer");
+        customerField.setEditable(false);
+        customerField.setStyle("-fx-background-color: #f0f0f0;");
+        
         TextField returnAmountField = createTextField("Return Amount");
+        returnAmountField.setEditable(false);
+        returnAmountField.setStyle("-fx-background-color: #f0f0f0;");
         
-        // Return items list
-        ListView<String> returnItemsList = createEnhancedListView();
+        // Return items table
+        TableView<SalesInvoiceItemUI> returnItemsTable = new TableView<>();
+        returnItemsTable.setPrefHeight(200);
         
-        // Add item controls
-        HBox addItemBox = new HBox(10);
-        TextField productField = createTextField("Product");
-        TextField quantityField = createTextField("Quantity");
-        Button addItemBtn = createActionButton("Add Item");
-        addItemBox.getChildren().addAll(productField, quantityField, addItemBtn);
+        TableColumn<SalesInvoiceItemUI, String> productCol = new TableColumn<>("Product");
+        productCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
+        productCol.setPrefWidth(200);
+        
+        TableColumn<SalesInvoiceItemUI, Double> originalQtyCol = new TableColumn<>("Original Qty");
+        originalQtyCol.setCellValueFactory(new PropertyValueFactory<>("originalQuantity"));
+        originalQtyCol.setPrefWidth(100);
+        
+        TableColumn<SalesInvoiceItemUI, Double> returnQtyCol = new TableColumn<>("Return Qty");
+        returnQtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
+        returnQtyCol.setPrefWidth(100);
+        
+        TableColumn<SalesInvoiceItemUI, Double> priceCol = new TableColumn<>("Price");
+        priceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
+        priceCol.setPrefWidth(100);
+        
+        TableColumn<SalesInvoiceItemUI, Double> totalCol = new TableColumn<>("Total");
+        totalCol.setCellValueFactory(new PropertyValueFactory<>("totalPrice"));
+        totalCol.setPrefWidth(100);
+        
+        returnItemsTable.getColumns().addAll(productCol, originalQtyCol, returnQtyCol, priceCol, totalCol);
+        
+        ObservableList<SalesInvoiceItemUI> returnItems = FXCollections.observableArrayList();
+        returnItemsTable.setItems(returnItems);
+        
+        // Available items table (from original invoice)
+        TableView<SalesInvoiceItemUI> availableItemsTable = new TableView<>();
+        availableItemsTable.setPrefHeight(150);
+        
+        TableColumn<SalesInvoiceItemUI, String> availableProductCol = new TableColumn<>("Product");
+        availableProductCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
+        availableProductCol.setPrefWidth(200);
+        
+        TableColumn<SalesInvoiceItemUI, Double> availableQtyCol = new TableColumn<>("Quantity");
+        availableQtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
+        availableQtyCol.setPrefWidth(100);
+        
+        TableColumn<SalesInvoiceItemUI, Double> availablePriceCol = new TableColumn<>("Price");
+        availablePriceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
+        availablePriceCol.setPrefWidth(100);
+        
+        availableItemsTable.getColumns().addAll(availableProductCol, availableQtyCol, availablePriceCol);
+        
+        ObservableList<SalesInvoiceItemUI> availableItems = FXCollections.observableArrayList();
+        availableItemsTable.setItems(availableItems);
+        
+        // Add return item controls
+        HBox addReturnItemBox = new HBox(10);
+        addReturnItemBox.setAlignment(Pos.CENTER_LEFT);
+        
+        TextField returnQuantityField = createTextField("Return Quantity");
+        returnQuantityField.setPrefWidth(120);
+        
+        Button addReturnItemBtn = createActionButton("Add to Return");
+        Button removeReturnItemBtn = createActionButton("Remove Item");
+        
+        addReturnItemBox.getChildren().addAll(
+            new Label("Return Qty:"), returnQuantityField,
+            addReturnItemBtn, removeReturnItemBtn
+        );
         
         // Action buttons
         HBox actionButtons = new HBox(10);
@@ -626,70 +872,206 @@ public class ProductionStock {
         form.getChildren().addAll(
             heading,
             createFormRow("Return Invoice Number:", returnInvoiceNumberField),
-            createFormRow("Original Invoice:", originalInvoiceField),
+            createFormRow("Original Invoice:", originalInvoiceComboBox),
             createFormRow("Return Date:", returnDatePicker),
             createFormRow("Customer:", customerField),
             createFormRow("Return Amount:", returnAmountField),
+            createSubheading("Available Items from Original Invoice:"),
+            availableItemsTable,
+            addReturnItemBox,
             createSubheading("Return Items:"),
-            addItemBox,
-            returnItemsList,
+            returnItemsTable,
             actionButtons
         );
 
         // Event handlers
-        addItemBtn.setOnAction(e -> {
-            String product = productField.getText().trim();
-            String quantity = quantityField.getText().trim();
+        originalInvoiceComboBox.setOnAction(e -> {
+            String selectedDisplay = originalInvoiceComboBox.getValue();
+            if (selectedDisplay != null) {
+                // Extract invoice number from display text
+                String invoiceNumber = selectedDisplay.split(" - ")[0];
+                
+                // Find the selected invoice data
+                for (Object[] invoice : salesInvoices) {
+                    if (invoiceNumber.equals(invoice[1])) {
+                        int salesInvoiceId = (Integer) invoice[0];
+                        
+                        // Get invoice details
+                        Object[] invoiceData = database.getSalesInvoiceById(salesInvoiceId);
+                        if (invoiceData != null) {
+                            customerField.setText((String) invoiceData[3]); // customer_name
+                        }
+                        
+                        // Load invoice items
+                        List<Object[]> originalItems = database.getSalesInvoiceItemsByInvoiceId(salesInvoiceId);
+                        availableItems.clear();
+                        
+                        for (Object[] item : originalItems) {
+                            SalesInvoiceItemUI itemUI = new SalesInvoiceItemUI(
+                                (String) item[1], // product_name
+                                (Double) item[2], // quantity
+                                (Double) item[3]  // unit_price
+                            );
+                            itemUI.setProductionStockId((Integer) item[0]);
+                            availableItems.add(itemUI);
+                        }
+                        break;
+                    }
+                }
+                
+                // Clear return items when original invoice changes
+                returnItems.clear();
+                updateReturnAmount(returnItems, returnAmountField);
+            }
+        });
+        
+        addReturnItemBtn.setOnAction(e -> {
+            SalesInvoiceItemUI selectedItem = availableItemsTable.getSelectionModel().getSelectedItem();
+            String returnQtyText = returnQuantityField.getText().trim();
             
-            if (!product.isEmpty() && !quantity.isEmpty()) {
-                returnItemsList.getItems().add(product + " - " + quantity);
-                productField.clear();
-                quantityField.clear();
+            if (selectedItem == null) {
+                showAlert("No Selection", "Please select an item from the available items table");
+                return;
+            }
+            
+            if (returnQtyText.isEmpty()) {
+                showAlert("Missing Information", "Please enter return quantity");
+                return;
+            }
+            
+            try {
+                double returnQty = Double.parseDouble(returnQtyText);
+                
+                if (returnQty <= 0) {
+                    showAlert("Invalid Input", "Return quantity must be positive");
+                    return;
+                }
+                
+                if (returnQty > selectedItem.getQuantity()) {
+                    showAlert("Invalid Input", "Return quantity cannot exceed original quantity");
+                    return;
+                }
+                
+                // Check if item already exists in return items
+                boolean itemExists = false;
+                for (SalesInvoiceItemUI returnItem : returnItems) {
+                    if (returnItem.getProductName().equals(selectedItem.getProductName())) {
+                        double newReturnQty = returnItem.getQuantity() + returnQty;
+                        if (newReturnQty > selectedItem.getQuantity()) {
+                            showAlert("Invalid Input", 
+                                String.format("Total return quantity (%.2f) cannot exceed original quantity (%.2f)", 
+                                    newReturnQty, selectedItem.getQuantity()));
+                            return;
+                        }
+                        returnItem.setQuantity(newReturnQty);
+                        itemExists = true;
+                        break;
+                    }
+                }
+                
+                if (!itemExists) {
+                    SalesInvoiceItemUI returnItem = new SalesInvoiceItemUI(
+                        selectedItem.getProductName(), returnQty, selectedItem.getUnitPrice());
+                    returnItem.setProductionStockId(selectedItem.getProductionStockId());
+                    returnItem.setOriginalQuantity(selectedItem.getQuantity());
+                    returnItems.add(returnItem);
+                }
+                
+                returnItemsTable.refresh();
+                updateReturnAmount(returnItems, returnAmountField);
+                returnQuantityField.clear();
+                
+            } catch (NumberFormatException ex) {
+                showAlert("Invalid Input", "Please enter a valid number for return quantity");
+            }
+        });
+        
+        removeReturnItemBtn.setOnAction(e -> {
+            SalesInvoiceItemUI selectedItem = returnItemsTable.getSelectionModel().getSelectedItem();
+            if (selectedItem != null) {
+                returnItems.remove(selectedItem);
+                updateReturnAmount(returnItems, returnAmountField);
+            } else {
+                showAlert("No Selection", "Please select an item to remove from return items");
             }
         });
         
         clearBtn.setOnAction(e -> {
-            if (!returnItemsList.getItems().isEmpty()) {
+            if (!returnItems.isEmpty()) {
                 Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
                 alert.setTitle("Confirm Clear");
                 alert.setHeaderText("Clear all return items?");
                 
                 if (alert.showAndWait().get() == ButtonType.OK) {
-                    returnItemsList.getItems().clear();
+                    returnItems.clear();
+                    updateReturnAmount(returnItems, returnAmountField);
                 }
             }
         });
         
         submitBtn.setOnAction(e -> {
-            String returnInvoice = returnInvoiceNumberField.getText().trim();
-            String originalInvoice = originalInvoiceField.getText().trim();
+            String returnInvoiceNumber = returnInvoiceNumberField.getText().trim();
+            String selectedDisplay = originalInvoiceComboBox.getValue();
             String customer = customerField.getText().trim();
             String date = returnDatePicker.getValue().format(DATE_FORMATTER);
-            String amount = returnAmountField.getText().trim();
+            String returnAmountText = returnAmountField.getText().trim();
             
-            if (returnInvoice.isEmpty() || customer.isEmpty() || amount.isEmpty() || 
-                returnItemsList.getItems().isEmpty()) {
-                showAlert("Missing Information", "Please fill all fields and add at least one item");
+            if (selectedDisplay == null || customer.isEmpty() || returnItems.isEmpty()) {
+                showAlert("Missing Information", "Please select original invoice and add at least one return item");
                 return;
             }
             
-            // In real app, save to database
-            System.out.println("Return Sales Invoice Submitted:");
-            System.out.println("Return #: " + returnInvoice);
-            System.out.println("Original: " + originalInvoice);
-            System.out.println("Date: " + date);
-            System.out.println("Customer: " + customer);
-            System.out.println("Amount: " + amount);
-            System.out.println("Items:");
-            returnItemsList.getItems().forEach(System.out::println);
-            
-            // Clear form
-            returnInvoiceNumberField.clear();
-            originalInvoiceField.clear();
-            returnDatePicker.setValue(LocalDate.now());
-            customerField.clear();
-            returnAmountField.clear();
-            returnItemsList.getItems().clear();
+            try {
+                double totalReturnAmount = Double.parseDouble(returnAmountText);
+                
+                // Get original invoice data
+                String originalInvoiceNumber = selectedDisplay.split(" - ")[0];
+                int originalSalesInvoiceId = -1;
+                int customerId = -1;
+                
+                for (Object[] invoice : salesInvoices) {
+                    if (originalInvoiceNumber.equals(invoice[1])) {
+                        originalSalesInvoiceId = (Integer) invoice[0];
+                        break;
+                    }
+                }
+                
+                customerId = database.getCustomerIdByName(customer);
+                
+                if (originalSalesInvoiceId == -1 || customerId == -1) {
+                    showAlert("Error", "Original invoice or customer not found");
+                    return;
+                }
+                
+                // Prepare return items for database
+                List<Object[]> items = new ArrayList<>();
+                for (SalesInvoiceItemUI item : returnItems) {
+                    items.add(new Object[]{item.getProductionStockId(), item.getQuantity(), item.getUnitPrice()});
+                }
+                
+                // Save to database
+                boolean success = database.insertSalesReturnInvoice(returnInvoiceNumber, originalSalesInvoiceId, 
+                    customerId, date, totalReturnAmount, items);
+                
+                if (success) {
+                    showAlert("Success", "Sales return invoice created successfully!");
+                    
+                    // Clear form and generate new return invoice number
+                    String newReturnInvoiceNumber = database.generateSalesReturnInvoiceNumber();
+                    returnInvoiceNumberField.setText(newReturnInvoiceNumber);
+                    originalInvoiceComboBox.setValue(null);
+                    returnDatePicker.setValue(LocalDate.now());
+                    customerField.clear();
+                    returnAmountField.clear();
+                    availableItems.clear();
+                    returnItems.clear();
+                } else {
+                    showAlert("Error", "Failed to create sales return invoice. Please try again.");
+                }
+                
+            } catch (NumberFormatException ex) {
+                showAlert("Invalid Input", "Invalid return amount");
+            }
         });
 
         return form;
@@ -1326,6 +1708,75 @@ public class ProductionStock {
         } catch (Exception e) {
             e.printStackTrace();
             showAlert("Error", "Failed to submit return production invoice: " + e.getMessage());
+        }
+    }
+
+    // Helper methods for sales invoice functionality
+    private static void updateTotalAmount(ObservableList<SalesInvoiceItemUI> items, Label totalLabel) {
+        double total = items.stream().mapToDouble(SalesInvoiceItemUI::getTotalPrice).sum();
+        totalLabel.setText(String.format("Total Amount: $%.2f", total));
+    }
+
+    private static void updateReturnAmount(ObservableList<SalesInvoiceItemUI> items, TextField returnAmountField) {
+        double total = items.stream().mapToDouble(SalesInvoiceItemUI::getTotalPrice).sum();
+        returnAmountField.setText(String.format("%.2f", total));
+    }
+
+    // UI Model class for Sales Invoice Items
+    public static class SalesInvoiceItemUI {
+        private final SimpleStringProperty productName;
+        private final SimpleDoubleProperty quantity;
+        private final SimpleDoubleProperty unitPrice;
+        private final SimpleDoubleProperty totalPrice;
+        private final SimpleDoubleProperty originalQuantity;
+        private int productionStockId;
+
+        public SalesInvoiceItemUI(String productName, double quantity, double unitPrice) {
+            this.productName = new SimpleStringProperty(productName);
+            this.quantity = new SimpleDoubleProperty(quantity);
+            this.unitPrice = new SimpleDoubleProperty(unitPrice);
+            this.totalPrice = new SimpleDoubleProperty(quantity * unitPrice);
+            this.originalQuantity = new SimpleDoubleProperty(quantity);
+        }
+
+        // Property getters
+        public SimpleStringProperty productNameProperty() { return productName; }
+        public SimpleDoubleProperty quantityProperty() { return quantity; }
+        public SimpleDoubleProperty unitPriceProperty() { return unitPrice; }
+        public SimpleDoubleProperty totalPriceProperty() { return totalPrice; }
+        public SimpleDoubleProperty originalQuantityProperty() { return originalQuantity; }
+
+        // Value getters
+        public String getProductName() { return productName.get(); }
+        public double getQuantity() { return quantity.get(); }
+        public double getUnitPrice() { return unitPrice.get(); }
+        public double getTotalPrice() { return totalPrice.get(); }
+        public double getOriginalQuantity() { return originalQuantity.get(); }
+        public int getProductionStockId() { return productionStockId; }
+
+        // Value setters
+        public void setProductName(String productName) { this.productName.set(productName); }
+        
+        public void setQuantity(double quantity) { 
+            this.quantity.set(quantity);
+            updateTotalPrice();
+        }
+        
+        public void setUnitPrice(double unitPrice) { 
+            this.unitPrice.set(unitPrice);
+            updateTotalPrice();
+        }
+        
+        public void setOriginalQuantity(double originalQuantity) { 
+            this.originalQuantity.set(originalQuantity); 
+        }
+        
+        public void setProductionStockId(int productionStockId) { 
+            this.productionStockId = productionStockId; 
+        }
+
+        private void updateTotalPrice() {
+            this.totalPrice.set(this.quantity.get() * this.unitPrice.get());
         }
     }
 }

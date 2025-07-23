@@ -3094,6 +3094,429 @@ public class SQLiteDatabase implements db {
     }
 
     // --------------------------
+    // Sales Invoice Operations
+    // --------------------------
+    @Override
+    public String generateSalesInvoiceNumber() {
+        String query = "SELECT MAX(CAST(SUBSTR(sales_invoice_number, 5) AS INTEGER)) as max_number " +
+                      "FROM Sales_Invoice WHERE sales_invoice_number LIKE 'SI-%'";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            if (rs.next()) {
+                int maxNumber = rs.getInt("max_number");
+                return String.format("SI-%03d", maxNumber + 1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return "SI-001";
+    }
+
+    @Override
+    public List<Object[]> getAllCustomersForDropdown() {
+        List<Object[]> customers = new ArrayList<>();
+        String query = "SELECT customer_id, customer_name FROM Customer ORDER BY customer_name";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("customer_id"),
+                    rs.getString("customer_name")
+                };
+                customers.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return customers;
+    }
+
+    @Override
+    public int getCustomerIdByName(String customerName) {
+        String query = "SELECT customer_id FROM Customer WHERE customer_name = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, customerName);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("customer_id");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    @Override
+    public List<Object[]> getAllProductionStocksWithPriceForDropdown() {
+        List<Object[]> products = new ArrayList<>();
+        String query = "SELECT ps.production_stock_id, ps.production_stock_name, ps.sale_price_per_unit, " +
+                      "ps.opening_quantity, c.category_name, b.brand_name, u.unit_name " +
+                      "FROM Production_Stock ps " +
+                      "JOIN Category c ON ps.category_id = c.category_id " +
+                      "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                      "JOIN Unit u ON ps.unit_id = u.unit_id " +
+                      "WHERE ps.opening_quantity > 0 " +
+                      "ORDER BY ps.production_stock_name";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("production_stock_id"),
+                    rs.getString("production_stock_name"),
+                    rs.getDouble("sale_price_per_unit"),
+                    rs.getDouble("opening_quantity"),
+                    rs.getString("category_name"),
+                    rs.getString("brand_name"),
+                    rs.getString("unit_name")
+                };
+                products.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return products;
+    }
+
+    @Override
+    public int getProductionStockIdByName(String productName) {
+        String query = "SELECT production_stock_id FROM Production_Stock WHERE production_stock_name = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, productName);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("production_stock_id");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    @Override
+    public int insertSalesInvoiceAndGetId(String invoiceNumber, int customerId, String salesDate, 
+                                         double totalAmount, double discountAmount, double paidAmount) {
+        String query = "INSERT INTO Sales_Invoice (sales_invoice_number, customer_id, sales_date, " +
+                      "total_amount, discount_amount, paid_amount) VALUES (?, ?, ?, ?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, invoiceNumber);
+            pstmt.setInt(2, customerId);
+            pstmt.setString(3, salesDate);
+            pstmt.setDouble(4, totalAmount);
+            pstmt.setDouble(5, discountAmount);
+            pstmt.setDouble(6, paidAmount);
+            
+            int affectedRows = pstmt.executeUpdate();
+            if (affectedRows > 0) {
+                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        return generatedKeys.getInt(1);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    @Override
+    public boolean insertSalesInvoiceItems(int salesInvoiceId, List<Object[]> items) {
+        String query = "INSERT INTO Sales_Invoice_Item (sales_invoice_id, production_stock_id, quantity, unit_price) " +
+                      "VALUES (?, ?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            for (Object[] item : items) {
+                pstmt.setInt(1, salesInvoiceId);
+                pstmt.setInt(2, (Integer) item[0]); // production_stock_id
+                pstmt.setDouble(3, (Double) item[1]); // quantity
+                pstmt.setDouble(4, (Double) item[2]); // unit_price
+                pstmt.addBatch();
+            }
+            
+            int[] results = pstmt.executeBatch();
+            for (int result : results) {
+                if (result <= 0) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    @Override
+    public boolean insertSalesInvoice(String invoiceNumber, int customerId, String salesDate, 
+                                     double totalAmount, double discountAmount, double paidAmount, 
+                                     List<Object[]> items) {
+        try {
+            connection.setAutoCommit(false);
+            
+            int salesInvoiceId = insertSalesInvoiceAndGetId(invoiceNumber, customerId, salesDate, 
+                                                           totalAmount, discountAmount, paidAmount);
+            
+            if (salesInvoiceId > 0 && insertSalesInvoiceItems(salesInvoiceId, items)) {
+                connection.commit();
+                return true;
+            } else {
+                connection.rollback();
+                return false;
+            }
+        } catch (SQLException e) {
+            try {
+                connection.rollback();
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            try {
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    // --------------------------
+    // Sales Return Invoice Operations
+    // --------------------------
+    @Override
+    public String generateSalesReturnInvoiceNumber() {
+        String query = "SELECT MAX(CAST(SUBSTR(return_invoice_number, 5) AS INTEGER)) as max_number " +
+                      "FROM Sales_Return_Invoice WHERE return_invoice_number LIKE 'SRI-%'";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            if (rs.next()) {
+                int maxNumber = rs.getInt("max_number");
+                return String.format("SRI-%03d", maxNumber + 1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return "SRI-001";
+    }
+
+    @Override
+    public List<Object[]> getAllSalesInvoicesForDropdown() {
+        List<Object[]> invoices = new ArrayList<>();
+        String query = "SELECT si.sales_invoice_id, si.sales_invoice_number, c.customer_name, si.sales_date " +
+                      "FROM Sales_Invoice si " +
+                      "JOIN Customer c ON si.customer_id = c.customer_id " +
+                      "ORDER BY si.sales_date DESC";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("sales_invoice_id"),
+                    rs.getString("sales_invoice_number"),
+                    rs.getString("customer_name"),
+                    rs.getString("sales_date")
+                };
+                invoices.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return invoices;
+    }
+
+    @Override
+    public List<Object[]> getSalesInvoiceItemsByInvoiceId(int salesInvoiceId) {
+        List<Object[]> items = new ArrayList<>();
+        String query = "SELECT sii.production_stock_id, ps.production_stock_name, sii.quantity, sii.unit_price " +
+                      "FROM Sales_Invoice_Item sii " +
+                      "JOIN Production_Stock ps ON sii.production_stock_id = ps.production_stock_id " +
+                      "WHERE sii.sales_invoice_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, salesInvoiceId);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Object[] row = {
+                        rs.getInt("production_stock_id"),
+                        rs.getString("production_stock_name"),
+                        rs.getDouble("quantity"),
+                        rs.getDouble("unit_price")
+                    };
+                    items.add(row);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return items;
+    }
+
+    @Override
+    public Object[] getSalesInvoiceById(int salesInvoiceId) {
+        String query = "SELECT si.sales_invoice_id, si.sales_invoice_number, si.customer_id, c.customer_name, " +
+                      "si.sales_date, si.total_amount, si.discount_amount, si.paid_amount " +
+                      "FROM Sales_Invoice si " +
+                      "JOIN Customer c ON si.customer_id = c.customer_id " +
+                      "WHERE si.sales_invoice_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, salesInvoiceId);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new Object[] {
+                        rs.getInt("sales_invoice_id"),
+                        rs.getString("sales_invoice_number"),
+                        rs.getInt("customer_id"),
+                        rs.getString("customer_name"),
+                        rs.getString("sales_date"),
+                        rs.getDouble("total_amount"),
+                        rs.getDouble("discount_amount"),
+                        rs.getDouble("paid_amount")
+                    };
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    @Override
+    public int insertSalesReturnInvoiceAndGetId(String returnInvoiceNumber, int originalSalesInvoiceId, 
+                                               int customerId, String returnDate, double totalReturnAmount) {
+        String query = "INSERT INTO Sales_Return_Invoice (return_invoice_number, original_sales_invoice_id, " +
+                      "customer_id, return_date, total_return_amount) VALUES (?, ?, ?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, returnInvoiceNumber);
+            pstmt.setInt(2, originalSalesInvoiceId);
+            pstmt.setInt(3, customerId);
+            pstmt.setString(4, returnDate);
+            pstmt.setDouble(5, totalReturnAmount);
+            
+            int affectedRows = pstmt.executeUpdate();
+            if (affectedRows > 0) {
+                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        return generatedKeys.getInt(1);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    @Override
+    public boolean insertSalesReturnInvoiceItems(int salesReturnInvoiceId, List<Object[]> items) {
+        String query = "INSERT INTO Sales_Return_Invoice_Item (sales_return_invoice_id, production_stock_id, quantity, unit_price) " +
+                      "VALUES (?, ?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            for (Object[] item : items) {
+                pstmt.setInt(1, salesReturnInvoiceId);
+                pstmt.setInt(2, (Integer) item[0]); // production_stock_id
+                pstmt.setDouble(3, (Double) item[1]); // quantity
+                pstmt.setDouble(4, (Double) item[2]); // unit_price
+                pstmt.addBatch();
+            }
+            
+            int[] results = pstmt.executeBatch();
+            for (int result : results) {
+                if (result <= 0) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    @Override
+    public boolean insertSalesReturnInvoice(String returnInvoiceNumber, int originalSalesInvoiceId, 
+                                           int customerId, String returnDate, double totalReturnAmount, 
+                                           List<Object[]> items) {
+        try {
+            connection.setAutoCommit(false);
+            
+            int salesReturnInvoiceId = insertSalesReturnInvoiceAndGetId(returnInvoiceNumber, originalSalesInvoiceId, 
+                                                                       customerId, returnDate, totalReturnAmount);
+            
+            if (salesReturnInvoiceId > 0 && insertSalesReturnInvoiceItems(salesReturnInvoiceId, items)) {
+                connection.commit();
+                return true;
+            } else {
+                connection.rollback();
+                return false;
+            }
+        } catch (SQLException e) {
+            try {
+                connection.rollback();
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            try {
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    @Override
+    public List<Object[]> getAllSalesReturnInvoices() {
+        List<Object[]> invoices = new ArrayList<>();
+        String query = "SELECT sri.return_invoice_number, sri.return_date, c.customer_name, " +
+                      "sri.total_return_amount, si.sales_invoice_number " +
+                      "FROM Sales_Return_Invoice sri " +
+                      "JOIN Customer c ON sri.customer_id = c.customer_id " +
+                      "JOIN Sales_Invoice si ON sri.original_sales_invoice_id = si.sales_invoice_id " +
+                      "ORDER BY sri.return_date DESC";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("return_invoice_number"),
+                    rs.getString("return_date"),
+                    rs.getString("customer_name"),
+                    rs.getDouble("total_return_amount"),
+                    rs.getString("sales_invoice_number")
+                };
+                invoices.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return invoices;
+    }
+
+    // --------------------------
     // Bank Management Operations
     // --------------------------
     @Override
