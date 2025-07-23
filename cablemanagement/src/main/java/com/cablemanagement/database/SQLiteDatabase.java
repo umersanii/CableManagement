@@ -43,8 +43,8 @@ public class SQLiteDatabase implements db {
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
+            return false;
         }
-        return false;
     }
 
     @Override
@@ -765,7 +765,12 @@ public class SQLiteDatabase implements db {
                         "('PowerFlex', 1), ('ABC', 2), ('aa', 3)");
         }
         rs.close();
+        
+        // Ensure all required views exist
+        ensureViewsExist();
     }
+    
+    
 
     @Override
     public List<String> getAllTehsils() {
@@ -3800,7 +3805,8 @@ public class SQLiteDatabase implements db {
         // Map view names to their respective date columns
         Map<String, String> dateColumnMap = new HashMap<>();
         dateColumnMap.put("View_Purchase_Book", "invoice_date");
-        dateColumnMap.put("View_Raw_Stock_Book", "usage_date");
+        dateColumnMap.put("View_Return_Purchase_Book", "invoice_date");
+        dateColumnMap.put("View_Raw_Stock_Book", "invoice_date");
         // Add other views and their date columns as needed
 
         String dateColumn = dateColumnMap.getOrDefault(viewName, "date"); // Default to 'date' if view not mapped
@@ -3835,11 +3841,13 @@ public class SQLiteDatabase implements db {
             }
             try (ResultSet rs = stmt.executeQuery()) {
                 int columnCount = rs.getMetaData().getColumnCount();
+                System.out.println("DEBUG: ResultSet has " + columnCount + " columns");
                 while (rs.next()) {
                     Object[] row = new Object[columnCount];
                     for (int i = 0; i < columnCount; i++) {
                         row[i] = rs.getObject(i + 1);
                     }
+                    System.out.println("DEBUG: Row created with " + row.length + " elements");
                     results.add(row);
                 }
             }
@@ -4247,7 +4255,132 @@ public class SQLiteDatabase implements db {
             return null;
         }
     }
+    /**
+     * Ensure all required views exist in the database
+     */
+    /**
+     * Ensure all required views exist in the database
+     */
+    public void ensureViewsExist() {
+        try {
+            // Drop and recreate View_Purchase_Book to fix column mismatch
+            try {
+                connection.createStatement().execute("DROP VIEW IF EXISTS View_Purchase_Book");
+            } catch (SQLException e) {
+                // Ignore if view doesn't exist
+            }
+            
+            // Create detailed view with item-level data (14 columns as expected)
+            String sql = "CREATE VIEW View_Purchase_Book AS " +
+                       "SELECT " +
+                       "    rpi.raw_purchase_invoice_id, " +           // 0: invoice_id
+                       "    rpi.invoice_number, " +                    // 1: invoice_number
+                       "    s.supplier_name, " +                      // 2: supplier_name
+                       "    rpi.invoice_date, " +                     // 3: invoice_date
+                       "    rs.item_name, " +                         // 4: item_name
+                       "    b.brand_name, " +                         // 5: brand_name
+                       "    m.manufacturer_name, " +                  // 6: manufacturer_name
+                       "    rpii.quantity, " +                        // 7: quantity
+                       "    rpii.unit_price, " +                      // 8: unit_price
+                       "    (rpii.quantity * rpii.unit_price) AS item_total, " + // 9: item_total
+                       "    rpi.total_amount, " +                     // 10: total_amount
+                       "    rpi.discount_amount, " +                  // 11: discount_amount
+                       "    rpi.paid_amount, " +                      // 12: paid_amount
+                       "    (rpi.total_amount - rpi.paid_amount) AS balance " + // 13: balance
+                       "FROM Raw_Purchase_Invoice rpi " +
+                       "JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
+                       "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
+                       "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                       "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                       "JOIN Manufacturer m ON b.manufacturer_id = m.manufacturer_id";
+            connection.createStatement().execute(sql);
+            System.out.println("Created View_Purchase_Book with 14 columns (item-level details)");
+            
+            // Drop and recreate View_Return_Purchase_Book to fix column mismatch
+            try {
+                connection.createStatement().execute("DROP VIEW IF EXISTS View_Return_Purchase_Book");
+            } catch (SQLException e) {
+                // Ignore if view doesn't exist
+            }
+            
+            sql = "CREATE VIEW View_Return_Purchase_Book AS " +
+                "SELECT " +
+                "    rpri.raw_purchase_return_invoice_id AS raw_purchase_invoice_id, " +     // 0: invoice_id
+                "    rpri.return_invoice_number AS invoice_number, " +          // 1: invoice_number
+                "    s.supplier_name, " +                                       // 2: supplier_name
+                "    rpri.return_date AS invoice_date, " +                      // 3: invoice_date
+                "    rs.item_name, " +                                          // 4: item_name
+                "    b.brand_name, " +                                          // 5: brand_name
+                "    m.manufacturer_name, " +                                   // 6: manufacturer_name
+                "    rprii.quantity AS quantity, " +                            // 7: quantity
+                "    rprii.unit_price, " +                                      // 8: unit_price
+                "    (rprii.quantity * rprii.unit_price) AS item_total, " +     // 9: item_total
+                "    rpri.total_return_amount AS total_amount, " +              // 10: total_amount
+                "    0.0 AS discount_amount, " +                                // 11: discount_amount
+                "    rpri.total_return_amount AS paid_amount, " +               // 12: paid_amount
+                "    0.0 AS balance " +                                         // 13: balance
+                "FROM Raw_Purchase_Return_Invoice rpri " +
+                "JOIN Supplier s ON rpri.supplier_id = s.supplier_id " +
+                "JOIN Raw_Purchase_Return_Invoice_Item rprii ON rpri.raw_purchase_return_invoice_id = rprii.raw_purchase_return_invoice_id " +
+                "JOIN Raw_Stock rs ON rprii.raw_stock_id = rs.stock_id " +
+                "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                "JOIN Manufacturer m ON b.manufacturer_id = m.manufacturer_id";
+            connection.createStatement().execute(sql);
+            System.out.println("Created View_Return_Purchase_Book with 14 columns (item-level details)");
+            
+            // Drop and recreate View_Raw_Stock_Book to fix column mismatch
+            try {
+                connection.createStatement().execute("DROP VIEW IF EXISTS View_Raw_Stock_Book");
+            } catch (SQLException e) {
+                // Ignore if view doesn't exist
+            }
+            
+            sql = "CREATE VIEW View_Raw_Stock_Book AS " +
+                "SELECT " +
+                "    rsui.raw_stock_use_invoice_id AS raw_purchase_invoice_id, " +         // 0: invoice_id
+                "    rsui.use_invoice_number AS invoice_number, " +              // 1: invoice_number
+                "    'Internal Usage' AS supplier_name, " +                      // 2: supplier_name
+                "    rsui.usage_date AS invoice_date, " +                        // 3: invoice_date
+                "    rs.item_name, " +                                           // 4: item_name
+                "    b.brand_name, " +                                           // 5: brand_name
+                "    m.manufacturer_name, " +                                    // 6: manufacturer_name
+                "    rsuii.quantity_used AS quantity, " +                        // 7: quantity
+                "    rsuii.unit_cost AS unit_price, " +                          // 8: unit_price
+                "    rsuii.total_cost AS item_total, " +                         // 9: item_total
+                "    rsui.total_usage_amount AS total_amount, " +                // 10: total_amount
+                "    0.0 AS discount_amount, " +                                 // 11: discount_amount
+                "    rsui.total_usage_amount AS paid_amount, " +                 // 12: paid_amount
+                "    0.0 AS balance " +                                          // 13: balance
+                "FROM Raw_Stock_Use_Invoice rsui " +
+                "JOIN Raw_Stock_Use_Invoice_Item rsuii ON rsui.raw_stock_use_invoice_id = rsuii.raw_stock_use_invoice_id " +
+                "JOIN Raw_Stock rs ON rsuii.raw_stock_id = rs.stock_id " +
+                "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                "JOIN Manufacturer m ON b.manufacturer_id = m.manufacturer_id";
+            connection.createStatement().execute(sql);
+            System.out.println("Created View_Raw_Stock_Book with 14 columns (item-level details)");
+            
+        } catch (SQLException e) {
+            System.err.println("Error creating views: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
 
+    /**
+     * Check if a view exists in the database
+     */
+    private boolean viewExists(String viewName) {
+        try {
+            String sql = "SELECT name FROM sqlite_master WHERE type='view' AND name=?";
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                stmt.setString(1, viewName);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    return rs.next();
+                }
+            }
+        } catch (SQLException e) {
+            return false;
+        }
+    }
 
 
 }

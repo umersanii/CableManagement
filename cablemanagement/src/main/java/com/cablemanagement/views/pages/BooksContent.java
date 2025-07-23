@@ -62,7 +62,7 @@ public class BooksContent {
         String[] buttonLabels = {
             "Purchase Book",
             "Return Purchase Book",
-            "Raw Stock Book",
+            "Raw Stock Usage Book",
             "Return Raw Stock Book",
             "Production Book",
             "Return Production Book",
@@ -73,7 +73,7 @@ public class BooksContent {
         Runnable[] actions = {
             () -> formArea.getChildren().setAll(createPurchaseBookForm()),
             () -> formArea.getChildren().setAll(createReturnPurchaseBookForm()),
-            () -> formArea.getChildren().setAll(createRawStockBookForm()),
+            () -> formArea.getChildren().setAll(createRawStockUsageBookForm()),
             () -> formArea.getChildren().setAll(createReturnRawStockBookForm()),
             () -> formArea.getChildren().setAll(createProductionBookForm()),
             () -> formArea.getChildren().setAll(createReturnProductionBookForm()),
@@ -189,8 +189,8 @@ public class BooksContent {
 
         generateBtn.setOnAction(e -> loadReturnPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), supplierFilter));
-        printBtn.setOnAction(e -> printReport("ReturnPurchaseBook", data));
-        exportBtn.setOnAction(e -> exportReport("ReturnPurchaseBook", data));
+        printBtn.setOnAction(e -> printReport("ReturnPurchaseBook", table.getItems()));
+        exportBtn.setOnAction(e -> exportReport("ReturnPurchaseBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadReturnPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -198,8 +198,8 @@ public class BooksContent {
         return form;
     }
 
-    private static VBox createRawStockBookForm() {
-        VBox form = createSection("Raw Stock Book", "View and manage raw stock usage records.");
+    private static VBox createRawStockUsageBookForm() {
+        VBox form = createSection("Raw Stock Usage Book", "View and manage raw stock usage records.");
         ObservableList<RawStockRecord> data = FXCollections.observableArrayList();
         TableView<RawStockRecord> table = createRawStockTable(data);
 
@@ -213,8 +213,8 @@ public class BooksContent {
 
         generateBtn.setOnAction(e -> loadRawStockData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), itemFilter));
-        printBtn.setOnAction(e -> printReport("RawStockBook", data));
-        exportBtn.setOnAction(e -> exportReport("RawStockBook", data));
+        printBtn.setOnAction(e -> printReport("RawStockUsageBook", table.getItems()));
+        exportBtn.setOnAction(e -> exportReport("RawStockUsageBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadRawStockData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -380,22 +380,39 @@ private static TableView<PurchaseRecord> createPurchaseTable(ObservableList<Purc
         TableView<ReturnPurchaseRecord> table = new TableView<>();
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
+        // Return Invoice Number Column
         TableColumn<ReturnPurchaseRecord, String> returnInvCol = new TableColumn<>("Return Invoice");
-        returnInvCol.setCellValueFactory(new PropertyValueFactory<>("returnInvoice"));
+        returnInvCol.setCellValueFactory(cellData -> cellData.getValue().returnInvoiceProperty());
 
+        // Date Column
         TableColumn<ReturnPurchaseRecord, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(new PropertyValueFactory<>("date"));
+        dateCol.setCellValueFactory(cellData -> cellData.getValue().dateProperty());
 
+        // Supplier Column
         TableColumn<ReturnPurchaseRecord, String> supplierCol = new TableColumn<>("Supplier");
-        supplierCol.setCellValueFactory(new PropertyValueFactory<>("supplier"));
+        supplierCol.setCellValueFactory(cellData -> cellData.getValue().supplierProperty());
 
-        TableColumn<ReturnPurchaseRecord, String> origInvCol = new TableColumn<>("Original Invoice");
-        origInvCol.setCellValueFactory(new PropertyValueFactory<>("originalInvoice"));
+        // Item Name Column
+        TableColumn<ReturnPurchaseRecord, String> itemCol = new TableColumn<>("Item");
+        itemCol.setCellValueFactory(cellData -> cellData.getValue().itemNameProperty());
 
-        TableColumn<ReturnPurchaseRecord, Double> amountCol = new TableColumn<>("Amount");
-        amountCol.setCellValueFactory(new PropertyValueFactory<>("amount"));
+        // Brand Column
+        TableColumn<ReturnPurchaseRecord, String> brandCol = new TableColumn<>("Brand");
+        brandCol.setCellValueFactory(cellData -> cellData.getValue().brandNameProperty());
 
-        table.getColumns().addAll(returnInvCol, dateCol, supplierCol, origInvCol, amountCol);
+        // Quantity Column
+        TableColumn<ReturnPurchaseRecord, Double> qtyCol = new TableColumn<>("Quantity");
+        qtyCol.setCellValueFactory(cellData -> new javafx.beans.property.ReadOnlyObjectWrapper<>(cellData.getValue().getQuantity()));
+
+        // Unit Price Column
+        TableColumn<ReturnPurchaseRecord, Double> unitPriceCol = new TableColumn<>("Unit Price");
+        unitPriceCol.setCellValueFactory(cellData -> new javafx.beans.property.ReadOnlyObjectWrapper<>(cellData.getValue().getUnitPrice()));
+
+        // Total Amount Column
+        TableColumn<ReturnPurchaseRecord, Double> amountCol = new TableColumn<>("Total Amount");
+        amountCol.setCellValueFactory(cellData -> new javafx.beans.property.ReadOnlyObjectWrapper<>(cellData.getValue().getTotalAmount()));
+
+        table.getColumns().addAll(returnInvCol, dateCol, supplierCol, itemCol, brandCol, qtyCol, unitPriceCol, amountCol);
         table.setItems(data);
         return table;
     }
@@ -406,16 +423,16 @@ private static TableView<PurchaseRecord> createPurchaseTable(ObservableList<Purc
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         TableColumn<RawStockRecord, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(new PropertyValueFactory<>("date"));
+        dateCol.setCellValueFactory(cellData -> cellData.getValue().dateProperty());
 
         TableColumn<RawStockRecord, String> itemCol = new TableColumn<>("Item");
-        itemCol.setCellValueFactory(new PropertyValueFactory<>("item"));
+        itemCol.setCellValueFactory(cellData -> cellData.getValue().itemProperty());
 
         TableColumn<RawStockRecord, Double> qtyCol = new TableColumn<>("Quantity");
-        qtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
+        qtyCol.setCellValueFactory(cellData -> new javafx.beans.property.ReadOnlyObjectWrapper<>(cellData.getValue().getQuantity()));
 
         TableColumn<RawStockRecord, String> refCol = new TableColumn<>("Reference");
-        refCol.setCellValueFactory(new PropertyValueFactory<>("reference"));
+        refCol.setCellValueFactory(cellData -> cellData.getValue().referenceProperty());
 
         table.getColumns().addAll(dateCol, itemCol, qtyCol, refCol);
         table.setItems(data);
@@ -597,56 +614,107 @@ private static void loadPurchaseData(TableView<PurchaseRecord> table, DatePicker
     }
 }
 private static void loadReturnPurchaseData(TableView<ReturnPurchaseRecord> table, DatePicker fromDate, DatePicker toDate, ComboBox<String> supplierFilter) {
-        if (config.database == null || !config.database.isConnected()) {
-            showAlert("Error", "Database not connected!");
-            return;
-        }
-
+    ObservableList<ReturnPurchaseRecord> data = FXCollections.observableArrayList();
+    try {
         Map<String, String> filters = new HashMap<>();
-        if (fromDate.getValue() != null) filters.put("return_date", ">= '" + fromDate.getValue().format(DATE_FORMATTER) + "'");
-        if (toDate.getValue() != null) filters.put("return_date", "<= '" + toDate.getValue().format(DATE_FORMATTER) + "'");
-        if (supplierFilter.getValue() != null && !supplierFilter.getValue().equals("All Suppliers")) {
-            filters.put("supplier_name", "= '" + supplierFilter.getValue() + "'");
+        if (fromDate.getValue() != null) {
+            filters.put("fromDate", fromDate.getValue().format(DATE_FORMATTER));
+        }
+        if (toDate.getValue() != null) {
+            filters.put("toDate", toDate.getValue().format(DATE_FORMATTER));
+        }
+        if (supplierFilter.getValue() != null && !supplierFilter.getValue().isEmpty() && !supplierFilter.getValue().equals("All Suppliers")) {
+            filters.put("supplier_name", supplierFilter.getValue());
         }
 
-        List<Object[]> rows = config.database.getViewData("View_Return_Purchase_Book", filters);
-        ObservableList<ReturnPurchaseRecord> data = FXCollections.observableArrayList();
-        for (Object[] row : rows) {
+        List<Object[]> result = config.database.getViewData("View_Return_Purchase_Book", filters);
+        System.out.println("View_Return_Purchase_Book results: " + result.size() + " rows");
+
+        // Use a set to track seen invoice numbers and skip duplicates
+        java.util.HashSet<String> seenInvoiceIds = new java.util.HashSet<>();
+        for (Object[] row : result) {
+            String invoiceId = row[0] != null ? row[0].toString() : "";
+            if (seenInvoiceIds.contains(invoiceId)) {
+                continue; // Skip duplicate invoice ids
+            }
+            seenInvoiceIds.add(invoiceId);
+
             data.add(new ReturnPurchaseRecord(
-                row[0] != null ? row[0].toString() : "",
-                row[1] != null ? row[1].toString() : "",
-                row[2] != null ? row[2].toString() : "",
-                row[4] != null ? row[4].toString() : "",
-                row[3] != null ? Double.parseDouble(row[3].toString()) : 0.0
+                invoiceId, // raw_purchase_invoice_id (return_invoice_id)
+                row[1] != null ? row[1].toString() : "", // invoice_number (return_invoice_number)
+                row[2] != null ? row[2].toString() : "", // supplier_name
+                row[3] != null ? row[3].toString() : "", // invoice_date (return_date)
+                row[4] != null ? row[4].toString() : "", // item_name
+                row[5] != null ? row[5].toString() : "", // brand_name
+                row[6] != null ? row[6].toString() : "", // manufacturer_name
+                row[7] != null ? Double.parseDouble(row[7].toString()) : 0.0, // quantity (return_quantity)
+                row[8] != null ? Double.parseDouble(row[8].toString()) : 0.0, // unit_price
+                row[9] != null ? Double.parseDouble(row[9].toString()) : 0.0, // item_total
+                row[10] != null ? Double.parseDouble(row[10].toString()) : 0.0, // total_amount (total_return_amount)
+                row[11] != null ? Double.parseDouble(row[11].toString()) : 0.0, // discount_amount
+                row[12] != null ? Double.parseDouble(row[12].toString()) : 0.0, // paid_amount
+                row[13] != null ? Double.parseDouble(row[13].toString()) : 0.0 // balance
             ));
         }
-        table.setItems(data);
+    } catch (Exception e) {
+        showAlert("Database Error", "Failed to load return purchase data: " + e.getMessage());
+        e.printStackTrace();
     }
 
+    table.setItems(data);
+
+    // Debug output
+    System.out.println("Return Purchase Table items count: " + table.getItems().size());
+    if (!table.getItems().isEmpty()) {
+        System.out.println("First return record: " + table.getItems().get(0).getReturnInvoice());
+    }
+}
+
     private static void loadRawStockData(TableView<RawStockRecord> table, DatePicker fromDate, DatePicker toDate, ComboBox<String> itemFilter) {
-        if (config.database == null || !config.database.isConnected()) {
-            showAlert("Error", "Database not connected!");
-            return;
-        }
-
-        Map<String, String> filters = new HashMap<>();
-        if (fromDate.getValue() != null) filters.put("usage_date", ">= '" + fromDate.getValue().format(DATE_FORMATTER) + "'");
-        if (toDate.getValue() != null) filters.put("usage_date", "<= '" + toDate.getValue().format(DATE_FORMATTER) + "'");
-        if (itemFilter.getValue() != null && !itemFilter.getValue().equals("All Items")) {
-            filters.put("raw_stock_name", "= '" + itemFilter.getValue() + "'");
-        }
-
-        List<Object[]> rows = config.database.getViewData("View_Raw_Stock_Book", filters);
         ObservableList<RawStockRecord> data = FXCollections.observableArrayList();
-        for (Object[] row : rows) {
-            data.add(new RawStockRecord(
-                row[0] != null ? row[0].toString() : "",
-                row[1] != null ? row[1].toString() : "",
-                row[2] != null ? Double.parseDouble(row[2].toString()) : 0.0,
-                row[3] != null ? row[3].toString() : ""
-            ));
+        try {
+            Map<String, String> filters = new HashMap<>();
+            if (fromDate.getValue() != null) {
+                filters.put("fromDate", fromDate.getValue().format(DATE_FORMATTER));
+            }
+            if (toDate.getValue() != null) {
+                filters.put("toDate", toDate.getValue().format(DATE_FORMATTER));
+            }
+            if (itemFilter.getValue() != null && !itemFilter.getValue().isEmpty() && !itemFilter.getValue().equals("All Items")) {
+                filters.put("item_name", itemFilter.getValue());
+            }
+
+            List<Object[]> result = config.database.getViewData("View_Raw_Stock_Book", filters);
+            System.out.println("View_Raw_Stock_Book results: " + result.size() + " rows");
+
+            // Use a set to track seen invoice numbers and skip duplicates
+            java.util.HashSet<String> seenInvoiceIds = new java.util.HashSet<>();
+            for (Object[] row : result) {
+                String invoiceId = row[0] != null ? row[0].toString() : "";
+                if (seenInvoiceIds.contains(invoiceId)) {
+                    continue; // Skip duplicate invoice ids
+                }
+                seenInvoiceIds.add(invoiceId);
+
+                data.add(new RawStockRecord(
+                    row[3] != null ? row[3].toString() : "", // invoice_date (usage_date)
+                    row[4] != null ? row[4].toString() : "", // item_name
+                    row[7] != null ? Double.parseDouble(row[7].toString()) : 0.0, // quantity (quantity_used)
+                    row[1] != null ? row[1].toString() : "" // invoice_number (use_invoice_number) as reference
+                ));
+            }
+        } catch (Exception e) {
+            showAlert("Database Error", "Failed to load raw stock usage data: " + e.getMessage());
+            e.printStackTrace();
         }
+
         table.setItems(data);
+
+        // Debug output
+        System.out.println("Raw Stock Usage Table items count: " + table.getItems().size());
+        if (!table.getItems().isEmpty()) {
+            System.out.println("First usage record: " + table.getItems().get(0).getReference());
+        }
     }
 
     private static void loadReturnRawStockData(TableView<ReturnRawStockRecord> table, DatePicker fromDate, DatePicker toDate, ComboBox<String> supplierFilter) {
@@ -939,18 +1007,23 @@ private static InvoiceData createInvoiceData(String reportName, ObservableList<?
         case "ReturnPurchaseBook":
             for (Object record : data) {
                 ReturnPurchaseRecord rpr = (ReturnPurchaseRecord) record;
+                double discountPercentage = rpr.getTotalAmount() != 0 ? rpr.getDiscountAmount() / rpr.getTotalAmount() * 100 : 0.0;
                 items.add(new Item(
-                    rpr.getSupplier() + " (Return Invoice: " + rpr.getReturnInvoice() + ")",
-                    1, 
-                    rpr.getAmount(), 
-                    0.0
+                    rpr.getItemName() + " - " + rpr.getBrandName() + " (Return Invoice: " + rpr.getReturnInvoice() + ")",
+                    (int) rpr.getQuantity(), 
+                    rpr.getUnitPrice(), 
+                    discountPercentage
                 ));
+                System.out.println("Return Item: " + rpr.getItemName() + ", Brand: " + rpr.getBrandName() + 
+                                  ", Supplier: " + rpr.getSupplier() + 
+                                  ", Qty: " + rpr.getQuantity() + ", Unit Price: " + rpr.getUnitPrice() + 
+                                  ", Total: " + rpr.getTotalAmount());
                 if (items.size() == 1) {
                     invoiceNumber = rpr.getReturnInvoice();
                 }
             }
             break;
-        case "RawStockBook":
+        case "RawStockUsageBook":
             for (Object record : data) {
                 RawStockRecord rsr = (RawStockRecord) record;
                 items.add(new Item(
@@ -1123,30 +1196,99 @@ static class PurchaseRecord {
 
 
     static class ReturnPurchaseRecord {
+        private final StringProperty returnInvoiceId = new SimpleStringProperty();
         private final StringProperty returnInvoice = new SimpleStringProperty();
-        private final StringProperty date = new SimpleStringProperty();
         private final StringProperty supplier = new SimpleStringProperty();
-        private final StringProperty originalInvoice = new SimpleStringProperty();
-        private final SimpleDoubleProperty amount = new SimpleDoubleProperty();
+        private final StringProperty date = new SimpleStringProperty();
+        private final StringProperty itemName = new SimpleStringProperty();
+        private final StringProperty brandName = new SimpleStringProperty();
+        private final StringProperty manufacturerName = new SimpleStringProperty();
+        private final SimpleDoubleProperty quantity = new SimpleDoubleProperty();
+        private final SimpleDoubleProperty unitPrice = new SimpleDoubleProperty();
+        private final SimpleDoubleProperty itemTotal = new SimpleDoubleProperty();
+        private final SimpleDoubleProperty totalAmount = new SimpleDoubleProperty();
+        private final SimpleDoubleProperty discountAmount = new SimpleDoubleProperty();
+        private final SimpleDoubleProperty paidAmount = new SimpleDoubleProperty();
+        private final SimpleDoubleProperty balance = new SimpleDoubleProperty();
 
+        // Constructor for backwards compatibility (5 parameters)
         ReturnPurchaseRecord(String returnInvoice, String date, String supplier, String originalInvoice, double amount) {
+            this.returnInvoiceId.set("");
             this.returnInvoice.set(returnInvoice);
-            this.date.set(date);
             this.supplier.set(supplier);
-            this.originalInvoice.set(originalInvoice);
-            this.amount.set(amount);
+            this.date.set(date);
+            this.itemName.set(originalInvoice); // Using as original invoice for backward compatibility
+            this.brandName.set("");
+            this.manufacturerName.set("");
+            this.quantity.set(1.0);
+            this.unitPrice.set(amount);
+            this.itemTotal.set(amount);
+            this.totalAmount.set(amount);
+            this.discountAmount.set(0.0);
+            this.paidAmount.set(amount);
+            this.balance.set(0.0);
         }
 
+        // Full constructor (14 parameters)
+        ReturnPurchaseRecord(String returnInvoiceId, String returnInvoice, String supplier, String date, 
+                           String itemName, String brandName, String manufacturerName, 
+                           double quantity, double unitPrice, double itemTotal, 
+                           double totalAmount, double discountAmount, double paidAmount, double balance) {
+            this.returnInvoiceId.set(returnInvoiceId);
+            this.returnInvoice.set(returnInvoice);
+            this.supplier.set(supplier);
+            this.date.set(date);
+            this.itemName.set(itemName);
+            this.brandName.set(brandName);
+            this.manufacturerName.set(manufacturerName);
+            this.quantity.set(quantity);
+            this.unitPrice.set(unitPrice);
+            this.itemTotal.set(itemTotal);
+            this.totalAmount.set(totalAmount);
+            this.discountAmount.set(discountAmount);
+            this.paidAmount.set(paidAmount);
+            this.balance.set(balance);
+        }
+
+        // Property getters
+        StringProperty returnInvoiceIdProperty() { return returnInvoiceId; }
         StringProperty returnInvoiceProperty() { return returnInvoice; }
-        StringProperty dateProperty() { return date; }
         StringProperty supplierProperty() { return supplier; }
-        StringProperty originalInvoiceProperty() { return originalInvoice; }
-        SimpleDoubleProperty amountProperty() { return amount; }
+        StringProperty dateProperty() { return date; }
+        StringProperty itemNameProperty() { return itemName; }
+        StringProperty brandNameProperty() { return brandName; }
+        StringProperty manufacturerNameProperty() { return manufacturerName; }
+        SimpleDoubleProperty quantityProperty() { return quantity; }
+        SimpleDoubleProperty unitPriceProperty() { return unitPrice; }
+        SimpleDoubleProperty itemTotalProperty() { return itemTotal; }
+        SimpleDoubleProperty totalAmountProperty() { return totalAmount; }
+        SimpleDoubleProperty discountAmountProperty() { return discountAmount; }
+        SimpleDoubleProperty paidAmountProperty() { return paidAmount; }
+        SimpleDoubleProperty balanceProperty() { return balance; }
+
+        // Backward compatibility properties
+        StringProperty originalInvoiceProperty() { return itemName; } // For backward compatibility
+        SimpleDoubleProperty amountProperty() { return totalAmount; } // For backward compatibility
+
+        // Value getters
+        String getReturnInvoiceId() { return returnInvoiceId.get(); }
         String getReturnInvoice() { return returnInvoice.get(); }
-        String getDate() { return date.get(); }
         String getSupplier() { return supplier.get(); }
-        String getOriginalInvoice() { return originalInvoice.get(); }
-        double getAmount() { return amount.get(); }
+        String getDate() { return date.get(); }
+        String getItemName() { return itemName.get(); }
+        String getBrandName() { return brandName.get(); }
+        String getManufacturerName() { return manufacturerName.get(); }
+        double getQuantity() { return quantity.get(); }
+        double getUnitPrice() { return unitPrice.get(); }
+        double getItemTotal() { return itemTotal.get(); }
+        double getTotalAmount() { return totalAmount.get(); }
+        double getDiscountAmount() { return discountAmount.get(); }
+        double getPaidAmount() { return paidAmount.get(); }
+        double getBalance() { return balance.get(); }
+
+        // Backward compatibility getters
+        String getOriginalInvoice() { return itemName.get(); } // For backward compatibility
+        double getAmount() { return totalAmount.get(); } // For backward compatibility
     }
 
     static class RawStockRecord {
