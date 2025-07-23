@@ -2938,7 +2938,7 @@ public class SQLiteDatabase implements db {
         List<Object[]> transactions = new ArrayList<>();
 
         // Use correct column names for each table
-        String cashQuery = "SELECT date AS date, transaction_type, amount, description, 'cash' AS source " +
+        String cashQuery = "SELECT transaction_date AS date, transaction_type, amount, description, 'cash' AS source " +
                         "FROM Cash_Transaction";
         String bankQuery = "SELECT transaction_date AS date, transaction_type, amount, description, 'bank' AS source " +
                         "FROM Bank_Transaction";
@@ -4064,12 +4064,35 @@ public class SQLiteDatabase implements db {
 
     @Override
     public ResultSet getBankTransferReport(Date fromDate, Date toDate) {
-        String query = "SELECT * FROM Bank_Transaction WHERE transaction_type IN ('transfer_in', 'transfer_out') AND transaction_date BETWEEN ? AND ?";
+        String query = "SELECT " +
+                "bt.transaction_date, " +
+                "COALESCE(" +
+                "  CASE WHEN bt.bank_id != 0 THEN (SELECT bank_name FROM Bank WHERE bank_id = bt.bank_id) ELSE 'Cash' END," +
+                "  'Unknown'" +
+                ") as from_bank, " +
+                "COALESCE(" +
+                "  CASE WHEN bt.related_bank_id != 0 THEN (SELECT bank_name FROM Bank WHERE bank_id = bt.related_bank_id) ELSE 'Cash' END," +
+                "  'Cash'" +
+                ") as to_bank, " +
+                "bt.amount, " +
+                "COALESCE(bt.description, 'Bank Transfer') as description " +
+                "FROM Bank_Transaction bt " +
+                "WHERE bt.transaction_type IN ('transfer_in', 'transfer_out') " +
+                "AND bt.transaction_date BETWEEN ? AND ? " +
+                "ORDER BY bt.transaction_date DESC";
+                
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setDate(1, fromDate);
-            pstmt.setDate(2, toDate);
+            // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            String fromDateStr = sdf.format(fromDate);
+            String toDateStr = sdf.format(toDate);
+            
+            pstmt.setString(1, fromDateStr);
+            pstmt.setString(2, toDateStr);
+            
             return pstmt.executeQuery();
         } catch (SQLException e) {
+            System.err.println("Error in getBankTransferReport: " + e.getMessage());
             e.printStackTrace();
             return null;
         }

@@ -391,7 +391,14 @@ public class ReportsContent {
         Label heading = createHeading("Bank Transfer Report");
 
         // Date range filters
-        HBox dateRangeBox = createDateRangeFilter();
+        HBox dateRangeBox = new HBox(10);
+        Label fromLabel = new Label("From:");
+        DatePicker fromDatePicker = new DatePicker(LocalDate.now().minusDays(7));
+        Label toLabel = new Label("To:");
+        DatePicker toDatePicker = new DatePicker(LocalDate.now());
+        Button filterBtn = createActionButton("Filter");
+        dateRangeBox.getChildren().addAll(fromLabel, fromDatePicker, toLabel, toDatePicker, filterBtn);
+        dateRangeBox.setAlignment(Pos.CENTER_LEFT);
 
         // Action buttons
         HBox buttons = createReportActionButtons();
@@ -413,14 +420,60 @@ public class ReportsContent {
         
         table.getColumns().addAll(dateCol, fromCol, toCol, amountCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        
-        // Sample data - in real app, fetch from View_Bank_Transfer_Report
-        ObservableList<BankTransferReport> data = FXCollections.observableArrayList(
-            new BankTransferReport("2025-07-04", "HBL", "MCB", "50000.00")
-        );
-        table.setItems(data);
 
-        form.getChildren().addAll(heading, dateRangeBox, buttons, table);
+        // Error label for feedback
+        Label errorLabel = new Label("");
+        errorLabel.setStyle("-fx-text-fill: red;");
+
+        // Load data from backend
+        filterBtn.setOnAction(e -> {
+            table.getItems().clear();
+            errorLabel.setText("");
+            try {
+                if (config.database != null && config.database.isConnected()) {
+                    java.sql.Date from = java.sql.Date.valueOf(fromDatePicker.getValue());
+                    java.sql.Date to = java.sql.Date.valueOf(toDatePicker.getValue());
+                    java.sql.ResultSet rs = config.database.getBankTransferReport(from, to);
+                    int count = 0;
+                    if (rs != null) {
+                        try {
+                            while (rs.next()) {
+                                String fromBank = rs.getString("from_bank");
+                                String toBank = rs.getString("to_bank");
+                                String amount = String.format("%.2f", rs.getDouble("amount"));
+                                String date = rs.getString("transaction_date");
+                                
+                                // Handle null values
+                                if (fromBank == null) fromBank = "Unknown";
+                                if (toBank == null) toBank = "Unknown";
+                                if (date == null) date = "Unknown";
+                                
+                                table.getItems().add(new BankTransferReport(date, fromBank, toBank, amount));
+                                count++;
+                            }
+                        } finally {
+                            rs.close();
+                        }
+                    }
+                    System.out.println("BankTransferReport rows loaded: " + count);
+                    if (count == 0) {
+                        errorLabel.setText("No bank transfer data found for selected date range.\n" +
+                                         "Bank transfers are created when you use 'Transfer Bank to Bank' in Bank Management.\n" +
+                                         "Only transactions with types 'transfer_in' and 'transfer_out' appear in this report.");
+                    }
+                } else {
+                    errorLabel.setText("Database not connected.");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error loading bank transfer data: " + ex.getMessage());
+            }
+        });
+
+        // Optionally, trigger filter on load
+        filterBtn.fire();
+
+        form.getChildren().addAll(heading, dateRangeBox, buttons, errorLabel, table);
         return form;
     }
 
