@@ -371,156 +371,140 @@ public class RawStock {
         return form;
     }
 
-    private static ScrollPane createRawStockReturnPurchaseInvoiceForm() {
-        VBox mainContainer = new VBox(20);
-        mainContainer.setPadding(new Insets(30));
-        mainContainer.getStyleClass().add("form-container");
+private static ScrollPane createRawStockReturnPurchaseInvoiceForm() {
+    VBox mainContainer = new VBox(25);
+    mainContainer.setPadding(new Insets(30));
+    mainContainer.setAlignment(Pos.TOP_CENTER);
+    mainContainer.getStyleClass().add("form-container");
 
-        Label heading = createHeading("Create Raw Stock Return Purchase Invoice");
+    // Heading
+    Label heading = createHeading("Create Raw Stock Return Purchase Invoice");
 
-        // Components
-        TextField returnInvoiceNumberField = createTextField("Return Invoice Number");
-        returnInvoiceNumberField.setEditable(false);
-        returnInvoiceNumberField.setText(database.generateReturnInvoiceNumber());
+    // === Form Fields ===
+    TextField returnInvoiceNumberField = createTextField("Return Invoice Number");
+    returnInvoiceNumberField.setEditable(false);
+    returnInvoiceNumberField.setText(database.generateReturnInvoiceNumber());
 
-        ComboBox<String> originalInvoiceComboBox = new ComboBox<>();
-        originalInvoiceComboBox.setPromptText("Select Original Invoice");
-        originalInvoiceComboBox.setPrefWidth(250);
+    ComboBox<String> originalInvoiceComboBox = new ComboBox<>();
+    originalInvoiceComboBox.setPromptText("Select Original Invoice");
+    originalInvoiceComboBox.setPrefWidth(300);
 
-        ComboBox<String> supplierComboBox = new ComboBox<>();
-        supplierComboBox.setPromptText("Supplier (Auto-selected)");
-        supplierComboBox.setPrefWidth(250);
-        supplierComboBox.setDisable(true);
+    ComboBox<String> supplierComboBox = new ComboBox<>();
+    supplierComboBox.setPromptText("Auto-selected Supplier");
+    supplierComboBox.setPrefWidth(300);
+    supplierComboBox.setDisable(true);
 
-        DatePicker returnDatePicker = new DatePicker();
-        returnDatePicker.setValue(LocalDate.now());
+    DatePicker returnDatePicker = new DatePicker(LocalDate.now());
 
-        TextField totalReturnAmountField = createTextField("Total Return Amount");
-        totalReturnAmountField.setEditable(false);
-        totalReturnAmountField.setText("0.00");
+    TextField totalReturnAmountField = createTextField("Total Return Amount");
+    totalReturnAmountField.setEditable(false);
+    totalReturnAmountField.setText("0.00");
 
-        Button addItemsBtn = createSubmitButton("Add Selected Items →");
-        Button removeItemsBtn = createSubmitButton("← Remove Selected Items");
-        Button submitReturnInvoiceBtn = createSubmitButton("Submit Return Invoice");
+    // === Tables & Buttons ===
+    TableView<RawStockPurchaseItem> availableItemsTable = createAvailableItemsTable();
+    TableView<RawStockPurchaseItem> selectedItemsTable = createSelectedReturnItemsTable();
 
-        TableView<RawStockPurchaseItem> availableItemsTable = createAvailableItemsTable();
-        TableView<RawStockPurchaseItem> selectedItemsTable = createSelectedReturnItemsTable();
+    Button addItemsBtn = createSubmitButton("Add Selected Items →");
+    Button removeItemsBtn = createSubmitButton("← Remove Selected Items");
+    Button submitReturnInvoiceBtn = createSubmitButton("Submit Return Invoice");
 
-        // Grid Layout
-        GridPane formGrid = new GridPane();
-        formGrid.setHgap(20);
-        formGrid.setVgap(15);
-        formGrid.setPadding(new Insets(10));
-        ColumnConstraints col1 = new ColumnConstraints();
-        col1.setPercentWidth(25);
-        ColumnConstraints col2 = new ColumnConstraints();
-        col2.setPercentWidth(75);
-        formGrid.getColumnConstraints().addAll(col1, col2);
+    HBox actionButtons = new HBox(10, addItemsBtn, removeItemsBtn);
+    actionButtons.setAlignment(Pos.CENTER);
 
-        formGrid.add(new Label("Return Invoice Number:"), 0, 0);
-        formGrid.add(returnInvoiceNumberField, 1, 0);
+    // === Grid Form Layout ===
+    GridPane formGrid = new GridPane();
+    formGrid.setHgap(15);
+    formGrid.setVgap(15);
+    formGrid.setPadding(new Insets(10));
+    formGrid.add(new Label("Return Invoice Number:"), 0, 0);
+    formGrid.add(returnInvoiceNumberField, 1, 0);
+    formGrid.add(new Label("Original Invoice:"), 0, 1);
+    formGrid.add(originalInvoiceComboBox, 1, 1);
+    formGrid.add(new Label("Supplier:"), 0, 2);
+    formGrid.add(supplierComboBox, 1, 2);
+    formGrid.add(new Label("Return Date:"), 0, 3);
+    formGrid.add(returnDatePicker, 1, 3);
+    formGrid.add(new Label("Total Return Amount:"), 0, 4);
+    formGrid.add(totalReturnAmountField, 1, 4);
 
-        formGrid.add(new Label("Original Invoice:"), 0, 1);
-        formGrid.add(originalInvoiceComboBox, 1, 1);
+    // === Tables Section ===
+    VBox tablesSection = new VBox(15,
+        createSubheading("Available Items from Original Invoice:"),
+        availableItemsTable,
+        actionButtons,
+        createSubheading("Selected Return Items:"),
+        selectedItemsTable
+    );
 
-        formGrid.add(new Label("Supplier:"), 0, 2);
-        formGrid.add(supplierComboBox, 1, 2);
+    // === Previous Return Invoices ===
+    Label returnHeading = createSubheading("Previous Return Purchase Invoices:");
+    TableView<Object[]> returnInvoicesTable = createReturnInvoicesTable();
+    loadReturnInvoicesIntoTable(returnInvoicesTable);
 
-        formGrid.add(new Label("Return Date:"), 0, 3);
-        formGrid.add(returnDatePicker, 1, 3);
+    // === Layout Composition ===
+    mainContainer.getChildren().addAll(
+        heading,
+        formGrid,
+        tablesSection,
+        submitReturnInvoiceBtn,
+        returnHeading,
+        returnInvoicesTable
+    );
 
-        formGrid.add(new Label("Total Return Amount:"), 0, 4);
-        formGrid.add(totalReturnAmountField, 1, 4);
+    // === Load Dropdowns and Handlers ===
+    loadOriginalInvoicesIntoDropdown(originalInvoiceComboBox);
 
-        // Button and Table Layout
-        HBox buttonBox = new HBox(10, addItemsBtn, removeItemsBtn);
-        buttonBox.setAlignment(Pos.CENTER);
+    originalInvoiceComboBox.setOnAction(e -> {
+        String selected = originalInvoiceComboBox.getValue();
+        if (selected == null) return;
 
-        VBox tableContainer = new VBox(10,
-            createSubheading("Available Items from Original Invoice:"),
-            availableItemsTable,
-            buttonBox,
-            createSubheading("Selected Return Items:"),
-            selectedItemsTable
-        );
-
-        // Return Invoices List
-        Label listHeading = createSubheading("Previous Return Purchase Invoices:");
-        TableView<Object[]> returnInvoicesTable = createReturnInvoicesTable();
-        loadReturnInvoicesIntoTable(returnInvoicesTable);
-
-        // Add all to main container
-        mainContainer.getChildren().addAll(
-            heading,
-            formGrid,
-            tableContainer,
-            submitReturnInvoiceBtn,
-            listHeading,
-            returnInvoicesTable
-        );
-
-        // Populate original invoices
-        loadOriginalInvoicesIntoDropdown(originalInvoiceComboBox);
-
-        // Handle original invoice selection
-        originalInvoiceComboBox.setOnAction(e -> {
-            String selectedInvoice = originalInvoiceComboBox.getValue();
-            if (selectedInvoice != null) {
-                List<Object[]> invoices = database.getAllRawPurchaseInvoicesForDropdown();
-                int invoiceId = -1;
-                String supplierName = "";
-                for (Object[] invoice : invoices) {
-                    String displayText = String.format("%s - %s (%.2f)", 
-                        invoice[1], invoice[2], (Double) invoice[4]);
-                    if (displayText.equals(selectedInvoice)) {
-                        invoiceId = (Integer) invoice[0];
-                        supplierName = (String) invoice[2];
-                        break;
-                    }
+        for (Object[] invoice : database.getAllRawPurchaseInvoicesForDropdown()) {
+            String displayText = String.format("%s - %s (%.2f)", invoice[1], invoice[2], (Double) invoice[4]);
+            if (displayText.equals(selected)) {
+                supplierComboBox.setValue((String) invoice[2]);
+                int invoiceId = (Integer) invoice[0];
+                List<Object[]> items = database.getInvoiceItemsByID(invoiceId);
+                ObservableList<RawStockPurchaseItem> itemsList = FXCollections.observableArrayList();
+                for (Object[] item : items) {
+                    itemsList.add(new RawStockPurchaseItem(
+                        (Integer) item[0], (String) item[1], (String) item[2],
+                        (Double) item[3], (Double) item[4]
+                    ));
                 }
-                if (invoiceId != -1) {
-                    supplierComboBox.setValue(supplierName);
-                    List<Object[]> items = database.getInvoiceItemsByID(invoiceId);
-                    ObservableList<RawStockPurchaseItem> itemsList = FXCollections.observableArrayList();
-                    for (Object[] item : items) {
-                        itemsList.add(new RawStockPurchaseItem(
-                            (Integer) item[0], (String) item[1], (String) item[2],
-                            (Double) item[3], (Double) item[4]
-                        ));
-                    }
-                    availableItemsTable.setItems(itemsList);
-                }
+                availableItemsTable.setItems(itemsList);
+                break;
             }
-        });
+        }
+    });
 
-        addItemsBtn.setOnAction(e -> {
-            ObservableList<RawStockPurchaseItem> selected = availableItemsTable.getSelectionModel().getSelectedItems();
-            for (RawStockPurchaseItem item : new ArrayList<>(selected)) {
-                RawStockPurchaseItem returnItem = showReturnItemDialog(item);
-                if (returnItem != null) {
-                    selectedItemsTable.getItems().add(returnItem);
-                    updateTotalAmount(selectedItemsTable, totalReturnAmountField);
-                }
+    addItemsBtn.setOnAction(e -> {
+        for (RawStockPurchaseItem item : new ArrayList<>(availableItemsTable.getSelectionModel().getSelectedItems())) {
+            RawStockPurchaseItem returnItem = showReturnItemDialog(item);
+            if (returnItem != null) {
+                selectedItemsTable.getItems().add(returnItem);
+                updateTotalAmount(selectedItemsTable, totalReturnAmountField);
             }
-        });
+        }
+    });
 
-        removeItemsBtn.setOnAction(e -> {
-            ObservableList<RawStockPurchaseItem> selected = selectedItemsTable.getSelectionModel().getSelectedItems();
-            selectedItemsTable.getItems().removeAll(new ArrayList<>(selected));
-            updateTotalAmount(selectedItemsTable, totalReturnAmountField);
-        });
+    removeItemsBtn.setOnAction(e -> {
+        selectedItemsTable.getItems().removeAll(new ArrayList<>(selectedItemsTable.getSelectionModel().getSelectedItems()));
+        updateTotalAmount(selectedItemsTable, totalReturnAmountField);
+    });
 
-        submitReturnInvoiceBtn.setOnAction(e -> {
-            handleReturnInvoiceSubmit(returnInvoiceNumberField, originalInvoiceComboBox, supplierComboBox,
-                    returnDatePicker, selectedItemsTable, totalReturnAmountField);
-        });
+    submitReturnInvoiceBtn.setOnAction(e -> {
+        handleReturnInvoiceSubmit(returnInvoiceNumberField, originalInvoiceComboBox, supplierComboBox,
+            returnDatePicker, selectedItemsTable, totalReturnAmountField);
+    });
 
-        // Wrap the main container in a ScrollPane for better scrolling support
-        ScrollPane scrollPane = new ScrollPane(mainContainer);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setFitToHeight(false);
-        return scrollPane;
-    }
+    // === Final Scrollable Container ===
+    ScrollPane scrollPane = new ScrollPane(mainContainer);
+    scrollPane.setFitToWidth(true);
+    scrollPane.setFitToHeight(false);
+    scrollPane.setPadding(new Insets(20));
+    scrollPane.setStyle("-fx-background-color:transparent;");
+    return scrollPane;
+}
 
     private static void loadOriginalInvoicesIntoDropdown(ComboBox<String> comboBox) {
         try {
@@ -539,43 +523,7 @@ public class RawStock {
             showAlert("Error", "Failed to load original invoices");
         }
     }
-private static void handleOriginalInvoiceSelection(String selectedInvoice, 
-                                                 ComboBox<String> supplierComboBox,
-                                                 TableView<RawStockPurchaseItem> availableItemsTable) {
-    try {
-        List<Object[]> invoices = database.getAllRawPurchaseInvoicesForDropdown();
-        int invoiceId = -1;
-        String supplierName = "";
-        for (Object[] invoice : invoices) {
-            String displayText = String.format("%s - %s (%.2f)", 
-                invoice[1], invoice[2], (Double) invoice[4]);
-            if (displayText.equals(selectedInvoice)) {
-                invoiceId = (Integer) invoice[0];
-                supplierName = (String) invoice[2];
-                break;
-            }
-        }
-        if (invoiceId != -1) {
-            supplierComboBox.setValue(supplierName);
-            List<Object[]> items = database.getInvoiceItemsByID(invoiceId); // Use getInvoiceItemsByID
-            ObservableList<RawStockPurchaseItem> itemsList = FXCollections.observableArrayList();
-            for (Object[] item : items) {
-                RawStockPurchaseItem purchaseItem = new RawStockPurchaseItem(
-                    (Integer) item[0],  // raw_stock_id
-                    (String) item[1],   // raw_stock_name
-                    (String) item[2],   // brand_name
-                    (Double) item[3],   // quantity
-                    (Double) item[4]    // unit_price
-                );
-                itemsList.add(purchaseItem);
-            }
-            availableItemsTable.setItems(itemsList);
-        }
-    } catch (Exception e) {
-        e.printStackTrace();
-        showAlert("Error", "Failed to load invoice items: " + e.getMessage());
-    }
-}
+
 private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
     TableView<RawStockPurchaseItem> table = new TableView<>();
     table.setPrefHeight(200);
@@ -694,6 +642,10 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                                                 DatePicker returnDatePicker,
                                                 TableView<RawStockPurchaseItem> selectedItemsTable,
                                                 TextField totalReturnAmountField) {
+        // Declare variables outside try block for use in catch block
+        int originalInvoiceId = -1;
+        int supplierId = -1;
+        
         try {
             // Validate inputs
             if (originalInvoiceComboBox.getValue() == null || originalInvoiceComboBox.getValue().isEmpty()) {
@@ -708,8 +660,6 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             
             // Get original invoice ID
             List<Object[]> invoices = database.getAllRawPurchaseInvoicesForDropdown();
-            int originalInvoiceId = -1;
-            int supplierId = -1;
             
             for (Object[] invoice : invoices) {
                 String displayText = String.format("%s - %s (%.2f)", 
@@ -727,7 +677,8 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             }
             
             // Insert return invoice
-            String returnInvoiceNumber = returnInvoiceNumberField.getText();
+            String returnInvoiceNumber = database.generateReturnInvoiceNumber();
+            returnInvoiceNumberField.setText(returnInvoiceNumber); // Update field to show new number
             String returnDate = returnDatePicker.getValue().format(DATE_FORMATTER);
             double totalAmount = Double.parseDouble(totalReturnAmountField.getText());
             
@@ -761,7 +712,45 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             
         } catch (Exception e) {
             e.printStackTrace();
-            showAlert("Error", "An error occurred while creating the return invoice: " + e.getMessage());
+            if (e.getMessage() != null && e.getMessage().contains("UNIQUE constraint failed")) {
+                // If there's a unique constraint error, try once more with a new invoice number
+                try {
+                    String retryReturnInvoiceNumber = database.generateReturnInvoiceNumber();
+                    returnInvoiceNumberField.setText(retryReturnInvoiceNumber);
+                    
+                    String returnDate = returnDatePicker.getValue().format(DATE_FORMATTER);
+                    double totalAmount = Double.parseDouble(totalReturnAmountField.getText());
+                    
+                    int returnInvoiceId = database.insertRawPurchaseReturnInvoiceAndGetId(
+                        retryReturnInvoiceNumber, originalInvoiceId, supplierId, returnDate, totalAmount);
+                    
+                    if (returnInvoiceId > 0) {
+                        List<RawStockPurchaseItem> items = new ArrayList<>(selectedItemsTable.getItems());
+                        boolean itemsInserted = database.insertRawPurchaseReturnInvoiceItems(returnInvoiceId, items);
+                        
+                        if (itemsInserted) {
+                            showAlert("Success", "Return invoice created successfully!");
+                            
+                            // Clear form
+                            returnInvoiceNumberField.setText(database.generateReturnInvoiceNumber());
+                            originalInvoiceComboBox.setValue(null);
+                            supplierComboBox.setValue(null);
+                            returnDatePicker.setValue(LocalDate.now());
+                            selectedItemsTable.getItems().clear();
+                            totalReturnAmountField.setText("0.00");
+                        } else {
+                            showAlert("Error", "Failed to save return invoice items on retry");
+                        }
+                    } else {
+                        showAlert("Error", "Failed to create return invoice even after retry");
+                    }
+                } catch (Exception retryException) {
+                    retryException.printStackTrace();
+                    showAlert("Error", "Return invoice number conflict occurred. Please try again. Error: " + retryException.getMessage());
+                }
+            } else {
+                showAlert("Error", "An error occurred while creating the return invoice: " + e.getMessage());
+            }
         }
     }
 
@@ -953,39 +942,219 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
 
         // Date range selection
         DatePicker startDatePicker = new DatePicker();
-        startDatePicker.setValue(LocalDate.now().minusDays(7));
+        startDatePicker.setValue(LocalDate.now().minusDays(30)); // Default to last 30 days
         DatePicker endDatePicker = new DatePicker();
         endDatePicker.setValue(LocalDate.now());
+
+        // Report type selection
+        ComboBox<String> reportTypeCombo = new ComboBox<>();
+        reportTypeCombo.getItems().addAll("Summary Report", "Detailed Report", "Item Usage Report");
+        reportTypeCombo.setValue("Summary Report");
 
         Button generateBtn = new Button("Generate Report");
         generateBtn.getStyleClass().add("form-submit");
 
-        Label reportHeading = createSubheading("Usage Report:");
-        ListView<String> reportView = createListView();
-        reportView.setPrefHeight(400);
+        // Summary statistics area
+        VBox summaryBox = new VBox(10);
+        summaryBox.setPadding(new Insets(10));
+        summaryBox.getStyleClass().add("summary-box");
+        Label summaryHeading = createSubheading("Summary Statistics:");
+        Label totalInvoicesLabel = new Label("Total Invoices: -");
+        Label uniqueItemsLabel = new Label("Unique Items Used: -");
+        Label totalValueLabel = new Label("Total Value Used: -");
+        summaryBox.getChildren().addAll(summaryHeading, totalInvoicesLabel, uniqueItemsLabel, totalValueLabel);
+
+        // Report display area
+        ScrollPane reportScrollPane = new ScrollPane();
+        reportScrollPane.setPrefHeight(400);
+        reportScrollPane.setFitToWidth(true);
+        VBox reportContent = new VBox(10);
+        reportScrollPane.setContent(reportContent);
 
         generateBtn.setOnAction(e -> {
-            String startDate = startDatePicker.getValue().format(DATE_FORMATTER);
-            String endDate = endDatePicker.getValue().format(DATE_FORMATTER);
-            
-            // In real app, this would query the database
-            reportView.getItems().clear();
-            reportView.getItems().add("Usage Report from " + startDate + " to " + endDate);
-            reportView.getItems().add("Copper Wire 8mm - 150m used");
-            reportView.getItems().add("PVC Granules - 75kg used");
-            reportView.getItems().add("Aluminum Conductor - 200m used");
+            try {
+                String startDate = startDatePicker.getValue().format(DATE_FORMATTER);
+                String endDate = endDatePicker.getValue().format(DATE_FORMATTER);
+                String reportType = reportTypeCombo.getValue();
+                
+                // Clear previous content
+                reportContent.getChildren().clear();
+                
+                // Generate summary statistics
+                Object[] summaryStats = database.getUsageSummaryStatistics(startDate, endDate);
+                if (summaryStats != null && summaryStats.length > 0) {
+                    totalInvoicesLabel.setText("Total Invoices: " + summaryStats[0]);
+                    uniqueItemsLabel.setText("Unique Items Used: " + summaryStats[1]);
+                    totalValueLabel.setText("Total Value Used: $" + String.format("%.2f", Double.parseDouble(summaryStats[2].toString())));
+                } else {
+                    totalInvoicesLabel.setText("Total Invoices: 0");
+                    uniqueItemsLabel.setText("Unique Items Used: 0");
+                    totalValueLabel.setText("Total Value Used: $0.00");
+                }
+                
+                // Generate selected report type
+                switch (reportType) {
+                    case "Summary Report":
+                        generateSummaryReport(reportContent, startDate, endDate);
+                        break;
+                    case "Detailed Report":
+                        generateDetailedReport(reportContent, startDate, endDate);
+                        break;
+                    case "Item Usage Report":
+                        generateItemUsageReport(reportContent, startDate, endDate);
+                        break;
+                }
+                
+            } catch (Exception ex) {
+                showAlert("Error", "Failed to generate report: " + ex.getMessage());
+            }
         });
 
         form.getChildren().addAll(
             heading,
             createFormRow("Start Date:", startDatePicker),
             createFormRow("End Date:", endDatePicker),
+            createFormRow("Report Type:", reportTypeCombo),
             generateBtn,
-            reportHeading,
-            reportView
+            summaryBox,
+            new Label("Report Details:"),
+            reportScrollPane
         );
         
         return form;
+    }
+
+    private static void generateSummaryReport(VBox reportContent, String startDate, String endDate) {
+        try {
+            List<Object[]> usageData = database.getRawStockUsageReportByDateRange(startDate, endDate);
+            
+            if (usageData.isEmpty()) {
+                reportContent.getChildren().add(new Label("No usage data found for the selected date range."));
+                return;
+            }
+            
+            // Create table for summary data
+            TableView<Object[]> table = new TableView<>();
+            table.setPrefHeight(300);
+            
+            TableColumn<Object[], String> itemCol = new TableColumn<>("Item Name");
+            itemCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[0]));
+            itemCol.setPrefWidth(200);
+            
+            TableColumn<Object[], String> brandCol = new TableColumn<>("Brand");
+            brandCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[1]));
+            brandCol.setPrefWidth(150);
+            
+            TableColumn<Object[], String> quantityCol = new TableColumn<>("Total Quantity");
+            quantityCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue()[2].toString()));
+            quantityCol.setPrefWidth(120);
+            
+            TableColumn<Object[], String> valueCol = new TableColumn<>("Total Value");
+            valueCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty("$" + String.format("%.2f", Double.parseDouble(cellData.getValue()[3].toString()))));
+            valueCol.setPrefWidth(120);
+            
+            table.getColumns().addAll(itemCol, brandCol, quantityCol, valueCol);
+            
+            ObservableList<Object[]> data = FXCollections.observableArrayList(usageData);
+            table.setItems(data);
+            
+            reportContent.getChildren().addAll(
+                new Label("Item Usage Summary from " + startDate + " to " + endDate),
+                table
+            );
+            
+        } catch (Exception e) {
+            reportContent.getChildren().add(new Label("Error generating summary report: " + e.getMessage()));
+        }
+    }
+
+    private static void generateDetailedReport(VBox reportContent, String startDate, String endDate) {
+        try {
+            List<Object[]> detailData = database.getRawStockUsageDetails(startDate, endDate);
+            
+            if (detailData.isEmpty()) {
+                reportContent.getChildren().add(new Label("No detailed usage data found for the selected date range."));
+                return;
+            }
+            
+            // Create table for detailed data
+            TableView<Object[]> table = new TableView<>();
+            table.setPrefHeight(350);
+            
+            TableColumn<Object[], String> invoiceCol = new TableColumn<>("Invoice #");
+            invoiceCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[0]));
+            invoiceCol.setPrefWidth(100);
+            
+            TableColumn<Object[], String> dateCol = new TableColumn<>("Date");
+            dateCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[1]));
+            dateCol.setPrefWidth(100);
+            
+            TableColumn<Object[], String> itemCol = new TableColumn<>("Item");
+            itemCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[2]));
+            itemCol.setPrefWidth(150);
+            
+            TableColumn<Object[], String> brandCol = new TableColumn<>("Brand");
+            brandCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[3]));
+            brandCol.setPrefWidth(120);
+            
+            TableColumn<Object[], String> quantityCol = new TableColumn<>("Quantity");
+            quantityCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue()[4].toString()));
+            quantityCol.setPrefWidth(80);
+            
+            TableColumn<Object[], String> unitCostCol = new TableColumn<>("Unit Cost");
+            unitCostCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty("$" + String.format("%.2f", Double.parseDouble(cellData.getValue()[5].toString()))));
+            unitCostCol.setPrefWidth(100);
+            
+            TableColumn<Object[], String> totalCol = new TableColumn<>("Total");
+            totalCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty("$" + String.format("%.2f", Double.parseDouble(cellData.getValue()[6].toString()))));
+            totalCol.setPrefWidth(100);
+            
+            table.getColumns().addAll(invoiceCol, dateCol, itemCol, brandCol, quantityCol, unitCostCol, totalCol);
+            
+            ObservableList<Object[]> data = FXCollections.observableArrayList(detailData);
+            table.setItems(data);
+            
+            reportContent.getChildren().addAll(
+                new Label("Detailed Usage Report from " + startDate + " to " + endDate),
+                table
+            );
+            
+        } catch (Exception e) {
+            reportContent.getChildren().add(new Label("Error generating detailed report: " + e.getMessage()));
+        }
+    }
+
+    private static void generateItemUsageReport(VBox reportContent, String startDate, String endDate) {
+        try {
+            List<Object[]> usageData = database.getRawStockUsageReportByDateRange(startDate, endDate);
+            
+            if (usageData.isEmpty()) {
+                reportContent.getChildren().add(new Label("No item usage data found for the selected date range."));
+                return;
+            }
+            
+            // Group by item and create charts/statistics
+            reportContent.getChildren().add(new Label("Item Usage Analysis from " + startDate + " to " + endDate));
+            
+            for (Object[] item : usageData) {
+                VBox itemBox = new VBox(5);
+                itemBox.setPadding(new Insets(10));
+                itemBox.getStyleClass().add("item-usage-box");
+                
+                Label itemLabel = new Label(item[0] + " (" + item[1] + ")");
+                itemLabel.setFont(Font.font(14));
+                itemLabel.getStyleClass().add("item-name");
+                
+                Label quantityLabel = new Label("Quantity Used: " + item[2]);
+                Label valueLabel = new Label("Total Value: $" + String.format("%.2f", Double.parseDouble(item[3].toString())));
+                
+                itemBox.getChildren().addAll(itemLabel, quantityLabel, valueLabel);
+                reportContent.getChildren().add(itemBox);
+            }
+            
+        } catch (Exception e) {
+            reportContent.getChildren().add(new Label("Error generating item usage report: " + e.getMessage()));
+        }
     }
 
     // Helper methods for UI components
@@ -1195,7 +1364,10 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         TableView<RawStockPurchaseItem> itemsTable, TextField discountField, 
         TextField paidAmountField, Label totalLabel) {
 
-        String invoiceNumber = invoiceNumberField.getText().trim();
+        // Generate a fresh invoice number to avoid UNIQUE constraint violations
+        String invoiceNumber = database.generateNextInvoiceNumber("RPI");
+        invoiceNumberField.setText(invoiceNumber); // Update the field to show the new number
+        
         String selectedSupplier = supplierCombo.getValue();
         String invoiceDate = invoiceDatePicker.getValue().format(DATE_FORMATTER);
 
@@ -1249,7 +1421,44 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         } catch (NumberFormatException ex) {
             showAlert(Alert.AlertType.ERROR, "Invalid Input", "Please enter valid numbers for discount and paid amount");
         } catch (Exception ex) {
-            showAlert(Alert.AlertType.ERROR, "Database Error", "Error saving to database: " + ex.getMessage());
+            ex.printStackTrace();
+            if (ex.getMessage() != null && ex.getMessage().contains("UNIQUE constraint failed")) {
+                // If there's a unique constraint error, try once more with a new invoice number
+                try {
+                    String retryInvoiceNumber = database.generateNextInvoiceNumber("RPI");
+                    invoiceNumberField.setText(retryInvoiceNumber);
+                    
+                    // Calculate total again
+                    double discount = discountField.getText().trim().isEmpty() ? 0.0 : 
+                                     Double.parseDouble(discountField.getText().trim());
+                    double paidAmount = paidAmountField.getText().trim().isEmpty() ? 0.0 : 
+                                       Double.parseDouble(paidAmountField.getText().trim());
+                    double subtotal = itemsTable.getItems().stream()
+                        .mapToDouble(RawStockPurchaseItem::getTotalPrice)
+                        .sum();
+                    double totalAmount = subtotal - discount;
+                    
+                    List<RawStockPurchaseItem> items = new ArrayList<>(itemsTable.getItems());
+                    boolean success = database.insertSimpleRawPurchaseInvoice(
+                        retryInvoiceNumber, selectedSupplier, invoiceDate, totalAmount, discount, paidAmount, items
+                    );
+                    
+                    if (success) {
+                        showAlert(Alert.AlertType.INFORMATION, "Success", 
+                            String.format("Purchase Invoice %s created successfully!\nTotal Amount: $%.2f", 
+                            retryInvoiceNumber, totalAmount));
+                        clearPurchaseInvoiceForm(invoiceNumberField, supplierCombo, itemsTable, 
+                                               discountField, paidAmountField, totalLabel);
+                    } else {
+                        showAlert(Alert.AlertType.ERROR, "Error", "Failed to create purchase invoice even after retry");
+                    }
+                } catch (Exception retryException) {
+                    retryException.printStackTrace();
+                    showAlert(Alert.AlertType.ERROR, "Error", "Invoice number conflict occurred. Please try again. Error: " + retryException.getMessage());
+                }
+            } else {
+                showAlert(Alert.AlertType.ERROR, "Database Error", "Error saving to database: " + ex.getMessage());
+            }
         }
     }
 
@@ -1672,6 +1881,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                     double newQuantity = existingItem.getQuantityUsed() + useItem.getQuantityUsed();
                     if (newQuantity <= item.getAvailableQuantity()) {
                         existingItem.setQuantityUsed(newQuantity);
+                        existingItem.recalculateTotalCost(); // Ensure total cost is updated
                         found = true;
                     } else {
                         showAlert(Alert.AlertType.ERROR, "Quantity Exceeded", 
@@ -1683,6 +1893,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             }
             
             if (!found) {
+                useItem.recalculateTotalCost(); // Ensure total cost is calculated
                 selectedTable.getItems().add(useItem);
             }
             
@@ -1768,7 +1979,10 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         }
         
         try {
-            String invoiceNumber = invoiceNumberField.getText().trim();
+            // Generate a fresh invoice number to avoid UNIQUE constraint violations
+            String invoiceNumber = database.generateUseInvoiceNumber();
+            invoiceNumberField.setText(invoiceNumber); // Update the field to show the new number
+            
             String usageDate = usageDatePicker.getValue().format(DATE_FORMATTER);
             String referencePurpose = referencePurposeField.getText().trim();
             
@@ -1783,6 +1997,29 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             if (invoiceId > 0) {
                 // Insert invoice items
                 List<RawStockUseItem> items = new ArrayList<>(selectedItemsTable.getItems());
+                
+                // Ensure all items have their total cost properly calculated and validate
+                for (RawStockUseItem item : items) {
+                    item.recalculateTotalCost();
+                    
+                    // Validate that all required fields are properly set
+                    if (item.getQuantityUsed() <= 0) {
+                        showAlert(Alert.AlertType.ERROR, "Validation Error", 
+                            "Invalid quantity for item: " + item.getRawStockName());
+                        return;
+                    }
+                    if (item.getUnitCost() < 0) {
+                        showAlert(Alert.AlertType.ERROR, "Validation Error", 
+                            "Invalid unit cost for item: " + item.getRawStockName());
+                        return;
+                    }
+                    if (Double.isNaN(item.getTotalCost()) || Double.isInfinite(item.getTotalCost())) {
+                        showAlert(Alert.AlertType.ERROR, "Validation Error", 
+                            "Invalid total cost calculated for item: " + item.getRawStockName());
+                        return;
+                    }
+                }
+                
                 boolean itemsInserted = database.insertRawStockUseInvoiceItems(invoiceId, items);
                 
                 if (itemsInserted) {
@@ -1802,7 +2039,57 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             
         } catch (Exception e) {
             e.printStackTrace();
-            showAlert(Alert.AlertType.ERROR, "Error", "An error occurred: " + e.getMessage());
+            if (e.getMessage() != null && e.getMessage().contains("UNIQUE constraint failed")) {
+                // If there's a unique constraint error, try once more with a new invoice number
+                try {
+                    String retryInvoiceNumber = database.generateUseInvoiceNumber();
+                    invoiceNumberField.setText(retryInvoiceNumber);
+                    
+                    String usageDate = usageDatePicker.getValue().format(DATE_FORMATTER);
+                    String referencePurpose = referencePurposeField.getText().trim();
+                    
+                    double totalAmount = selectedItemsTable.getItems().stream()
+                            .mapToDouble(item -> item.getQuantityUsed() * item.getUnitCost())
+                            .sum();
+                    
+                    int invoiceId = database.insertRawStockUseInvoiceAndGetId(retryInvoiceNumber, usageDate, totalAmount, referencePurpose);
+                    
+                    if (invoiceId > 0) {
+                        List<RawStockUseItem> items = new ArrayList<>(selectedItemsTable.getItems());
+                        
+                        // Ensure all items have their total cost properly calculated and validate
+                        for (RawStockUseItem item : items) {
+                            item.recalculateTotalCost();
+                            
+                            // Validate that all required fields are properly set
+                            if (item.getQuantityUsed() <= 0 || item.getUnitCost() < 0 || 
+                                Double.isNaN(item.getTotalCost()) || Double.isInfinite(item.getTotalCost())) {
+                                showAlert(Alert.AlertType.ERROR, "Validation Error", 
+                                    "Invalid item data detected during retry for: " + item.getRawStockName());
+                                return;
+                            }
+                        }
+                        
+                        boolean itemsInserted = database.insertRawStockUseInvoiceItems(invoiceId, items);
+                        
+                        if (itemsInserted) {
+                            showAlert(Alert.AlertType.INFORMATION, "Success", 
+                                "Raw Stock Use Invoice created successfully!\nInvoice Number: " + retryInvoiceNumber);
+                            clearUseInvoiceForm(invoiceNumberField, usageDatePicker, referencePurposeField, 
+                                              selectedItemsTable, totalLabel);
+                        } else {
+                            showAlert(Alert.AlertType.ERROR, "Database Error", "Failed to save invoice items on retry.");
+                        }
+                    } else {
+                        showAlert(Alert.AlertType.ERROR, "Database Error", "Failed to create invoice even after retry.");
+                    }
+                } catch (Exception retryException) {
+                    retryException.printStackTrace();
+                    showAlert(Alert.AlertType.ERROR, "Error", "Invoice number conflict occurred. Please try again. Error: " + retryException.getMessage());
+                }
+            } else {
+                showAlert(Alert.AlertType.ERROR, "Database Error", "Database error occurred: " + e.getMessage());
+            }
         }
     }
     

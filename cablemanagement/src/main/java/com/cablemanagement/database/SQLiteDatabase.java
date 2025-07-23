@@ -577,6 +577,28 @@ public class SQLiteDatabase implements db {
                     "related_bank_id INTEGER," +
                     "FOREIGN KEY (bank_id) REFERENCES Bank(bank_id)," +
                     "FOREIGN KEY (related_bank_id) REFERENCES Bank(bank_id)" +
+                    ")",
+
+                    // Raw Stock Use Invoice table
+                    "CREATE TABLE IF NOT EXISTS Raw_Stock_Use_Invoice (" +
+                    "raw_stock_use_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "use_invoice_number TEXT NOT NULL UNIQUE," +
+                    "usage_date TEXT NOT NULL," +
+                    "total_usage_amount REAL NOT NULL DEFAULT 0.0," +
+                    "reference_purpose TEXT," +
+                    "created_at TEXT DEFAULT CURRENT_TIMESTAMP" +
+                    ")",
+
+                    // Raw Stock Use Invoice Item table
+                    "CREATE TABLE IF NOT EXISTS Raw_Stock_Use_Invoice_Item (" +
+                    "raw_stock_use_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "raw_stock_use_invoice_id INTEGER NOT NULL," +
+                    "raw_stock_id INTEGER NOT NULL," +
+                    "quantity_used REAL NOT NULL," +
+                    "unit_cost REAL NOT NULL," +
+                    "total_cost REAL NOT NULL," +
+                    "FOREIGN KEY (raw_stock_use_invoice_id) REFERENCES Raw_Stock_Use_Invoice(raw_stock_use_invoice_id)," +
+                    "FOREIGN KEY (raw_stock_id) REFERENCES Raw_Stock(stock_id)" +
                     ")"
                 };
                 
@@ -2199,7 +2221,7 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean insertRawStockUseInvoiceItems(int useInvoiceId, List<RawStockUseItem> items) {
         String query = "INSERT INTO Raw_Stock_Use_Invoice_Item (raw_stock_use_invoice_id, " +
-                      "raw_stock_id, quantity_used, unit_cost) VALUES (?, ?, ?, ?)";
+                      "raw_stock_id, quantity_used, unit_cost, total_cost) VALUES (?, ?, ?, ?, ?)";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             connection.setAutoCommit(false); // Start transaction
@@ -2209,6 +2231,7 @@ public class SQLiteDatabase implements db {
                 pstmt.setInt(2, item.getRawStockId());
                 pstmt.setDouble(3, item.getQuantityUsed());
                 pstmt.setDouble(4, item.getUnitCost());
+                pstmt.setDouble(5, item.getTotalCost()); // Add total_cost field
                 pstmt.addBatch();
             }
             
@@ -2244,7 +2267,7 @@ public class SQLiteDatabase implements db {
         List<Object[]> useInvoices = new ArrayList<>();
         String query = "SELECT rsui.use_invoice_number, rsui.usage_date, " +
                       "rsui.total_usage_amount, rsui.reference_purpose " +
-                      "FROM RawStock_Use_Invoice rsui " +
+                      "FROM Raw_Stock_Use_Invoice rsui " +
                       "ORDER BY rsui.usage_date DESC";
         
         try (Statement stmt = connection.createStatement();
@@ -2263,6 +2286,119 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return useInvoices;
+    }
+
+    /**
+     * Get raw stock usage report by date range
+     */
+    public List<Object[]> getRawStockUsageReportByDateRange(String startDate, String endDate) {
+        List<Object[]> usageReport = new ArrayList<>();
+        String query = "SELECT rs.item_name, b.brand_name, " +
+                      "SUM(rsuii.quantity_used) as total_quantity_used, " +
+                      "rsuii.unit_cost, " +
+                      "SUM(rsuii.total_cost) as total_cost_used, " +
+                      "COUNT(DISTINCT rsui.raw_stock_use_invoice_id) as usage_count " +
+                      "FROM Raw_Stock_Use_Invoice_Item rsuii " +
+                      "JOIN Raw_Stock_Use_Invoice rsui ON rsuii.raw_stock_use_invoice_id = rsui.raw_stock_use_invoice_id " +
+                      "JOIN Raw_Stock rs ON rsuii.raw_stock_id = rs.stock_id " +
+                      "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                      "WHERE rsui.usage_date BETWEEN ? AND ? " +
+                      "GROUP BY rs.stock_id, rs.item_name, b.brand_name, rsuii.unit_cost " +
+                      "ORDER BY total_cost_used DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Object[] row = {
+                        rs.getString("item_name"),
+                        rs.getString("brand_name"),
+                        rs.getDouble("total_quantity_used"),
+                        rs.getDouble("unit_cost"),
+                        rs.getDouble("total_cost_used"),
+                        rs.getInt("usage_count")
+                    };
+                    usageReport.add(row);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return usageReport;
+    }
+
+    /**
+     * Get usage summary statistics for a date range
+     */
+    public Object[] getUsageSummaryStatistics(String startDate, String endDate) {
+        String query = "SELECT " +
+                      "COUNT(DISTINCT rsui.raw_stock_use_invoice_id) as total_invoices, " +
+                      "COUNT(DISTINCT rsuii.raw_stock_id) as unique_items_used, " +
+                      "SUM(rsuii.quantity_used) as total_quantity_used, " +
+                      "SUM(rsuii.total_cost) as total_cost " +
+                      "FROM Raw_Stock_Use_Invoice rsui " +
+                      "JOIN Raw_Stock_Use_Invoice_Item rsuii ON rsui.raw_stock_use_invoice_id = rsuii.raw_stock_use_invoice_id " +
+                      "WHERE rsui.usage_date BETWEEN ? AND ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new Object[] {
+                        rs.getInt("total_invoices"),
+                        rs.getInt("unique_items_used"),
+                        rs.getDouble("total_quantity_used"),
+                        rs.getDouble("total_cost")
+                    };
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return new Object[] {0, 0, 0.0, 0.0};
+    }
+
+    /**
+     * Get usage details for a specific date range (invoices with items)
+     */
+    public List<Object[]> getRawStockUsageDetails(String startDate, String endDate) {
+        List<Object[]> usageDetails = new ArrayList<>();
+        String query = "SELECT rsui.use_invoice_number, rsui.usage_date, rsui.reference_purpose, " +
+                      "rs.item_name, b.brand_name, rsuii.quantity_used, rsuii.unit_cost, rsuii.total_cost " +
+                      "FROM Raw_Stock_Use_Invoice rsui " +
+                      "JOIN Raw_Stock_Use_Invoice_Item rsuii ON rsui.raw_stock_use_invoice_id = rsuii.raw_stock_use_invoice_id " +
+                      "JOIN Raw_Stock rs ON rsuii.raw_stock_id = rs.stock_id " +
+                      "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                      "WHERE rsui.usage_date BETWEEN ? AND ? " +
+                      "ORDER BY rsui.usage_date DESC, rsui.use_invoice_number";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Object[] row = {
+                        rs.getString("use_invoice_number"),
+                        rs.getString("usage_date"),
+                        rs.getString("reference_purpose"),
+                        rs.getString("item_name"),
+                        rs.getString("brand_name"),
+                        rs.getDouble("quantity_used"),
+                        rs.getDouble("unit_cost"),
+                        rs.getDouble("total_cost")
+                    };
+                    usageDetails.add(row);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return usageDetails;
     }
 
     // --------------------------

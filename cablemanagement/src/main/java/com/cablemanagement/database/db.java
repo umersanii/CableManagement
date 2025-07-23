@@ -216,6 +216,12 @@ public interface db {
     boolean insertRawStockUseInvoiceItems(int useInvoiceId, List<RawStockUseItem> items);
     
     List<Object[]> getAllRawStockUseInvoices();
+    
+    List<Object[]> getRawStockUsageReportByDateRange(String startDate, String endDate);
+    
+    Object[] getUsageSummaryStatistics(String startDate, String endDate);
+    
+    List<Object[]> getRawStockUsageDetails(String startDate, String endDate);
 
     // --------------------------
     // Production Invoice Operations
