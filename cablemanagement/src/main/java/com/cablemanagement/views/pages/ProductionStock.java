@@ -1224,7 +1224,7 @@ public class ProductionStock {
             int totalQuantity = Integer.parseInt(totalReturnQuantity);
             
             // Insert return invoice and get ID
-            int returnInvoiceId = sqliteDatabase.insertProductionReturnInvoiceAndGetId(formattedDate, reference, totalQuantity);
+            int returnInvoiceId = sqliteDatabase.insertProductionReturnInvoiceAndGetId(formattedDate, reference, totalQuantity, Integer.parseInt(productionInvoiceId));
             
             if (returnInvoiceId > 0) {
                 // Prepare return invoice items
@@ -1232,24 +1232,31 @@ public class ProductionStock {
                 
                 for (String returnItem : returnItems) {
                     try {
-                        // Parse item format: "Product Name - Quantity: X (Return Qty: Y)"
+                        // Parse item format: "ProductName - BrandName - Quantity: X (Return Qty: Y)"
                         String[] parts = returnItem.split(" \\(Return Qty: ");
                         if (parts.length == 2) {
-                            String productPart = parts[0]; // "Product Name - Quantity: X"
+                            String productPart = parts[0]; // "ProductName - BrandName - Quantity: X"
                             String returnQtyPart = parts[1].replace(")", ""); // "Y"
                             
-                            // Extract product name (everything before " - Quantity:")
-                            String productName = productPart.split(" - Quantity:")[0];
-                            int returnQuantity = Integer.parseInt(returnQtyPart);
-                            
-                            // Get production stock ID
-                            int productionStockId = getProductionStockIdByName(productName);
-                            if (productionStockId > 0) {
-                                returnInvoiceItems.add(new Object[]{
-                                    returnInvoiceId,
-                                    productionStockId,
-                                    returnQuantity
-                                });
+                            // Extract product name and brand name (everything before " - Quantity:")
+                            String[] productParts = productPart.split(" - Quantity:");
+                            if (productParts.length == 2) {
+                                String fullProductInfo = productParts[0]; // "ProductName - BrandName"
+                                String[] productInfoParts = fullProductInfo.split(" - ");
+                                if (productInfoParts.length >= 2) {
+                                    String productName = productInfoParts[0];
+                                    int returnQuantity = Integer.parseInt(returnQtyPart);
+                                    
+                                    // Get production stock ID by name
+                                    int productionStockId = getProductionStockIdByName(productName);
+                                    if (productionStockId > 0) {
+                                        returnInvoiceItems.add(new Object[]{
+                                            returnInvoiceId,
+                                            productionStockId,
+                                            returnQuantity
+                                        });
+                                    }
+                                }
                             }
                         }
                     } catch (Exception e) {

@@ -345,15 +345,26 @@ CREATE TABLE Production_Stock_Raw_Usage (
 
 CREATE TABLE Production_Return_Invoice (
     production_return_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    return_invoice_number TEXT NOT NULL UNIQUE,
+    original_production_invoice_id INTEGER NOT NULL,
     return_date TEXT NOT NULL,
+    total_return_quantity REAL NOT NULL,
     reference TEXT,
-    total_return_quantity REAL
+    FOREIGN KEY (original_production_invoice_id) REFERENCES Production_Invoice(production_invoice_id)
+);
+
+CREATE TABLE Production_Return_Invoice_Item (
+    production_return_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    production_return_invoice_id INTEGER NOT NULL,
+    production_stock_id INTEGER NOT NULL,
+    quantity_returned REAL NOT NULL,
+    unit_price REAL NOT NULL,
+    FOREIGN KEY (production_return_invoice_id) REFERENCES Production_Return_Invoice(production_return_invoice_id),
+    FOREIGN KEY (production_stock_id) REFERENCES Production_Stock(production_stock_id)
 );
 
 
-INSERT INTO Production_Stock (production_stock_name, category_id, brand_id, unit_id, sale_price_per_unit, opening_quantity) VALUES
-('Copper Cable Roll 25m', 1, 1, 2, 750.00, 50),
-('PVC Sheathed Wire 50m', 1, 2, 2, 1200.00, 20);
+
 
 INSERT INTO Production_Invoice (production_date, notes) VALUES
 ('2025-07-05', 'Batch #1 - Copper & PVC cables');
@@ -437,10 +448,37 @@ JOIN Production_Stock ON Production_Invoice_Item.production_stock_id = Productio
 
 CREATE VIEW View_Return_Production_Book AS
 SELECT 
-    Production_Return_Invoice.return_date,
-    Production_Return_Invoice.reference,
-    Production_Return_Invoice.total_return_quantity
-FROM Production_Return_Invoice;
+    pri.return_invoice_number,
+    pri.return_date,
+    pri.reference,
+    pri.total_return_quantity,
+    pi.production_date AS original_production_date,
+    pi.notes AS original_production_notes
+FROM Production_Return_Invoice pri
+JOIN Production_Invoice pi ON pri.original_production_invoice_id = pi.production_invoice_id;
+
+-- View for production invoice items that can be returned
+CREATE VIEW View_Production_Invoice_Items_For_Return AS
+SELECT 
+    pi.production_invoice_id,
+    pi.production_date,
+    pi.notes,
+    ps.production_stock_id,
+    ps.production_stock_name,
+    b.brand_name,
+    u.unit_name,
+    pii.quantity_produced,
+    ps.sale_price_per_unit,
+    COALESCE(SUM(prii.quantity_returned), 0) AS total_returned,
+    (pii.quantity_produced - COALESCE(SUM(prii.quantity_returned), 0)) AS available_for_return
+FROM Production_Invoice pi
+JOIN Production_Invoice_Item pii ON pi.production_invoice_id = pii.production_invoice_id
+JOIN Production_Stock ps ON pii.production_stock_id = ps.production_stock_id
+JOIN Brand b ON ps.brand_id = b.brand_id
+JOIN Unit u ON ps.unit_id = u.unit_id
+LEFT JOIN Production_Return_Invoice_Item prii ON pii.production_stock_id = prii.production_stock_id
+GROUP BY pi.production_invoice_id, ps.production_stock_id
+HAVING available_for_return > 0;
 
 
 

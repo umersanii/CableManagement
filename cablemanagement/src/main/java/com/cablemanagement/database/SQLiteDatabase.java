@@ -2715,7 +2715,7 @@ public class SQLiteDatabase implements db {
     public List<Object[]> getProductionItemsByInvoiceId(int productionInvoiceId) {
         List<Object[]> items = new ArrayList<>();
         String query = "SELECT pii.production_id, ps.product_name, b.brand_name, " +
-                      "pii.quantity_produced " +
+                      "pii.quantity_produced, ps.unit_cost " +
                       "FROM Production_Invoice_Item pii " +
                       "JOIN ProductionStock ps ON pii.production_id = ps.production_id " +
                       "JOIN Brand b ON ps.brand_id = b.brand_id " +
@@ -2730,7 +2730,8 @@ public class SQLiteDatabase implements db {
                     rs.getInt("production_id"),
                     rs.getString("product_name"),
                     rs.getString("brand_name"),
-                    rs.getDouble("quantity_produced")
+                    rs.getDouble("quantity_produced"),
+                    rs.getDouble("unit_cost")
                 };
                 items.add(row);
             }
@@ -2744,14 +2745,19 @@ public class SQLiteDatabase implements db {
      * Insert production return invoice and return the generated ID
      */
     public int insertProductionReturnInvoiceAndGetId(String returnDate, String reference, 
-                                                    double totalReturnQuantity) {
-        String query = "INSERT INTO Production_Return_Invoice (return_date, reference, total_return_quantity) " +
-                      "VALUES (?, ?, ?)";
+                                                    double totalReturnQuantity, int originalProductionInvoiceId) {
+        // First generate the return invoice number
+        String returnInvoiceNumber = generateProductionReturnInvoiceNumber();
+        
+        String query = "INSERT INTO Production_Return_Invoice (return_invoice_number, original_production_invoice_id, return_date, reference, total_return_quantity) " +
+                      "VALUES (?, ?, ?, ?, ?)";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
-            pstmt.setString(1, returnDate);
-            pstmt.setString(2, reference);
-            pstmt.setDouble(3, totalReturnQuantity);
+            pstmt.setString(1, returnInvoiceNumber);
+            pstmt.setInt(2, originalProductionInvoiceId);
+            pstmt.setString(3, returnDate);
+            pstmt.setString(4, reference);
+            pstmt.setDouble(5, totalReturnQuantity);
             
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows > 0) {
@@ -2773,7 +2779,7 @@ public class SQLiteDatabase implements db {
     public boolean insertProductionReturnInvoiceItems(int returnInvoiceId, int originalInvoiceId,
                                                      List<Object[]> returnItems) {
         String query = "INSERT INTO Production_Return_Invoice_Item " +
-                      "(production_return_invoice_id, production_invoice_id, production_id, quantity_returned) " +
+                      "(production_return_invoice_id, production_stock_id, quantity_returned, unit_price) " +
                       "VALUES (?, ?, ?, ?)";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
@@ -2781,9 +2787,13 @@ public class SQLiteDatabase implements db {
             
             for (Object[] item : returnItems) {
                 pstmt.setInt(1, returnInvoiceId);
-                pstmt.setInt(2, originalInvoiceId);
-                pstmt.setInt(3, (Integer) item[0]); // production_id
-                pstmt.setDouble(4, (Double) item[1]); // quantity_returned
+                pstmt.setInt(2, (Integer) item[1]); // production_id (using as production_stock_id)
+                pstmt.setDouble(3, (Double) item[2]); // quantity_returned
+                
+                // Get the unit price from ProductionStock table
+                double unitPrice = getProductionStockPrice((Integer) item[1]);
+                pstmt.setDouble(4, unitPrice);
+                
                 pstmt.addBatch();
             }
             
@@ -2808,6 +2818,54 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
             return false;
         }
+    }
+    
+    /**
+     * Get production stock price by ID
+     */
+    private double getProductionStockPrice(int productionStockId) {
+        String query = "SELECT unit_cost FROM ProductionStock WHERE production_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, productionStockId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getDouble("unit_cost");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0.0;
+    }
+    
+    /**
+     * Get available items for return from a specific production invoice
+     */
+    public List<Object[]> getAvailableItemsForReturn(int productionInvoiceId) {
+        List<Object[]> items = new ArrayList<>();
+        String query = "SELECT ps.production_id, ps.product_name, b.brand_name, " +
+                      "ps.quantity, ps.unit_cost " +
+                      "FROM ProductionStock ps " +
+                      "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                      "WHERE ps.quantity > 0 " +
+                      "ORDER BY ps.product_name";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("production_id"),
+                    rs.getString("product_name"),
+                    rs.getString("brand_name"),
+                    rs.getDouble("quantity"),
+                    rs.getDouble("unit_cost")
+                };
+                items.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return items;
     }
     
     /**
