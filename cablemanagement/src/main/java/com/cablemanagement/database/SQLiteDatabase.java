@@ -551,6 +551,23 @@ private boolean bankExists(int bankId) throws SQLException {
                     "transaction_type TEXT NOT NULL," +
                     "date TEXT DEFAULT CURRENT_TIMESTAMP," +
                     "FOREIGN KEY (bank_id) REFERENCES Bank(bank_id)" +
+                    ")",
+                    
+                    // Production Invoice table
+                    "CREATE TABLE IF NOT EXISTS Production_Invoice (" +
+                    "production_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "production_date TEXT NOT NULL," +
+                    "notes TEXT" +
+                    ")",
+                    
+                    // Production Invoice Item table
+                    "CREATE TABLE IF NOT EXISTS Production_Invoice_Item (" +
+                    "production_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "production_invoice_id INTEGER NOT NULL," +
+                    "production_id INTEGER NOT NULL," +
+                    "quantity_produced REAL NOT NULL," +
+                    "FOREIGN KEY (production_invoice_id) REFERENCES Production_Invoice(production_invoice_id)," +
+                    "FOREIGN KEY (production_id) REFERENCES ProductionStock(production_id)" +
                     ")"
                 };
                 
@@ -2363,7 +2380,7 @@ Override
     @Override
     public boolean insertProductionInvoiceItems(int productionInvoiceId, List<Object[]> productionItems) {
         String query = "INSERT INTO Production_Invoice_Item (production_invoice_id, " +
-                      "production_stock_id, quantity_produced) VALUES (?, ?, ?)";
+                      "production_id, quantity_produced) VALUES (?, ?, ?)";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             connection.setAutoCommit(false);
@@ -2490,10 +2507,10 @@ Override
     public List<Object[]> getAllProductionInvoices() {
         List<Object[]> invoices = new ArrayList<>();
         String query = "SELECT pi.production_invoice_id, pi.production_date, pi.notes, " +
-                      "ps.production_stock_name, pii.quantity_produced " +
+                      "ps.product_name, pii.quantity_produced " +
                       "FROM Production_Invoice pi " +
                       "JOIN Production_Invoice_Item pii ON pi.production_invoice_id = pii.production_invoice_id " +
-                      "JOIN Production_Stock ps ON pii.production_stock_id = ps.production_stock_id " +
+                      "JOIN ProductionStock ps ON pii.production_id = ps.production_id " +
                       "ORDER BY pi.production_date DESC";
         
         try (Statement stmt = connection.createStatement();
@@ -2504,7 +2521,7 @@ Override
                     rs.getInt("production_invoice_id"),
                     rs.getString("production_date"),
                     rs.getString("notes"),
-                    rs.getString("production_stock_name"),
+                    rs.getString("product_name"),
                     rs.getDouble("quantity_produced")
                 };
                 invoices.add(row);
