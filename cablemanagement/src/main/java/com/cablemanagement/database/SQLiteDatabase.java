@@ -790,6 +790,18 @@ public class SQLiteDatabase implements db {
         }
         rs.close();
         
+        // Check if ProductionStock table is empty and insert some default production stock
+        rs = stmt.executeQuery("SELECT COUNT(*) FROM ProductionStock");
+        rs.next();
+        if (rs.getInt(1) == 0) {
+            stmt.execute("INSERT INTO ProductionStock (product_name, brand_id, quantity, unit_cost, total_cost) VALUES " +
+                        "('Copper Cable 10mm', 1, 50, 450.00, 22500.00), " +
+                        "('PVC Sheathed Wire 6mm', 2, 30, 320.00, 9600.00), " +
+                        "('Fiber Optic Cable', 1, 25, 800.00, 20000.00), " +
+                        "('Power Cable 16mm', 3, 40, 650.00, 26000.00)");
+        }
+        rs.close();
+        
         // Ensure all required views exist
         ensureViewsExist();
     }
@@ -3156,24 +3168,22 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllProductionStocksWithPriceForDropdown() {
         List<Object[]> products = new ArrayList<>();
-        String query = "SELECT ps.production_stock_id, ps.production_stock_name, ps.sale_price_per_unit, " +
-                      "ps.opening_quantity, c.category_name, b.brand_name, u.unit_name " +
-                      "FROM Production_Stock ps " +
-                      "JOIN Category c ON ps.category_id = c.category_id " +
+        String query = "SELECT ps.production_id, ps.product_name, ps.unit_cost, " +
+                      "ps.quantity, 'N/A' as category_name, b.brand_name, 'N/A' as unit_name " +
+                      "FROM ProductionStock ps " +
                       "JOIN Brand b ON ps.brand_id = b.brand_id " +
-                      "JOIN Unit u ON ps.unit_id = u.unit_id " +
-                      "WHERE ps.opening_quantity > 0 " +
-                      "ORDER BY ps.production_stock_name";
+                      "WHERE ps.quantity > 0 " +
+                      "ORDER BY ps.product_name";
         
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             
             while (rs.next()) {
                 Object[] row = {
-                    rs.getInt("production_stock_id"),
-                    rs.getString("production_stock_name"),
-                    rs.getDouble("sale_price_per_unit"),
-                    rs.getDouble("opening_quantity"),
+                    rs.getInt("production_id"),
+                    rs.getString("product_name"),
+                    rs.getDouble("unit_cost"),
+                    rs.getDouble("quantity"),
                     rs.getString("category_name"),
                     rs.getString("brand_name"),
                     rs.getString("unit_name")
@@ -3188,14 +3198,14 @@ public class SQLiteDatabase implements db {
 
     @Override
     public int getProductionStockIdByName(String productName) {
-        String query = "SELECT production_stock_id FROM Production_Stock WHERE production_stock_name = ?";
+        String query = "SELECT production_id FROM ProductionStock WHERE product_name = ?";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, productName);
             
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getInt("production_stock_id");
+                    return rs.getInt("production_id");
                 }
             }
         } catch (SQLException e) {
@@ -3343,9 +3353,9 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getSalesInvoiceItemsByInvoiceId(int salesInvoiceId) {
         List<Object[]> items = new ArrayList<>();
-        String query = "SELECT sii.production_stock_id, ps.production_stock_name, sii.quantity, sii.unit_price " +
+        String query = "SELECT sii.production_stock_id, ps.product_name, sii.quantity, sii.unit_price " +
                       "FROM Sales_Invoice_Item sii " +
-                      "JOIN Production_Stock ps ON sii.production_stock_id = ps.production_stock_id " +
+                      "JOIN ProductionStock ps ON sii.production_stock_id = ps.production_id " +
                       "WHERE sii.sales_invoice_id = ?";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
@@ -3355,7 +3365,7 @@ public class SQLiteDatabase implements db {
                 while (rs.next()) {
                     Object[] row = {
                         rs.getInt("production_stock_id"),
-                        rs.getString("production_stock_name"),
+                        rs.getString("product_name"),
                         rs.getDouble("quantity"),
                         rs.getDouble("unit_price")
                     };
