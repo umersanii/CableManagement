@@ -9,6 +9,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -769,28 +770,190 @@ public class ReportsContent {
         Label heading = createHeading("Summary Report");
 
         // Date range filters
-        HBox dateRangeBox = createDateRangeFilter();
+        HBox dateRangeBox = new HBox(10);
+        Label fromLabel = new Label("From:");
+        DatePicker fromDatePicker = new DatePicker(LocalDate.now().minusDays(30));
+        Label toLabel = new Label("To:");
+        DatePicker toDatePicker = new DatePicker(LocalDate.now());
+        Button filterBtn = createActionButton("Filter");
+        dateRangeBox.getChildren().addAll(fromLabel, fromDatePicker, toLabel, toDatePicker, filterBtn);
+        dateRangeBox.setAlignment(Pos.CENTER_LEFT);
 
         // Action buttons
         HBox buttons = createReportActionButtons();
 
-        // Summary report - maps to View_Summary_Report
+        // Summary report - maps to getSummaryReport database method
         GridPane summaryGrid = new GridPane();
         summaryGrid.setHgap(20);
         summaryGrid.setVgap(10);
         summaryGrid.setPadding(new Insets(15));
+        summaryGrid.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #dee2e6; -fx-border-width: 1; -fx-padding: 15;");
 
-        // Add summary items
-        addSummaryItem(summaryGrid, 0, "Total Purchases:", "27500.00");
-        addSummaryItem(summaryGrid, 1, "Total Sales:", "40000.00");
-        addSummaryItem(summaryGrid, 2, "Total Purchase Returns:", "5000.00");
-        addSummaryItem(summaryGrid, 3, "Total Sales Returns:", "3000.00");
-        addSummaryItem(summaryGrid, 4, "Net Purchases:", "22500.00");
-        addSummaryItem(summaryGrid, 5, "Net Sales:", "37000.00");
-        addSummaryItem(summaryGrid, 6, "Gross Profit:", "14500.00");
+        // Error label for feedback
+        Label errorLabel = new Label("");
+        errorLabel.setStyle("-fx-text-fill: red;");
 
-        form.getChildren().addAll(heading, dateRangeBox, buttons, summaryGrid);
+        // Initialize with default values
+        updateSummaryGrid(summaryGrid, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0.0);
+
+        // Load data from database
+        filterBtn.setOnAction(e -> {
+            errorLabel.setText("");
+            try {
+                if (config.database != null && config.database.isConnected()) {
+                    java.sql.Date fromDate = java.sql.Date.valueOf(fromDatePicker.getValue());
+                    java.sql.Date toDate = java.sql.Date.valueOf(toDatePicker.getValue());
+                    
+                    System.out.println("DEBUG: Summary Report - Loading data from " + fromDate + " to " + toDate);
+                    
+                    java.sql.ResultSet rs = config.database.getSummaryReport(fromDate, toDate);
+                    if (rs != null && rs.next()) {
+                        double totalPurchases = rs.getDouble("total_purchases");
+                        double totalSales = rs.getDouble("total_sales");
+                        double totalPurchaseReturns = rs.getDouble("total_purchase_returns");
+                        double totalSalesReturns = rs.getDouble("total_sales_returns");
+                        double totalBankBalance = rs.getDouble("total_bank_balance");
+                        int totalCustomers = rs.getInt("total_customers");
+                        int totalSuppliers = rs.getInt("total_suppliers");
+                        double totalInventoryValue = rs.getDouble("total_inventory_value");
+                        
+                        System.out.println("DEBUG: Summary data loaded - Purchases: " + totalPurchases + 
+                                         ", Sales: " + totalSales + ", Bank Balance: " + totalBankBalance);
+                        
+                        // Update the grid with real data
+                        updateSummaryGrid(summaryGrid, totalPurchases, totalSales, totalPurchaseReturns, 
+                                        totalSalesReturns, totalBankBalance, totalCustomers, totalSuppliers, totalInventoryValue);
+                        
+                        try {
+                            rs.close();
+                        } catch (SQLException closeEx) {
+                            System.out.println("DEBUG: Error closing ResultSet: " + closeEx.getMessage());
+                        }
+                    } else {
+                        System.out.println("DEBUG: No summary data found");
+                        errorLabel.setText("No data found for selected date range.");
+                        updateSummaryGrid(summaryGrid, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0.0);
+                        
+                        if (rs != null) {
+                            try {
+                                rs.close();
+                            } catch (SQLException closeEx) {
+                                System.out.println("DEBUG: Error closing empty ResultSet: " + closeEx.getMessage());
+                            }
+                        }
+                    }
+                } else {
+                    errorLabel.setText("Database not connected.");
+                    updateSummaryGrid(summaryGrid, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0.0);
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error loading summary data: " + ex.getMessage());
+                updateSummaryGrid(summaryGrid, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0.0);
+            }
+        });
+
+        // Refresh button action
+        ((Button) buttons.getChildren().get(0)).setOnAction(e -> filterBtn.fire());
+
+        // Print button action
+        ((Button) buttons.getChildren().get(1)).setOnAction(e -> {
+            try {
+                // Create a print-friendly representation
+                StringBuilder printContent = new StringBuilder();
+                printContent.append("BUSINESS SUMMARY REPORT\n");
+                printContent.append("Date Range: ").append(fromDatePicker.getValue()).append(" to ").append(toDatePicker.getValue()).append("\n");
+                printContent.append("Generated on: ").append(LocalDate.now()).append("\n");
+                printContent.append("=".repeat(50)).append("\n\n");
+                
+                // Extract current values from the grid
+                printContent.append("FINANCIAL SUMMARY:\n");
+                printContent.append("-".repeat(30)).append("\n");
+                for (int i = 0; i < summaryGrid.getChildren().size(); i += 2) {
+                    if (i + 1 < summaryGrid.getChildren().size()) {
+                        Label labelNode = (Label) summaryGrid.getChildren().get(i);
+                        Label valueNode = (Label) summaryGrid.getChildren().get(i + 1);
+                        printContent.append(String.format("%-25s %s\n", labelNode.getText(), valueNode.getText()));
+                    }
+                }
+                
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Print Summary Report");
+                alert.setHeaderText("Business Summary Report");
+                alert.setContentText("Print functionality would be implemented here.\n\n" +
+                                   "Sample Print Preview:\n" + 
+                                   printContent.toString().substring(0, Math.min(300, printContent.length())) + "...");
+                alert.showAndWait();
+                
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error preparing report for printing: " + ex.getMessage());
+            }
+        });
+
+        // Export button action
+        ((Button) buttons.getChildren().get(2)).setOnAction(e -> {
+            try {
+                // Create CSV export content
+                StringBuilder csvContent = new StringBuilder();
+                csvContent.append("Summary Item,Value\n");
+                
+                // Extract current values from the grid
+                for (int i = 0; i < summaryGrid.getChildren().size(); i += 2) {
+                    if (i + 1 < summaryGrid.getChildren().size()) {
+                        Label labelNode = (Label) summaryGrid.getChildren().get(i);
+                        Label valueNode = (Label) summaryGrid.getChildren().get(i + 1);
+                        String label = labelNode.getText().replace(":", "").replace(",", ";");
+                        String value = valueNode.getText().replace(",", "");
+                        csvContent.append(String.format("%s,%s\n", label, value));
+                    }
+                }
+                
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Export Summary Report");
+                alert.setHeaderText("Business Summary Report Export");
+                alert.setContentText("Export functionality would be implemented here.\n\n" +
+                                   "Sample CSV format:\n" + 
+                                   csvContent.toString().substring(0, Math.min(200, csvContent.length())) + "...");
+                alert.showAndWait();
+                
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error preparing report for export: " + ex.getMessage());
+            }
+        });
+
+        // Load initial data
+        filterBtn.fire();
+
+        form.getChildren().addAll(heading, dateRangeBox, buttons, errorLabel, summaryGrid);
         return form;
+    }
+
+    // Helper method to update the summary grid with data
+    private static void updateSummaryGrid(GridPane summaryGrid, double totalPurchases, double totalSales, 
+                                        double totalPurchaseReturns, double totalSalesReturns, 
+                                        double totalBankBalance, int totalCustomers, int totalSuppliers, 
+                                        double totalInventoryValue) {
+        summaryGrid.getChildren().clear();
+        
+        // Calculate derived values
+        double netPurchases = totalPurchases - totalPurchaseReturns;
+        double netSales = totalSales - totalSalesReturns;
+        double grossProfit = netSales - netPurchases;
+        
+        // Add summary items with formatted values
+        addSummaryItem(summaryGrid, 0, "Total Purchases:", String.format("%.2f", totalPurchases));
+        addSummaryItem(summaryGrid, 1, "Total Sales:", String.format("%.2f", totalSales));
+        addSummaryItem(summaryGrid, 2, "Total Purchase Returns:", String.format("%.2f", totalPurchaseReturns));
+        addSummaryItem(summaryGrid, 3, "Total Sales Returns:", String.format("%.2f", totalSalesReturns));
+        addSummaryItem(summaryGrid, 4, "Net Purchases:", String.format("%.2f", netPurchases));
+        addSummaryItem(summaryGrid, 5, "Net Sales:", String.format("%.2f", netSales));
+        addSummaryItem(summaryGrid, 6, "Gross Profit:", String.format("%.2f", grossProfit));
+        addSummaryItem(summaryGrid, 7, "Total Bank Balance:", String.format("%.2f", totalBankBalance));
+        addSummaryItem(summaryGrid, 8, "Total Customers:", String.valueOf(totalCustomers));
+        addSummaryItem(summaryGrid, 9, "Total Suppliers:", String.valueOf(totalSuppliers));
+        addSummaryItem(summaryGrid, 10, "Inventory Value:", String.format("%.2f", totalInventoryValue));
     }
 
     private static VBox createBalanceSheet() {

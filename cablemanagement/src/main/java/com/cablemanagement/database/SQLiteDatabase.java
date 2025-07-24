@@ -2466,8 +2466,8 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllProductionStocks() {
         List<Object[]> productionStocks = new ArrayList<>();
-        String query = "SELECT ps.production_id, ps.product_name, ps.product_description, " +
-                      "b.brand_name, b.brand_description, ps.quantity, ps.unit_cost, ps.sale_price, ps.total_cost, ps.production_date " +
+        String query = "SELECT ps.production_id, ps.product_name, " +
+                      "b.brand_name, ps.quantity, ps.unit_cost, ps.sale_price, ps.total_cost, ps.production_date " +
                       "FROM ProductionStock ps " +
                       "JOIN Brand b ON ps.brand_id = b.brand_id " +
                       "ORDER BY ps.product_name";
@@ -2479,9 +2479,9 @@ public class SQLiteDatabase implements db {
                 Object[] row = {
                     rs.getInt("production_id"),        // 0
                     rs.getString("product_name"),      // 1
-                    rs.getString("product_description"), // 2
+                    "", // Empty string for product_description (not available) // 2
                     rs.getString("brand_name"),        // 3
-                    rs.getString("brand_description"), // 4
+                    "", // Empty string for brand_description (not available) // 4
                     rs.getInt("quantity"),             // 5
                     rs.getDouble("unit_cost"),         // 6
                     rs.getDouble("sale_price"),        // 7
@@ -5116,16 +5116,135 @@ public class SQLiteDatabase implements db {
 
     @Override
     public ResultSet getSummaryReport(Date fromDate, Date toDate) {
+        System.out.println("DEBUG: Summary Report - Getting data from " + fromDate + " to " + toDate);
+        
+        // First, let's check what data exists in each table
+        try {
+            System.out.println("DEBUG: Checking table contents...");
+            
+            // Check Raw_Purchase_Invoice table
+            String checkPurchases = "SELECT COUNT(*) as count, MIN(invoice_date) as min_date, MAX(invoice_date) as max_date, SUM(total_amount) as total FROM Raw_Purchase_Invoice";
+            try (PreparedStatement checkStmt = connection.prepareStatement(checkPurchases)) {
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    System.out.println("DEBUG: Raw_Purchase_Invoice - Count: " + rs.getInt("count") + 
+                                     ", Date range: " + rs.getString("min_date") + " to " + rs.getString("max_date") + 
+                                     ", Total amount: " + rs.getDouble("total"));
+                }
+            }
+            
+            // Check Sales_Invoice table
+            String checkSales = "SELECT COUNT(*) as count, MIN(sales_date) as min_date, MAX(sales_date) as max_date, SUM(total_amount) as total FROM Sales_Invoice";
+            try (PreparedStatement checkStmt = connection.prepareStatement(checkSales)) {
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    System.out.println("DEBUG: Sales_Invoice - Count: " + rs.getInt("count") + 
+                                     ", Date range: " + rs.getString("min_date") + " to " + rs.getString("max_date") + 
+                                     ", Total amount: " + rs.getDouble("total"));
+                }
+            }
+            
+            // Check Bank table
+            String checkBank = "SELECT COUNT(*) as count, SUM(balance) as total FROM Bank";
+            try (PreparedStatement checkStmt = connection.prepareStatement(checkBank)) {
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    System.out.println("DEBUG: Bank - Count: " + rs.getInt("count") + ", Total balance: " + rs.getDouble("total"));
+                }
+            }
+            
+            // Check ProductionStock table
+            String checkStock = "SELECT COUNT(*) as count, SUM(quantity * unit_cost) as total_value FROM ProductionStock";
+            try (PreparedStatement checkStmt = connection.prepareStatement(checkStock)) {
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    System.out.println("DEBUG: ProductionStock - Count: " + rs.getInt("count") + ", Total value: " + rs.getDouble("total_value"));
+                }
+            }
+            
+            // Check return tables
+            String checkPurchaseReturns = "SELECT COUNT(*) as count, SUM(total_return_amount) as total FROM Raw_Purchase_Return_Invoice";
+            try (PreparedStatement checkStmt = connection.prepareStatement(checkPurchaseReturns)) {
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    System.out.println("DEBUG: Raw_Purchase_Return_Invoice - Count: " + rs.getInt("count") + ", Total: " + rs.getDouble("total"));
+                }
+            }
+            
+            String checkSalesReturns = "SELECT COUNT(*) as count, SUM(total_return_amount) as total FROM Sales_Return_Invoice";
+            try (PreparedStatement checkStmt = connection.prepareStatement(checkSalesReturns)) {
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    System.out.println("DEBUG: Sales_Return_Invoice - Count: " + rs.getInt("count") + ", Total: " + rs.getDouble("total"));
+                }
+            }
+            
+        } catch (SQLException e) {
+            System.out.println("DEBUG: Error checking table contents: " + e.getMessage());
+        }
+        
         String query = "SELECT " +
-                    "(SELECT SUM(total_amount) FROM Raw_Purchase_Invoice WHERE invoice_date BETWEEN ? AND ?) AS total_purchases, " +
-                    "(SELECT SUM(total_amount) FROM Sales_Invoice WHERE invoice_date BETWEEN ? AND ?) AS total_sales";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+                    "(SELECT COALESCE(SUM(total_amount), 0) FROM Raw_Purchase_Invoice WHERE invoice_date BETWEEN ? AND ?) AS total_purchases, " +
+                    "(SELECT COALESCE(SUM(total_amount), 0) FROM Sales_Invoice WHERE sales_date BETWEEN ? AND ?) AS total_sales, " +
+                    "(SELECT COALESCE(SUM(total_return_amount), 0) FROM Raw_Purchase_Return_Invoice WHERE return_date BETWEEN ? AND ?) AS total_purchase_returns, " +
+                    "(SELECT COALESCE(SUM(total_return_amount), 0) FROM Sales_Return_Invoice WHERE return_date BETWEEN ? AND ?) AS total_sales_returns, " +
+                    "(SELECT COALESCE(SUM(balance), 0) FROM Bank) AS total_bank_balance, " +
+                    "(SELECT COUNT(*) FROM Customer) AS total_customers, " +
+                    "(SELECT COUNT(*) FROM Supplier) AS total_suppliers, " +
+                    "(SELECT COALESCE(SUM(quantity * unit_cost), 0) FROM ProductionStock) AS total_inventory_value";
+        
+        System.out.println("DEBUG: Executing summary query: " + query);
+        
+        try {
+            // Don't use try-with-resources since we need to return the ResultSet
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            
+            // Debug the date parameters being used
+            System.out.println("DEBUG: Date parameters:");
+            System.out.println("  fromDate: " + fromDate + " (SQL Date: " + fromDate.toString() + ")");
+            System.out.println("  toDate: " + toDate + " (SQL Date: " + toDate.toString() + ")");
+            
             pstmt.setDate(1, fromDate);
             pstmt.setDate(2, toDate);
             pstmt.setDate(3, fromDate);
             pstmt.setDate(4, toDate);
-            return pstmt.executeQuery();
+            pstmt.setDate(5, fromDate);
+            pstmt.setDate(6, toDate);
+            pstmt.setDate(7, fromDate);
+            pstmt.setDate(8, toDate);
+            
+            // Test individual subqueries to see which ones return data
+            System.out.println("DEBUG: Testing individual subqueries...");
+            
+            // Test purchases in date range
+            try (PreparedStatement testStmt = connection.prepareStatement(
+                    "SELECT COALESCE(SUM(total_amount), 0) as result FROM Raw_Purchase_Invoice WHERE invoice_date BETWEEN ? AND ?")) {
+                testStmt.setDate(1, fromDate);
+                testStmt.setDate(2, toDate);
+                ResultSet testRs = testStmt.executeQuery();
+                if (testRs.next()) {
+                    System.out.println("  Purchases in date range: " + testRs.getDouble("result"));
+                }
+            }
+            
+            // Test sales in date range
+            try (PreparedStatement testStmt = connection.prepareStatement(
+                    "SELECT COALESCE(SUM(total_amount), 0) as result FROM Sales_Invoice WHERE sales_date BETWEEN ? AND ?")) {
+                testStmt.setDate(1, fromDate);
+                testStmt.setDate(2, toDate);
+                ResultSet testRs = testStmt.executeQuery();
+                if (testRs.next()) {
+                    System.out.println("  Sales in date range: " + testRs.getDouble("result"));
+                }
+            }
+            
+            ResultSet rs = pstmt.executeQuery();
+            
+            System.out.println("DEBUG: Summary query executed successfully");
+            
+            return rs;
         } catch (SQLException e) {
+            System.out.println("DEBUG: Error executing summary query: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
