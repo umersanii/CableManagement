@@ -4834,6 +4834,42 @@ public class SQLiteDatabase implements db {
 
     @Override
     public ResultSet getBankTransferReport(Date fromDate, Date toDate) {
+        System.out.println("DEBUG: getBankTransferReport called with dates: " + fromDate + " to " + toDate);
+        
+        // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        String fromDateStr = sdf.format(fromDate);
+        String toDateStr = sdf.format(toDate);
+        
+        System.out.println("DEBUG: Date strings: " + fromDateStr + " to " + toDateStr);
+        
+        // First, let's check all bank transactions to see what's available
+        String debugQuery = "SELECT transaction_type, COUNT(*) as count FROM Bank_Transaction GROUP BY transaction_type";
+        try (PreparedStatement debugStmt = connection.prepareStatement(debugQuery)) {
+            ResultSet debugRs = debugStmt.executeQuery();
+            System.out.println("DEBUG: Available transaction types in Bank_Transaction:");
+            while (debugRs.next()) {
+                System.out.println("  - " + debugRs.getString("transaction_type") + ": " + debugRs.getInt("count") + " records");
+            }
+            debugRs.close();
+        } catch (SQLException e) {
+            System.err.println("DEBUG: Error checking transaction types: " + e.getMessage());
+        }
+        
+        // Check transactions in date range
+        String dateCheckQuery = "SELECT COUNT(*) as count FROM Bank_Transaction WHERE transaction_date >= ? AND transaction_date <= ?";
+        try (PreparedStatement dateStmt = connection.prepareStatement(dateCheckQuery)) {
+            dateStmt.setString(1, fromDateStr);
+            dateStmt.setString(2, toDateStr);
+            ResultSet dateRs = dateStmt.executeQuery();
+            if (dateRs.next()) {
+                System.out.println("DEBUG: Transactions in date range " + fromDateStr + " to " + toDateStr + ": " + dateRs.getInt("count"));
+            }
+            dateRs.close();
+        } catch (SQLException e) {
+            System.err.println("DEBUG: Error checking date range: " + e.getMessage());
+        }
+        
         String query = "SELECT " +
                 "bt.transaction_date, " +
                 "COALESCE(" +
@@ -4845,24 +4881,24 @@ public class SQLiteDatabase implements db {
                 "  'Cash'" +
                 ") as to_bank, " +
                 "bt.amount, " +
+                "bt.transaction_type, " +
                 "COALESCE(bt.description, 'Bank Transfer') as description " +
                 "FROM Bank_Transaction bt " +
                 "WHERE bt.transaction_type IN ('transfer_in', 'transfer_out') " +
-                "AND bt.transaction_date BETWEEN ? AND ? " +
+                "AND bt.transaction_date >= ? AND bt.transaction_date <= ? " +
                 "ORDER BY bt.transaction_date DESC";
                 
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            String fromDateStr = sdf.format(fromDate);
-            String toDateStr = sdf.format(toDate);
-            
+        try {
+            PreparedStatement pstmt = connection.prepareStatement(query);
             pstmt.setString(1, fromDateStr);
             pstmt.setString(2, toDateStr);
             
+            System.out.println("DEBUG: Executing bank transfer query: " + query);
+            System.out.println("DEBUG: Parameters: " + fromDateStr + ", " + toDateStr);
+            
             return pstmt.executeQuery();
         } catch (SQLException e) {
-            System.err.println("Error in getBankTransferReport: " + e.getMessage());
+            System.err.println("DEBUG: SQLException in getBankTransferReport: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
