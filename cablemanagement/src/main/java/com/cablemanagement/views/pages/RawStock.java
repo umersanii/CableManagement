@@ -291,6 +291,8 @@ public class RawStock {
 
         TextField unitPriceField = createTextField("Unit Price");
         unitPriceField.setPrefWidth(100);
+        unitPriceField.setEditable(false);
+        unitPriceField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
 
         Button addItemBtn = createActionButton("Add Item");
 
@@ -300,6 +302,26 @@ public class RawStock {
             String displayName = String.format("%s (%s - %s)", stock[1], stock[2], stock[3]); // name (category - brand)
             rawStockCombo.getItems().add(displayName);
         }
+        
+        // Auto-fill price when raw stock is selected
+        rawStockCombo.setOnAction(e -> {
+            String selectedDisplay = rawStockCombo.getValue();
+            if (selectedDisplay != null && !selectedDisplay.isEmpty()) {
+                // Extract raw stock name from display (before the first parenthesis)
+                String stockName = selectedDisplay.split(" \\(")[0];
+                
+                // Find the matching stock and get its unit price
+                for (Object[] stock : rawStocks) {
+                    if (stockName.equals(stock[1])) { // stock[1] is the item_name
+                        double unitPrice = ((Number) stock[5]).doubleValue(); // stock[5] is unit_price
+                        unitPriceField.setText(String.format("%.2f", unitPrice));
+                        break;
+                    }
+                }
+            } else {
+                unitPriceField.clear();
+            }
+        });
 
         addItemControls.getChildren().addAll(
             new Label("Raw Stock:"), rawStockCombo,
@@ -602,6 +624,8 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         quantityField.setPromptText("Return Quantity (Max: " + originalItem.getQuantity() + ")");
         TextField unitPriceField = new TextField();
         unitPriceField.setText(String.valueOf(originalItem.getUnitPrice()));
+        unitPriceField.setEditable(false);
+        unitPriceField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
         
         grid.add(new Label("Return Quantity:"), 0, 0);
         grid.add(quantityField, 1, 0);
