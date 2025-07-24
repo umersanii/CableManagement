@@ -530,9 +530,11 @@ public class ProductionStock {
         
         // Invoice items table
         TableView<SalesInvoiceItemUI> itemsTable = new TableView<>();
-        itemsTable.setPrefHeight(200);
+        itemsTable.setPrefHeight(250);
+        itemsTable.setMaxHeight(250);
+        itemsTable.getStyleClass().add("table-view");
         
-        TableColumn<SalesInvoiceItemUI, String> productCol = new TableColumn<>("Product");
+        TableColumn<SalesInvoiceItemUI, String> productCol = new TableColumn<>("Product Name");
         productCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
         productCol.setPrefWidth(200);
         
@@ -540,13 +542,13 @@ public class ProductionStock {
         quantityCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
         quantityCol.setPrefWidth(100);
         
-        TableColumn<SalesInvoiceItemUI, Double> priceCol = new TableColumn<>("Price");
+        TableColumn<SalesInvoiceItemUI, Double> priceCol = new TableColumn<>("Unit Price");
         priceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
-        priceCol.setPrefWidth(100);
+        priceCol.setPrefWidth(120);
         
-        TableColumn<SalesInvoiceItemUI, Double> totalCol = new TableColumn<>("Total");
+        TableColumn<SalesInvoiceItemUI, Double> totalCol = new TableColumn<>("Total Amount");
         totalCol.setCellValueFactory(new PropertyValueFactory<>("totalPrice"));
-        totalCol.setPrefWidth(100);
+        totalCol.setPrefWidth(120);
         
         itemsTable.getColumns().addAll(productCol, quantityCol, priceCol, totalCol);
         
@@ -808,27 +810,30 @@ public class ProductionStock {
         
         // Return items table
         TableView<SalesInvoiceItemUI> returnItemsTable = new TableView<>();
-        returnItemsTable.setPrefHeight(200);
+        returnItemsTable.setPrefHeight(250);
+        returnItemsTable.setMaxHeight(250);
+        returnItemsTable.getStyleClass().add("table-view");
+        returnItemsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
         TableColumn<SalesInvoiceItemUI, String> productCol = new TableColumn<>("Product");
         productCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
-        productCol.setPrefWidth(200);
+        productCol.prefWidthProperty().bind(returnItemsTable.widthProperty().multiply(0.20));
         
         TableColumn<SalesInvoiceItemUI, Double> originalQtyCol = new TableColumn<>("Original Qty");
         originalQtyCol.setCellValueFactory(new PropertyValueFactory<>("originalQuantity"));
-        originalQtyCol.setPrefWidth(100);
+        originalQtyCol.prefWidthProperty().bind(returnItemsTable.widthProperty().multiply(0.20));
         
         TableColumn<SalesInvoiceItemUI, Double> returnQtyCol = new TableColumn<>("Return Qty");
         returnQtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
-        returnQtyCol.setPrefWidth(100);
+        returnQtyCol.prefWidthProperty().bind(returnItemsTable.widthProperty().multiply(0.20));
         
-        TableColumn<SalesInvoiceItemUI, Double> priceCol = new TableColumn<>("Price");
+        TableColumn<SalesInvoiceItemUI, Double> priceCol = new TableColumn<>("Unit Price");
         priceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
-        priceCol.setPrefWidth(100);
+        priceCol.prefWidthProperty().bind(returnItemsTable.widthProperty().multiply(0.20));
         
-        TableColumn<SalesInvoiceItemUI, Double> totalCol = new TableColumn<>("Total");
+        TableColumn<SalesInvoiceItemUI, Double> totalCol = new TableColumn<>("Total Amount");
         totalCol.setCellValueFactory(new PropertyValueFactory<>("totalPrice"));
-        totalCol.setPrefWidth(100);
+        totalCol.prefWidthProperty().bind(returnItemsTable.widthProperty().multiply(0.20));
         
         returnItemsTable.getColumns().addAll(productCol, originalQtyCol, returnQtyCol, priceCol, totalCol);
         
@@ -837,19 +842,21 @@ public class ProductionStock {
         
         // Available items table (from original invoice)
         TableView<SalesInvoiceItemUI> availableItemsTable = new TableView<>();
-        availableItemsTable.setPrefHeight(150);
+        availableItemsTable.setPrefHeight(200);
+        availableItemsTable.setMaxHeight(200);
+        availableItemsTable.getStyleClass().add("table-view");
         
-        TableColumn<SalesInvoiceItemUI, String> availableProductCol = new TableColumn<>("Product");
+        TableColumn<SalesInvoiceItemUI, String> availableProductCol = new TableColumn<>("Product Name");
         availableProductCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
-        availableProductCol.setPrefWidth(200);
+        availableProductCol.setPrefWidth(250);
         
-        TableColumn<SalesInvoiceItemUI, Double> availableQtyCol = new TableColumn<>("Quantity");
+        TableColumn<SalesInvoiceItemUI, Double> availableQtyCol = new TableColumn<>("Available Quantity");
         availableQtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
-        availableQtyCol.setPrefWidth(100);
+        availableQtyCol.setPrefWidth(140);
         
-        TableColumn<SalesInvoiceItemUI, Double> availablePriceCol = new TableColumn<>("Price");
+        TableColumn<SalesInvoiceItemUI, Double> availablePriceCol = new TableColumn<>("Unit Price");
         availablePriceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
-        availablePriceCol.setPrefWidth(100);
+        availablePriceCol.setPrefWidth(120);
         
         availableItemsTable.getColumns().addAll(availableProductCol, availableQtyCol, availablePriceCol);
         
@@ -857,40 +864,67 @@ public class ProductionStock {
         availableItemsTable.setItems(availableItems);
         
         // Add return item controls
-        HBox addReturnItemBox = new HBox(10);
+        VBox addReturnSection = new VBox(10);
+        addReturnSection.setPadding(new Insets(15, 0, 15, 0));
+        addReturnSection.getStyleClass().add("form-container");
+        
+        HBox addReturnItemBox = new HBox(15);
         addReturnItemBox.setAlignment(Pos.CENTER_LEFT);
+        addReturnItemBox.setPadding(new Insets(10));
+        addReturnItemBox.getStyleClass().add("form-row");
+        
+        Label returnQtyLabel = new Label("Return Quantity:");
+        returnQtyLabel.getStyleClass().add("form-label");
         
         TextField returnQuantityField = createTextField("Return Quantity");
-        returnQuantityField.setPrefWidth(120);
+        returnQuantityField.setPrefWidth(150);
         
         Button addReturnItemBtn = createActionButton("Add to Return");
+        addReturnItemBtn.setPrefWidth(120);
+        
         Button removeReturnItemBtn = createActionButton("Remove Item");
+        removeReturnItemBtn.setPrefWidth(120);
         
         addReturnItemBox.getChildren().addAll(
-            new Label("Return Qty:"), returnQuantityField,
+            returnQtyLabel, returnQuantityField,
             addReturnItemBtn, removeReturnItemBtn
         );
         
+        addReturnSection.getChildren().add(addReturnItemBox);
+        
         // Action buttons
-        HBox actionButtons = new HBox(10);
+        HBox actionButtons = new HBox(15);
+        actionButtons.setAlignment(Pos.CENTER);
+        actionButtons.setPadding(new Insets(20, 0, 10, 0));
+        actionButtons.getStyleClass().add("form-row");
+        
         Button submitBtn = createSubmitButton("Submit Return");
         Button clearBtn = createActionButton("Clear All");
+        
         actionButtons.getChildren().addAll(submitBtn, clearBtn);
 
-        form.getChildren().addAll(
+        // Form layout with proper spacing
+        VBox formContent = new VBox(20);
+        formContent.getChildren().addAll(
             heading,
-            createFormRow("Return Invoice Number:", returnInvoiceNumberField),
-            createFormRow("Original Invoice:", originalInvoiceComboBox),
-            createFormRow("Return Date:", returnDatePicker),
-            createFormRow("Customer:", customerField),
-            createFormRow("Return Amount:", returnAmountField),
-            createSubheading("Available Items from Original Invoice:"),
-            availableItemsTable,
-            addReturnItemBox,
-            createSubheading("Return Items:"),
-            returnItemsTable,
+            new VBox(10, 
+                createFormRow("Return Invoice Number:", returnInvoiceNumberField),
+                createFormRow("Original Invoice:", originalInvoiceComboBox),
+                createFormRow("Return Date:", returnDatePicker),
+                createFormRow("Customer:", customerField),
+                createFormRow("Return Amount:", returnAmountField)
+            ),
+            new VBox(15,
+                createSubheading("Available Items from Original Invoice:"),
+                availableItemsTable,
+                addReturnSection,
+                createSubheading("Return Items:"),
+                returnItemsTable
+            ),
             actionButtons
         );
+        
+        form.getChildren().add(formContent);
 
         // Event handlers
         originalInvoiceComboBox.setOnAction(e -> {
@@ -1240,28 +1274,31 @@ public class ProductionStock {
     private static TableView<ProductionStockRecord> createProductionStockTable() {
         TableView<ProductionStockRecord> table = new TableView<>();
         table.setPrefHeight(300);
+        table.setMaxHeight(300);
+        table.getStyleClass().add("table-view");
         
         TableColumn<ProductionStockRecord, String> nameCol = new TableColumn<>("Product Name");
         nameCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getName()));
-        nameCol.setPrefWidth(150);
+        nameCol.setPrefWidth(180);
         
         TableColumn<ProductionStockRecord, String> brandCol = new TableColumn<>("Brand");
         brandCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getBrand()));
-        brandCol.setPrefWidth(100);
+        brandCol.setPrefWidth(120);
         
         TableColumn<ProductionStockRecord, String> quantityCol = new TableColumn<>("Quantity");
         quantityCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getQuantity())));
-        quantityCol.setPrefWidth(80);
+        quantityCol.setPrefWidth(100);
         
         TableColumn<ProductionStockRecord, String> unitCostCol = new TableColumn<>("Unit Cost");
-        unitCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("%.2f", data.getValue().getUnitCost())));
-        unitCostCol.setPrefWidth(100);
+        unitCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("$%.2f", data.getValue().getUnitCost())));
+        unitCostCol.setPrefWidth(120);
         
         TableColumn<ProductionStockRecord, String> totalCostCol = new TableColumn<>("Total Cost");
-        totalCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("%.2f", data.getValue().getTotalCost())));
-        totalCostCol.setPrefWidth(100);
+        totalCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("$%.2f", data.getValue().getTotalCost())));
+        totalCostCol.setPrefWidth(120);
         
         table.getColumns().addAll(nameCol, brandCol, quantityCol, unitCostCol, totalCostCol);
+        
         return table;
     }
 
