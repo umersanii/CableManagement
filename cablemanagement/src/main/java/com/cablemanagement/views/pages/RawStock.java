@@ -468,19 +468,12 @@ private static ScrollPane createRawStockReturnPurchaseInvoiceForm() {
         selectedItemsTable
     );
 
-    // === Previous Return Invoices ===
-    Label returnHeading = createSubheading("Previous Return Purchase Invoices:");
-    TableView<Object[]> returnInvoicesTable = createReturnInvoicesTable();
-    loadReturnInvoicesIntoTable(returnInvoicesTable);
-
     // === Layout Composition ===
     mainContainer.getChildren().addAll(
         heading,
         formGrid,
         tablesSection,
-        submitReturnInvoiceBtn,
-        returnHeading,
-        returnInvoicesTable
+        submitReturnInvoiceBtn
     );
 
     // === Load Dropdowns and Handlers ===
@@ -562,22 +555,49 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
     
     TableColumn<RawStockPurchaseItem, String> nameCol = new TableColumn<>("Item Name");
     nameCol.setCellValueFactory(new PropertyValueFactory<>("rawStockName"));
-    nameCol.setPrefWidth(150);
+    nameCol.setPrefWidth(200);
+    nameCol.setMinWidth(150);
     
     TableColumn<RawStockPurchaseItem, String> brandCol = new TableColumn<>("Brand");
     brandCol.setCellValueFactory(new PropertyValueFactory<>("brandName"));
-    brandCol.setPrefWidth(100);
+    brandCol.setPrefWidth(120);
+    brandCol.setMinWidth(100);
     
     TableColumn<RawStockPurchaseItem, Double> quantityCol = new TableColumn<>("Orig. Qty");
     quantityCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
-    quantityCol.setPrefWidth(80);
+    quantityCol.setPrefWidth(100);
+    quantityCol.setMinWidth(80);
+    quantityCol.setCellFactory(column -> new TableCell<RawStockPurchaseItem, Double>() {
+        @Override
+        protected void updateItem(Double item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null) {
+                setText(null);
+            } else {
+                setText(String.format("%.0f", item));
+            }
+        }
+    });
     
     TableColumn<RawStockPurchaseItem, Double> unitPriceCol = new TableColumn<>("Unit Price");
     unitPriceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
-    unitPriceCol.setPrefWidth(80);
+    unitPriceCol.setPrefWidth(120);
+    unitPriceCol.setMinWidth(100);
+    unitPriceCol.setCellFactory(column -> new TableCell<RawStockPurchaseItem, Double>() {
+        @Override
+        protected void updateItem(Double item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null) {
+                setText(null);
+            } else {
+                setText(String.format("$%.2f", item));
+            }
+        }
+    });
     
     table.getColumns().addAll(nameCol, brandCol, quantityCol, unitPriceCol);
     table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+    table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
     
     return table;
 }
@@ -587,22 +607,60 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         
         TableColumn<RawStockPurchaseItem, String> nameCol = new TableColumn<>("Item Name");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("rawStockName"));
-        nameCol.setPrefWidth(150);
+        nameCol.setPrefWidth(200);
+        nameCol.setMinWidth(150);
         
         TableColumn<RawStockPurchaseItem, Double> quantityCol = new TableColumn<>("Return Qty");
         quantityCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
-        quantityCol.setPrefWidth(80);
+        quantityCol.setPrefWidth(120);
+        quantityCol.setMinWidth(100);
+        quantityCol.setCellFactory(column -> new TableCell<RawStockPurchaseItem, Double>() {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(String.format("%.0f", item));
+                }
+            }
+        });
         
         TableColumn<RawStockPurchaseItem, Double> unitPriceCol = new TableColumn<>("Unit Price");
         unitPriceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
-        unitPriceCol.setPrefWidth(80);
+        unitPriceCol.setPrefWidth(120);
+        unitPriceCol.setMinWidth(100);
+        unitPriceCol.setCellFactory(column -> new TableCell<RawStockPurchaseItem, Double>() {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(String.format("$%.2f", item));
+                }
+            }
+        });
         
         TableColumn<RawStockPurchaseItem, Double> totalCol = new TableColumn<>("Total");
         totalCol.setCellValueFactory(new PropertyValueFactory<>("totalPrice"));
-        totalCol.setPrefWidth(80);
+        totalCol.setPrefWidth(120);
+        totalCol.setMinWidth(100);
+        totalCol.setCellFactory(column -> new TableCell<RawStockPurchaseItem, Double>() {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(String.format("$%.2f", item));
+                }
+            }
+        });
         
         table.getColumns().addAll(nameCol, quantityCol, unitPriceCol, totalCol);
         table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
         return table;
     }
@@ -788,51 +846,6 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         }
     }
 
-    private static TableView<Object[]> createReturnInvoicesTable() {
-        TableView<Object[]> table = new TableView<>();
-        table.setPrefHeight(200);
-        
-        TableColumn<Object[], String> returnInvoiceCol = new TableColumn<>("Return Invoice");
-        returnInvoiceCol.setCellValueFactory(cellData -> 
-            new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[0]));
-        returnInvoiceCol.setPrefWidth(120);
-        
-        TableColumn<Object[], String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(cellData -> 
-            new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[1]));
-        dateCol.setPrefWidth(100);
-        
-        TableColumn<Object[], String> supplierCol = new TableColumn<>("Supplier");
-        supplierCol.setCellValueFactory(cellData -> 
-            new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[2]));
-        supplierCol.setPrefWidth(120);
-        
-        TableColumn<Object[], String> originalCol = new TableColumn<>("Original Invoice");
-        originalCol.setCellValueFactory(cellData -> 
-            new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[3]));
-        originalCol.setPrefWidth(120);
-        
-        TableColumn<Object[], Double> amountCol = new TableColumn<>("Amount");
-        amountCol.setCellValueFactory(cellData -> 
-            new javafx.beans.property.SimpleObjectProperty<>((Double) cellData.getValue()[4]));
-        amountCol.setPrefWidth(80);
-        
-        table.getColumns().addAll(returnInvoiceCol, dateCol, supplierCol, originalCol, amountCol);
-        
-        return table;
-    }
-
-    private static void loadReturnInvoicesIntoTable(TableView<Object[]> table) {
-        try {
-            List<Object[]> returnInvoices = database.getAllRawPurchaseReturnInvoices();
-            ObservableList<Object[]> data = FXCollections.observableArrayList(returnInvoices);
-            table.setItems(data);
-        } catch (Exception e) {
-            e.printStackTrace();
-            showAlert("Error", "Failed to load return invoices");
-        }
-    }
-
     private static void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(title);
@@ -934,13 +947,6 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             selectedItemsTable, totalLabel
         ));
 
-        // Previous use invoices table (compact)
-        Label previousInvoicesLabel = createSubheading("Previous Use Invoices:");
-        TableView<Object[]> previousInvoicesTable = createPreviousUseInvoicesTable();
-        previousInvoicesTable.setPrefHeight(120); // Reduced height
-        previousInvoicesTable.setMaxHeight(120);
-        loadPreviousUseInvoices(previousInvoicesTable);
-
         // Add all components to form
         form.getChildren().addAll(
             basicInfoSection,
@@ -950,9 +956,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             selectedItemsLabel,
             selectedItemsTable,
             totalLabel,
-            submitBtn,
-            previousInvoicesLabel,
-            previousInvoicesTable
+            submitBtn
         );
         
         // Wrap in ScrollPane for responsiveness
@@ -1944,50 +1948,6 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 .mapToDouble(item -> item.getQuantityUsed() * item.getUnitCost())
                 .sum();
         totalLabel.setText("Total Usage Amount: $" + String.format("%.2f", total));
-    }
-    
-    /**
-     * Create table for displaying previous use invoices
-     */
-    private static TableView<Object[]> createPreviousUseInvoicesTable() {
-        TableView<Object[]> table = new TableView<>();
-        table.setPrefHeight(120);
-        table.setMaxHeight(120);
-        
-        TableColumn<Object[], String> invoiceCol = new TableColumn<>("Invoice #");
-        invoiceCol.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty((String) data.getValue()[0]));
-        invoiceCol.setPrefWidth(120); // Reduced from 150
-        
-        TableColumn<Object[], String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty((String) data.getValue()[1]));
-        dateCol.setPrefWidth(100); // Reduced from 120
-        
-        TableColumn<Object[], String> amountCol = new TableColumn<>("Amount");
-        amountCol.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(
-            String.format("$%.2f", (Double) data.getValue()[2])));
-        amountCol.setPrefWidth(100); // Reduced from 120
-        
-        TableColumn<Object[], String> purposeCol = new TableColumn<>("Purpose");
-        purposeCol.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty((String) data.getValue()[3]));
-        purposeCol.setPrefWidth(200); // Same width
-        
-        table.getColumns().addAll(invoiceCol, dateCol, amountCol, purposeCol);
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        
-        return table;
-    }
-    
-    /**
-     * Load previous use invoices into the table
-     */
-    private static void loadPreviousUseInvoices(TableView<Object[]> table) {
-        try {
-            List<Object[]> invoices = database.getAllRawStockUseInvoices();
-            table.setItems(FXCollections.observableArrayList(invoices));
-        } catch (Exception e) {
-            e.printStackTrace();
-            showAlert(Alert.AlertType.ERROR, "Database Error", "Failed to load previous invoices: " + e.getMessage());
-        }
     }
     
     /**
