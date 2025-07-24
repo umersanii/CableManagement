@@ -623,6 +623,56 @@ public class SQLiteDatabase implements db {
                     "total_cost REAL NOT NULL," +
                     "FOREIGN KEY (raw_stock_use_invoice_id) REFERENCES Raw_Stock_Use_Invoice(raw_stock_use_invoice_id)," +
                     "FOREIGN KEY (raw_stock_id) REFERENCES Raw_Stock(stock_id)" +
+                    ")",
+
+                    // Sales Invoice table
+                    "CREATE TABLE IF NOT EXISTS Sales_Invoice (" +
+                    "sales_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "sales_invoice_number TEXT NOT NULL UNIQUE," +
+                    "customer_id INTEGER NOT NULL," +
+                    "sales_date TEXT NOT NULL," +
+                    "total_amount REAL NOT NULL DEFAULT 0.0," +
+                    "discount_amount REAL NOT NULL DEFAULT 0.0," +
+                    "paid_amount REAL NOT NULL DEFAULT 0.0," +
+                    "created_at TEXT DEFAULT CURRENT_TIMESTAMP," +
+                    "FOREIGN KEY (customer_id) REFERENCES Customer(customer_id)" +
+                    ")",
+
+                    // Sales Invoice Item table
+                    "CREATE TABLE IF NOT EXISTS Sales_Invoice_Item (" +
+                    "sales_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "sales_invoice_id INTEGER NOT NULL," +
+                    "production_stock_id INTEGER NOT NULL," +
+                    "quantity REAL NOT NULL," +
+                    "unit_price REAL NOT NULL," +
+                    "total_price REAL NOT NULL," +
+                    "FOREIGN KEY (sales_invoice_id) REFERENCES Sales_Invoice(sales_invoice_id)," +
+                    "FOREIGN KEY (production_stock_id) REFERENCES ProductionStock(production_id)" +
+                    ")",
+
+                    // Sales Return Invoice table
+                    "CREATE TABLE IF NOT EXISTS Sales_Return_Invoice (" +
+                    "sales_return_invoice_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "return_invoice_number TEXT NOT NULL UNIQUE," +
+                    "original_sales_invoice_id INTEGER NOT NULL," +
+                    "customer_id INTEGER NOT NULL," +
+                    "return_date TEXT NOT NULL," +
+                    "total_return_amount REAL NOT NULL DEFAULT 0.0," +
+                    "created_at TEXT DEFAULT CURRENT_TIMESTAMP," +
+                    "FOREIGN KEY (original_sales_invoice_id) REFERENCES Sales_Invoice(sales_invoice_id)," +
+                    "FOREIGN KEY (customer_id) REFERENCES Customer(customer_id)" +
+                    ")",
+
+                    // Sales Return Invoice Item table
+                    "CREATE TABLE IF NOT EXISTS Sales_Return_Invoice_Item (" +
+                    "sales_return_invoice_item_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "sales_return_invoice_id INTEGER NOT NULL," +
+                    "production_stock_id INTEGER NOT NULL," +
+                    "quantity REAL NOT NULL," +
+                    "unit_price REAL NOT NULL," +
+                    "total_price REAL NOT NULL," +
+                    "FOREIGN KEY (sales_return_invoice_id) REFERENCES Sales_Return_Invoice(sales_return_invoice_id)," +
+                    "FOREIGN KEY (production_stock_id) REFERENCES ProductionStock(production_id)" +
                     ")"
                 };
                 
@@ -3244,8 +3294,8 @@ public class SQLiteDatabase implements db {
 
     @Override
     public boolean insertSalesInvoiceItems(int salesInvoiceId, List<Object[]> items) {
-        String query = "INSERT INTO Sales_Invoice_Item (sales_invoice_id, production_stock_id, quantity, unit_price) " +
-                      "VALUES (?, ?, ?, ?)";
+        String query = "INSERT INTO Sales_Invoice_Item (sales_invoice_id, production_stock_id, quantity, unit_price, total_price) " +
+                      "VALUES (?, ?, ?, ?, ?)";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             for (Object[] item : items) {
@@ -3253,6 +3303,7 @@ public class SQLiteDatabase implements db {
                 pstmt.setInt(2, (Integer) item[0]); // production_stock_id
                 pstmt.setDouble(3, (Double) item[1]); // quantity
                 pstmt.setDouble(4, (Double) item[2]); // unit_price
+                pstmt.setDouble(5, (Double) item[1] * (Double) item[2]); // total_price = quantity * unit_price
                 pstmt.addBatch();
             }
             
@@ -3438,8 +3489,8 @@ public class SQLiteDatabase implements db {
 
     @Override
     public boolean insertSalesReturnInvoiceItems(int salesReturnInvoiceId, List<Object[]> items) {
-        String query = "INSERT INTO Sales_Return_Invoice_Item (sales_return_invoice_id, production_stock_id, quantity, unit_price) " +
-                      "VALUES (?, ?, ?, ?)";
+        String query = "INSERT INTO Sales_Return_Invoice_Item (sales_return_invoice_id, production_stock_id, quantity, unit_price, total_price) " +
+                      "VALUES (?, ?, ?, ?, ?)";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             for (Object[] item : items) {
@@ -3447,6 +3498,7 @@ public class SQLiteDatabase implements db {
                 pstmt.setInt(2, (Integer) item[0]); // production_stock_id
                 pstmt.setDouble(3, (Double) item[1]); // quantity
                 pstmt.setDouble(4, (Double) item[2]); // unit_price
+                pstmt.setDouble(5, (Double) item[1] * (Double) item[2]); // total_price = quantity * unit_price
                 pstmt.addBatch();
             }
             
@@ -4663,12 +4715,41 @@ public class SQLiteDatabase implements db {
 
     @Override
     public ResultSet getSalesReport(Date fromDate, Date toDate) {
-        String query = "SELECT * FROM Sales_Invoice WHERE invoice_date BETWEEN ? AND ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setDate(1, fromDate);
-            pstmt.setDate(2, toDate);
-            return pstmt.executeQuery();
+        String query = "SELECT " +
+                "si.sales_invoice_number AS sales_invoice_number, " +
+                "si.sales_date AS sales_date, " +
+                "COALESCE(c.customer_name, 'Unknown Customer') AS customer_name, " +
+                "si.total_amount AS total_amount, " +
+                "si.discount_amount AS discount_amount, " +
+                "si.paid_amount AS paid_amount " +
+                "FROM Sales_Invoice si " +
+                "LEFT JOIN Customer c ON si.customer_id = c.customer_id " +
+                "WHERE si.sales_date BETWEEN ? AND ? " +
+                "ORDER BY si.sales_date DESC";
+        try {
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            String fromDateStr = sdf.format(fromDate);
+            String toDateStr = sdf.format(toDate);
+            
+            // Debug logging
+            System.out.println("DEBUG: getSalesReport called with dates:");
+            System.out.println("DEBUG: fromDate: " + fromDate + " -> " + fromDateStr);
+            System.out.println("DEBUG: toDate: " + toDate + " -> " + toDateStr);
+            System.out.println("DEBUG: Query: " + query);
+            
+            pstmt.setString(1, fromDateStr);
+            pstmt.setString(2, toDateStr);
+            
+            ResultSet rs = pstmt.executeQuery();
+            
+            // Debug: Just log that we're returning the ResultSet
+            System.out.println("DEBUG: Returning ResultSet from getSalesReport");
+            
+            return rs;
         } catch (SQLException e) {
+            System.err.println("DEBUG: SQLException in getSalesReport: " + e.getMessage());
             e.printStackTrace();
             return null;
         }

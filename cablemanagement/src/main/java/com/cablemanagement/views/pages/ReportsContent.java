@@ -213,12 +213,19 @@ public class ReportsContent {
         Label heading = createHeading("Sales Report");
 
         // Date range filters
-        HBox dateRangeBox = createDateRangeFilter();
+        HBox dateRangeBox = new HBox(10);
+        Label fromLabel = new Label("From:");
+        DatePicker fromDatePicker = new DatePicker(LocalDate.now().minusDays(7));
+        Label toLabel = new Label("To:");
+        DatePicker toDatePicker = new DatePicker(LocalDate.now());
+        Button filterBtn = createActionButton("Filter");
+        dateRangeBox.getChildren().addAll(fromLabel, fromDatePicker, toLabel, toDatePicker, filterBtn);
+        dateRangeBox.setAlignment(Pos.CENTER_LEFT);
 
         // Action buttons
         HBox buttons = createReportActionButtons();
 
-        // Sales report table - maps to View_Sales_Report
+        // Sales report table - maps to Sales_Invoice table
         TableView<SalesReport> table = new TableView<>();
         
         TableColumn<SalesReport, String> invCol = new TableColumn<>("Invoice #");
@@ -241,15 +248,54 @@ public class ReportsContent {
         
         table.getColumns().addAll(invCol, dateCol, customerCol, amountCol, discountCol, paidCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        
-        // Sample data - in real app, fetch from View_Sales_Report
-        ObservableList<SalesReport> data = FXCollections.observableArrayList(
-            new SalesReport("INV-SL-001", "2025-07-05", "Ali Traders", "15000.00", "500.00", "14500.00"),
-            new SalesReport("INV-SL-002", "2025-07-06", "Pak Electric House", "25000.00", "1000.00", "24000.00")
-        );
-        table.setItems(data);
 
-        form.getChildren().addAll(heading, dateRangeBox, buttons, table);
+        // Error label for feedback
+        Label errorLabel = new Label("");
+        errorLabel.setStyle("-fx-text-fill: red;");
+
+        // Load data from backend
+        filterBtn.setOnAction(e -> {
+            table.getItems().clear();
+            errorLabel.setText("");
+            try {
+                if (config.database != null && config.database.isConnected()) {
+                    java.sql.Date from = java.sql.Date.valueOf(fromDatePicker.getValue());
+                    java.sql.Date to = java.sql.Date.valueOf(toDatePicker.getValue());
+                    java.sql.ResultSet rs = config.database.getSalesReport(from, to);
+                    int count = 0;
+                    while (rs != null && rs.next()) {
+                        // Format the amounts as strings with proper formatting
+                        String totalAmount = String.format("%.2f", rs.getDouble("total_amount"));
+                        String discountAmount = String.format("%.2f", rs.getDouble("discount_amount"));
+                        String paidAmount = String.format("%.2f", rs.getDouble("paid_amount"));
+                        
+                        table.getItems().add(new SalesReport(
+                            rs.getString("sales_invoice_number"),
+                            rs.getString("sales_date"),
+                            rs.getString("customer_name"),
+                            totalAmount,
+                            discountAmount,
+                            paidAmount
+                        ));
+                        count++;
+                    }
+                    System.out.println("SalesReport rows loaded: " + count);
+                    if (count == 0) {
+                        errorLabel.setText("No sales data found for selected date range.");
+                    }
+                } else {
+                    errorLabel.setText("Database not connected.");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error loading sales data: " + ex.getMessage());
+            }
+        });
+
+        // Optionally, trigger filter on load
+        filterBtn.fire();
+
+        form.getChildren().addAll(heading, dateRangeBox, buttons, errorLabel, table);
         return form;
     }
 
