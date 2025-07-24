@@ -4799,12 +4799,34 @@ public class SQLiteDatabase implements db {
 
     @Override
     public ResultSet getReturnSalesReport(Date fromDate, Date toDate) {
-        String query = "SELECT * FROM Sales_Return_Invoice WHERE return_date BETWEEN ? AND ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setDate(1, fromDate);
-            pstmt.setDate(2, toDate);
+        System.out.println("DEBUG: getReturnSalesReport called with dates: " + fromDate + " to " + toDate);
+        
+        // Convert Date to string format for comparison
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        String fromDateStr = sdf.format(fromDate);
+        String toDateStr = sdf.format(toDate);
+        
+        System.out.println("DEBUG: Date strings: " + fromDateStr + " to " + toDateStr);
+        
+        String query = "SELECT " +
+                "sri.return_invoice_number AS return_invoice_number, " +
+                "sri.return_date AS return_date, " +
+                "c.customer_name AS customer_name, " +
+                "sri.total_return_amount AS total_return_amount " +
+                "FROM Sales_Return_Invoice sri " +
+                "LEFT JOIN Customer c ON sri.customer_id = c.customer_id " +
+                "WHERE sri.return_date >= ? AND sri.return_date <= ? " +
+                "ORDER BY sri.return_date DESC";
+        
+        try {
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            pstmt.setString(1, fromDateStr);
+            pstmt.setString(2, toDateStr);
+            
+            System.out.println("DEBUG: Executing return sales report query: " + query);
             return pstmt.executeQuery();
         } catch (SQLException e) {
+            System.err.println("DEBUG: SQLException in getReturnSalesReport: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
