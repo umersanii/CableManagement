@@ -733,14 +733,371 @@ private static double safeParseDouble(Object value) {
     }
 
     private static VBox viewCashInHand() {
-        VBox box = createSection("Cash In Hand", "Shows the total available cash.");
+        VBox box = createSection("Cash In Hand Management", "Manage cash transactions - Add, Update, or Remove cash entries.");
 
+        // Current Cash Balance Display
         double cashBalance = calculateCashBalance();
-        Label amount = new Label(String.format("Rs. %.2f", cashBalance));
-        amount.getStyleClass().add("amount-label");
+        Label balanceLabel = new Label(String.format("Current Cash Balance: Rs. %.2f", cashBalance));
+        balanceLabel.getStyleClass().add("amount-label");
+        balanceLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
 
-        box.getChildren().add(amount);
+        // Cash Transaction Form
+        VBox transactionForm = createCashTransactionForm(balanceLabel);
+        
+        // Cash Transactions Table
+        TableView<BankTransaction> cashTable = createCashTransactionsTable();
+        loadCashTransactionsTable(cashTable);
+
+        box.getChildren().addAll(balanceLabel, transactionForm, new Label("Cash Transaction History:"), cashTable);
         return box;
+    }
+
+    private static VBox createCashTransactionForm(Label balanceLabel) {
+        VBox form = new VBox(15);
+        form.setPadding(new Insets(20));
+        form.getStyleClass().add("form-container");
+        form.setStyle("-fx-border-color: #ddd; -fx-border-width: 1; -fx-border-radius: 5;");
+
+        Label formHeading = new Label("Cash Transaction Entry");
+        formHeading.getStyleClass().add("form-subheading");
+
+        // Transaction Type Selection
+        ComboBox<String> transactionType = new ComboBox<>();
+        transactionType.getItems().addAll("Cash In", "Cash Out", "Cash Adjustment");
+        transactionType.setPromptText("Select Transaction Type");
+        transactionType.setPrefWidth(200);
+        transactionType.getStyleClass().add("combo-box");
+
+        // Amount Field
+        TextField amountField = new TextField();
+        amountField.setPromptText("Enter Amount");
+        amountField.getStyleClass().add("text-field");
+
+        // Description Field
+        TextField descriptionField = new TextField();
+        descriptionField.setPromptText("Enter Description/Purpose");
+        descriptionField.getStyleClass().add("text-field");
+
+        // Date Picker
+        DatePicker datePicker = new DatePicker(LocalDate.now());
+        datePicker.getStyleClass().add("date-picker");
+
+        // Buttons
+        Button addBtn = new Button("Add Transaction");
+        addBtn.getStyleClass().add("register-button");
+        
+        Button updateBtn = new Button("Update Transaction");
+        updateBtn.getStyleClass().add("update-button");
+        updateBtn.setVisible(false);
+
+        Button cancelBtn = new Button("Cancel");
+        cancelBtn.getStyleClass().add("button");
+        cancelBtn.setVisible(false);
+
+        HBox buttonRow = new HBox(10, addBtn, updateBtn, cancelBtn);
+        buttonRow.setAlignment(Pos.CENTER_LEFT);
+
+        // Form Layout
+        HBox row1 = new HBox(15,
+            new VBox(5, new Label("Transaction Type:"), transactionType),
+            new VBox(5, new Label("Amount:"), amountField)
+        );
+        
+        HBox row2 = new HBox(15,
+            new VBox(5, new Label("Description:"), descriptionField),
+            new VBox(5, new Label("Date:"), datePicker)
+        );
+
+        form.getChildren().addAll(formHeading, row1, row2, buttonRow);
+
+        // Add Transaction Action
+        addBtn.setOnAction(e -> {
+            if (validateCashTransactionForm(transactionType, amountField, descriptionField, datePicker)) {
+                String type = transactionType.getValue().toLowerCase().replace(" ", "_");
+                double amount = Double.parseDouble(amountField.getText().trim());
+                String description = descriptionField.getText().trim();
+                String date = datePicker.getValue().format(dateFormatter);
+
+                BankTransaction transaction = new BankTransaction(
+                    0, 0, date, type, amount, description, 0
+                );
+
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.insertCashTransaction(transaction)) {
+                        // Update balance display
+                        double newBalance = calculateCashBalance();
+                        balanceLabel.setText(String.format("Current Cash Balance: Rs. %.2f", newBalance));
+                        
+                        // Clear form
+                        clearCashTransactionForm(transactionType, amountField, descriptionField, datePicker);
+                        
+                        // Refresh table if it exists
+                        refreshCashTransactionsTable();
+                        
+                        showAlert("Success", "Cash transaction added successfully!");
+                    } else {
+                        showAlert("Error", "Failed to add cash transaction!");
+                    }
+                } else {
+                    showAlert("Error", "Database not connected!");
+                }
+            }
+        });
+
+        // Cancel Action
+        cancelBtn.setOnAction(e -> {
+            clearCashTransactionForm(transactionType, amountField, descriptionField, datePicker);
+            addBtn.setVisible(true);
+            updateBtn.setVisible(false);
+            cancelBtn.setVisible(false);
+        });
+
+        return form;
+    }
+
+    private static TableView<BankTransaction> createCashTransactionsTable() {
+        TableView<BankTransaction> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setPrefHeight(300);
+
+        // Date Column
+        TableColumn<BankTransaction, String> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(cell -> {
+            String dateStr = cell.getValue().getTransactionDate();
+            try {
+                LocalDate date = LocalDate.parse(dateStr);
+                return new ReadOnlyStringWrapper(date.format(DateTimeFormatter.ofPattern("dd-MMM-yyyy")));
+            } catch (Exception e) {
+                return new ReadOnlyStringWrapper(dateStr);
+            }
+        });
+        dateCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
+
+        // Type Column
+        TableColumn<BankTransaction, String> typeCol = new TableColumn<>("Type");
+        typeCol.setCellValueFactory(cell -> {
+            String type = cell.getValue().getTransactionType();
+            String displayType = type.replace("_", " ");
+            return new ReadOnlyStringWrapper(displayType.substring(0, 1).toUpperCase() + displayType.substring(1));
+        });
+        typeCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
+
+        // Amount Column
+        TableColumn<BankTransaction, String> amountCol = new TableColumn<>("Amount");
+        amountCol.setCellValueFactory(cell -> {
+            double amount = cell.getValue().getAmount();
+            String type = cell.getValue().getTransactionType();
+            String sign = type.equals("cash_out") ? "-" : "+";
+            return new ReadOnlyStringWrapper(String.format("%s Rs. %,.2f", sign, amount));
+        });
+        amountCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
+
+        // Description Column
+        TableColumn<BankTransaction, String> descCol = new TableColumn<>("Description");
+        descCol.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().getDescription()));
+        descCol.prefWidthProperty().bind(table.widthProperty().multiply(0.35));
+
+        // Actions Column
+        TableColumn<BankTransaction, Void> actionsCol = new TableColumn<>("Actions");
+        actionsCol.setCellFactory(col -> new TableCell<>() {
+            private final Button editButton = new Button("Edit");
+            private final Button deleteButton = new Button("Delete");
+
+            {
+                editButton.getStyleClass().add("button");
+                deleteButton.getStyleClass().add("delete-button");
+                editButton.setStyle("-fx-font-size: 11px; -fx-padding: 3 8 3 8;");
+                deleteButton.setStyle("-fx-font-size: 11px; -fx-padding: 3 8 3 8;");
+
+                editButton.setOnAction(e -> {
+                    BankTransaction selected = getTableView().getItems().get(getIndex());
+                    editCashTransaction(selected);
+                });
+
+                deleteButton.setOnAction(e -> {
+                    BankTransaction selected = getTableView().getItems().get(getIndex());
+                    deleteCashTransaction(selected, table);
+                });
+            }
+
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    HBox buttons = new HBox(5, editButton, deleteButton);
+                    buttons.setAlignment(Pos.CENTER);
+                    setGraphic(buttons);
+                }
+            }
+        });
+        actionsCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
+
+        table.getColumns().addAll(dateCol, typeCol, amountCol, descCol, actionsCol);
+        return table;
+    }
+
+    private static boolean validateCashTransactionForm(ComboBox<String> type, TextField amount, 
+                                                     TextField description, DatePicker date) {
+        if (type.getValue() == null) {
+            showAlert("Validation Error", "Please select a transaction type!");
+            return false;
+        }
+
+        String amountText = amount.getText().trim();
+        if (amountText.isEmpty()) {
+            showAlert("Validation Error", "Please enter an amount!");
+            return false;
+        }
+
+        try {
+            double amountValue = Double.parseDouble(amountText);
+            if (amountValue <= 0) {
+                showAlert("Validation Error", "Amount must be greater than 0!");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            showAlert("Validation Error", "Please enter a valid amount!");
+            return false;
+        }
+
+        if (description.getText().trim().isEmpty()) {
+            showAlert("Validation Error", "Please enter a description!");
+            return false;
+        }
+
+        if (date.getValue() == null) {
+            showAlert("Validation Error", "Please select a date!");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static void clearCashTransactionForm(ComboBox<String> type, TextField amount, 
+                                               TextField description, DatePicker date) {
+        type.setValue(null);
+        amount.clear();
+        description.clear();
+        date.setValue(LocalDate.now());
+    }
+
+    private static void editCashTransaction(BankTransaction transaction) {
+        // Create edit dialog
+        Dialog<BankTransaction> dialog = new Dialog<>();
+        dialog.setTitle("Edit Cash Transaction");
+        dialog.setHeaderText("Modify the transaction details");
+
+        // Create form fields
+        ComboBox<String> typeCombo = new ComboBox<>();
+        typeCombo.getItems().addAll("Cash In", "Cash Out", "Cash Adjustment");
+        String currentType = transaction.getTransactionType().replace("_", " ");
+        typeCombo.setValue(currentType.substring(0, 1).toUpperCase() + currentType.substring(1));
+
+        TextField amountField = new TextField(String.valueOf(transaction.getAmount()));
+        TextField descField = new TextField(transaction.getDescription());
+        DatePicker datePicker = new DatePicker(LocalDate.parse(transaction.getTransactionDate()));
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 150, 10, 10));
+
+        grid.add(new Label("Type:"), 0, 0);
+        grid.add(typeCombo, 1, 0);
+        grid.add(new Label("Amount:"), 0, 1);
+        grid.add(amountField, 1, 1);
+        grid.add(new Label("Description:"), 0, 2);
+        grid.add(descField, 1, 2);
+        grid.add(new Label("Date:"), 0, 3);
+        grid.add(datePicker, 1, 3);
+
+        dialog.getDialogPane().setContent(grid);
+
+        ButtonType saveButtonType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
+
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == saveButtonType) {
+                try {
+                    String newType = typeCombo.getValue().toLowerCase().replace(" ", "_");
+                    double newAmount = Double.parseDouble(amountField.getText().trim());
+                    String newDesc = descField.getText().trim();
+                    String newDate = datePicker.getValue().format(dateFormatter);
+
+                    transaction.setTransactionType(newType);
+                    transaction.setAmount(newAmount);
+                    transaction.setDescription(newDesc);
+                    transaction.setTransactionDate(newDate);
+
+                    return transaction;
+                } catch (Exception e) {
+                    showAlert("Error", "Invalid input data!");
+                    return null;
+                }
+            }
+            return null;
+        });
+
+        dialog.showAndWait().ifPresent(updatedTransaction -> {
+            if (config.database != null && config.database.isConnected()) {
+                if (config.database.updateCashTransaction(updatedTransaction)) {
+                    // Refresh the cash transactions by reloading the cash in hand view
+                    showAlert("Success", "Transaction updated successfully!");
+                } else {
+                    showAlert("Error", "Failed to update transaction!");
+                }
+            }
+        });
+    }
+
+    private static void deleteCashTransaction(BankTransaction transaction, TableView<BankTransaction> table) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Delete Transaction");
+        alert.setHeaderText("Are you sure you want to delete this transaction?");
+        alert.setContentText(String.format("Type: %s\nAmount: Rs. %.2f\nDescription: %s", 
+            transaction.getTransactionType(), transaction.getAmount(), transaction.getDescription()));
+
+        alert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                if (config.database != null && config.database.isConnected()) {
+                    if (config.database.deleteCashTransaction(transaction.getTransactionId())) {
+                        table.getItems().remove(transaction);
+                        showAlert("Success", "Transaction deleted successfully!");
+                    } else {
+                        showAlert("Error", "Failed to delete transaction!");
+                    }
+                }
+            }
+        });
+    }
+
+    private static void loadCashTransactionsTable(TableView<BankTransaction> table) {
+        ObservableList<BankTransaction> transactions = FXCollections.observableArrayList();
+        
+        if (config.database != null && config.database.isConnected()) {
+            try {
+                List<Object[]> cashRows = config.database.getAllCashTransactions();
+                for (Object[] row : cashRows) {
+                    BankTransaction transaction = createTransactionFromRow(row, false);
+                    if (transaction != null) {
+                        transactions.add(transaction);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error loading cash transactions: " + e.getMessage());
+            }
+        }
+        
+        table.setItems(transactions);
+    }
+
+    private static void refreshCashTransactionsTable() {
+        // This method can be called to refresh any existing cash transactions table
+        // Since we're using a modular approach, the table will be refreshed when the view is reloaded
+        cashTransactions.clear();
+        loadTransactionsFromDatabase();
     }
 
     private static double calculateCashBalance() {

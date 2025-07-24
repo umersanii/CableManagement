@@ -81,6 +81,34 @@ public class SQLiteDatabase implements db {
     }
 
     @Override
+    public boolean updateCashTransaction(BankTransaction transaction) {
+        String query = "UPDATE Cash_Transaction SET transaction_type = ?, amount = ?, description = ?, transaction_date = ? WHERE transaction_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, transaction.getTransactionType());
+            pstmt.setDouble(2, transaction.getAmount());
+            pstmt.setString(3, transaction.getDescription());
+            pstmt.setString(4, transaction.getTransactionDate());
+            pstmt.setInt(5, transaction.getTransactionId());
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean deleteCashTransaction(int transactionId) {
+        String query = "DELETE FROM Cash_Transaction WHERE transaction_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, transactionId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
     public boolean updateBank(Bank bank) {
         String query = "UPDATE Bank SET branch_name = ?, balance = ?, account_number = ? WHERE bank_id = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {

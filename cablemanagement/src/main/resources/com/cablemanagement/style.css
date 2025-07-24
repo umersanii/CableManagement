@@ -202,12 +202,58 @@
     -fx-border-color: #ddd;
     -fx-border-width: 1;
     -fx-background-color: #fff;
+    -fx-padding: 5px;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
 }
 
 .table-view .column-header {
     -fx-background-color: #ecf0f1;
     -fx-font-weight: bold;
+    -fx-text-fill: #2c3e50 !important;
+    -fx-padding: 8px 5px;
+    -fx-border-color: #dee2e6;
+    -fx-border-width: 0 1px 1px 0;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: #2c3e50 !important;
+    -fx-padding: 5px;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #ecf0f1;
+    -fx-border-color: #dee2e6;
+    -fx-border-width: 1px;
+}
+
+.table-view .column-header-background .label {
+    -fx-text-fill: #2c3e50 !important;
+}
+
+.table-view .table-cell {
+    -fx-padding: 8px 5px;
+    -fx-border-color: #dee2e6;
+    -fx-border-width: 0 1px 1px 0;
     -fx-text-fill: #2c3e50;
+}
+
+.table-view .table-row-cell {
+    -fx-border-color: #dee2e6;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.table-view .table-row-cell:odd {
+    -fx-background-color: #f8f9fa;
+}
+
+.table-view .table-row-cell:even {
+    -fx-background-color: #ffffff;
+}
+
+.table-view .table-row-cell:selected {
+    -fx-background-color: #e3f2fd;
+    -fx-text-fill: #1976d2;
 }
 
 /* ---------------- SCROLLPANE ---------------- */

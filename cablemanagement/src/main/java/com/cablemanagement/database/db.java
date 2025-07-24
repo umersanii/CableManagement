@@ -372,6 +372,10 @@ boolean insertBankTransaction(BankTransaction transaction);
 
 boolean insertCashTransaction(BankTransaction transaction);
 
+boolean updateCashTransaction(BankTransaction transaction);
+
+boolean deleteCashTransaction(int transactionId);
+
 double getCashBalance();
 
 boolean updateBankBalance(double newBalance);

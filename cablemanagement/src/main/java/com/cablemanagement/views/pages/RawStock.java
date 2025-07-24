@@ -111,7 +111,7 @@ public class RawStock {
         
         // Supplier ComboBox (optional)
         ComboBox<String> supplierCombo = new ComboBox<>();
-        supplierCombo.setPromptText("Select Supplier (Optional)");
+        supplierCombo.setPromptText("Select Supplier");
         supplierCombo.getItems().addAll(database.getAllSupplierNames());
         supplierCombo.setPrefWidth(200);
 
@@ -130,6 +130,7 @@ public class RawStock {
 
         // Create form content in a compact layout
         VBox formContent = new VBox(15);
+        formContent.setStyle("-fx-text-fill: black;");
         formContent.getChildren().addAll(
             heading, 
             createFormRow("Stock Name:", nameField),
@@ -220,6 +221,9 @@ public class RawStock {
         table.getColumns().addAll(idCol, nameCol, brandCol, qtyCol, priceCol, totalCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
+        // Apply CSS class for proper header styling (defined in style.css)
+        table.getStyleClass().add("table-view");
+        
         return table;
     }
 
@@ -247,6 +251,12 @@ public class RawStock {
         form.getStyleClass().add("form-container");
 
         Label heading = createHeading("Create Raw Stock Purchase Invoice");
+        heading.setAlignment(Pos.CENTER);
+        
+        // Center the heading in a container
+        HBox headingContainer = new HBox();
+        headingContainer.setAlignment(Pos.CENTER);
+        headingContainer.getChildren().add(heading);
 
         // Auto-generated invoice number (readonly)
         TextField invoiceNumberField = createTextField(database.generateNextInvoiceNumber("RPI"), "Auto-generated Invoice Number");
@@ -331,7 +341,7 @@ public class RawStock {
         itemsSection.getChildren().addAll(itemsHeading, addItemControls, itemsTable, totalsSection);
 
         form.getChildren().addAll(
-            heading,
+            headingContainer,
             createFormRow("Invoice Number:", invoiceNumberField),
             createFormRow("Supplier:", supplierCombo),
             createFormRow("Invoice Date:", invoiceDatePicker),
