@@ -574,12 +574,19 @@ public class ReportsContent {
         Label heading = createHeading("Profit Report");
 
         // Date range filters
-        HBox dateRangeBox = createDateRangeFilter();
+        HBox dateRangeBox = new HBox(10);
+        Label fromLabel = new Label("From:");
+        DatePicker fromDatePicker = new DatePicker(LocalDate.now().minusDays(7));
+        Label toLabel = new Label("To:");
+        DatePicker toDatePicker = new DatePicker(LocalDate.now());
+        Button filterBtn = createActionButton("Filter");
+        dateRangeBox.getChildren().addAll(fromLabel, fromDatePicker, toLabel, toDatePicker, filterBtn);
+        dateRangeBox.setAlignment(Pos.CENTER_LEFT);
 
         // Action buttons
         HBox buttons = createReportActionButtons();
 
-        // Profit report table - maps to View_Profit_Report
+        // Profit report table - maps to Sales_Invoice joined with Sales_Invoice_Item and ProductionStock
         TableView<ProfitReport> table = new TableView<>();
         
         TableColumn<ProfitReport, String> invCol = new TableColumn<>("Invoice #");
@@ -599,15 +606,158 @@ public class ReportsContent {
         
         table.getColumns().addAll(invCol, dateCol, saleCol, costCol, profitCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        
-        // Sample data - in real app, fetch from View_Profit_Report
-        ObservableList<ProfitReport> data = FXCollections.observableArrayList(
-            new ProfitReport("INV-SL-001", "2025-07-05", "15000.00", "10000.00", "5000.00"),
-            new ProfitReport("INV-SL-002", "2025-07-06", "25000.00", "18000.00", "7000.00")
-        );
-        table.setItems(data);
 
-        form.getChildren().addAll(heading, dateRangeBox, buttons, table);
+        // Error label for feedback
+        Label errorLabel = new Label("");
+        errorLabel.setStyle("-fx-text-fill: red;");
+
+        // Load data from backend
+        filterBtn.setOnAction(e -> {
+            table.getItems().clear();
+            errorLabel.setText("");
+            try {
+                System.out.println("DEBUG: Profit Report - Loading data...");
+                if (config.database != null && config.database.isConnected()) {
+                    java.sql.Date from = java.sql.Date.valueOf(fromDatePicker.getValue());
+                    java.sql.Date to = java.sql.Date.valueOf(toDatePicker.getValue());
+                    
+                    System.out.println("DEBUG: Date range: " + from + " to " + to);
+                    
+                    java.sql.ResultSet rs = config.database.getProfitReport(from, to);
+                    int count = 0;
+                    while (rs != null && rs.next()) {
+                        String invoiceNumber = rs.getString("sales_invoice_number");
+                        String invoiceDate = rs.getString("sales_date");
+                        double saleAmount = rs.getDouble("sale_amount");
+                        double costAmount = rs.getDouble("cost_amount");
+                        double profitAmount = rs.getDouble("profit");
+                        
+                        // Format amounts as currency strings
+                        String formattedSaleAmount = String.format("%.2f", saleAmount);
+                        String formattedCostAmount = String.format("%.2f", costAmount);
+                        String formattedProfit = String.format("%.2f", profitAmount);
+                        
+                        System.out.println("DEBUG: Processing profit record - Invoice: " + invoiceNumber + 
+                                         ", Date: " + invoiceDate + 
+                                         ", Sale: " + formattedSaleAmount + 
+                                         ", Cost: " + formattedCostAmount + 
+                                         ", Profit: " + formattedProfit);
+                        
+                        table.getItems().add(new ProfitReport(
+                            invoiceNumber,
+                            invoiceDate,
+                            formattedSaleAmount,
+                            formattedCostAmount,
+                            formattedProfit
+                        ));
+                        count++;
+                    }
+                    
+                    System.out.println("ProfitReport rows loaded: " + count);
+                    if (count == 0) {
+                        errorLabel.setText("No profit data found for selected date range.\n" +
+                                         "Profit is calculated as (Sale Amount - Cost Amount) per invoice.\n" +
+                                         "Data comes from Sales_Invoice, Sales_Invoice_Item, and ProductionStock tables.");
+                    }
+                } else {
+                    System.out.println("DEBUG: Database is null or not connected");
+                    errorLabel.setText("Database not connected.");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error loading profit data: " + ex.getMessage());
+            }
+        });
+
+        // Refresh button action
+        ((Button) buttons.getChildren().get(0)).setOnAction(e -> filterBtn.fire());
+
+        // Print button action
+        ((Button) buttons.getChildren().get(1)).setOnAction(e -> {
+            try {
+                // Create a print-friendly representation
+                StringBuilder printContent = new StringBuilder();
+                printContent.append("Profit Report\n");
+                printContent.append("Date Range: ").append(fromDatePicker.getValue()).append(" to ").append(toDatePicker.getValue()).append("\n");
+                printContent.append("Generated on: ").append(LocalDate.now()).append("\n\n");
+                printContent.append(String.format("%-15s %-12s %-15s %-15s %-15s\n", "Invoice #", "Date", "Sale Amount", "Cost Amount", "Profit"));
+                printContent.append("=".repeat(75)).append("\n");
+                
+                double totalSales = 0, totalCosts = 0, totalProfit = 0;
+                for (ProfitReport item : table.getItems()) {
+                    printContent.append(String.format("%-15s %-12s %-15s %-15s %-15s\n",
+                        item.getInvoiceNumber(),
+                        item.getInvoiceDate(),
+                        item.getSaleAmount(),
+                        item.getCostAmount(),
+                        item.getProfit()
+                    ));
+                    
+                    // Calculate totals
+                    try {
+                        totalSales += Double.parseDouble(item.getSaleAmount());
+                        totalCosts += Double.parseDouble(item.getCostAmount());
+                        totalProfit += Double.parseDouble(item.getProfit());
+                    } catch (NumberFormatException ignored) {}
+                }
+                
+                printContent.append("=".repeat(75)).append("\n");
+                printContent.append(String.format("%-28s %-15s %-15s %-15s\n", "TOTALS:", 
+                    String.format("%.2f", totalSales), 
+                    String.format("%.2f", totalCosts), 
+                    String.format("%.2f", totalProfit)
+                ));
+                
+                // For now, just show print dialog (actual printing implementation depends on requirements)
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Print Report");
+                alert.setHeaderText("Profit Report");
+                alert.setContentText("Print functionality would be implemented here.\nReport contains " + table.getItems().size() + " records.");
+                alert.showAndWait();
+                
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error preparing report for printing: " + ex.getMessage());
+            }
+        });
+
+        // Export button action
+        ((Button) buttons.getChildren().get(2)).setOnAction(e -> {
+            try {
+                // Create CSV export content
+                StringBuilder csvContent = new StringBuilder();
+                csvContent.append("Invoice Number,Date,Sale Amount,Cost Amount,Profit\n");
+                
+                for (ProfitReport item : table.getItems()) {
+                    csvContent.append(String.format("%s,%s,%s,%s,%s\n",
+                        item.getInvoiceNumber(),
+                        item.getInvoiceDate(),
+                        item.getSaleAmount(),
+                        item.getCostAmount(),
+                        item.getProfit()
+                    ));
+                }
+                
+                // For now, just show export dialog (actual file saving implementation depends on requirements)
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Export Report");
+                alert.setHeaderText("Profit Report Export");
+                alert.setContentText("Export functionality would be implemented here.\n" +
+                                   "Data would be saved as CSV with " + table.getItems().size() + " records.\n\n" +
+                                   "Sample CSV format:\n" + 
+                                   csvContent.toString().substring(0, Math.min(200, csvContent.length())) + "...");
+                alert.showAndWait();
+                
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error preparing report for export: " + ex.getMessage());
+            }
+        });
+
+        // Optionally, trigger filter on load
+        filterBtn.fire();
+
+        form.getChildren().addAll(heading, dateRangeBox, buttons, errorLabel, table);
         return form;
     }
 

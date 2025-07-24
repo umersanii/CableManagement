@@ -159,6 +159,10 @@ public interface db {
     
     boolean insertProductionStock(String name, String category, String brand, String unit, double openingQty, double salePrice, double reorderLevel);
     
+    // New method with separate unit cost and sale price parameters
+    boolean insertProductionStock(String name, String category, String brand, String unit, 
+                                 double openingQty, double unitCost, double salePrice, double reorderLevel);
+    
     List<Object[]> getAllRawPurchaseInvoices();
     
     boolean insertRawPurchaseInvoice(String invoiceNumber, int supplierId, String invoiceDate, 
@@ -255,6 +259,15 @@ public interface db {
     List<Object[]> getAllProductionStocksWithPriceForDropdown();
     
     int getProductionStockIdByName(String productName);
+    
+    // Check if production stock exists with given name and brand
+    boolean productionStockExists(String productName, String brandName);
+    
+    // Add quantity to existing production stock
+    boolean addToProductionStock(String productName, String brandName, int addedQuantity, double unitCost, double salePrice);
+    
+    // Decrease production stock when items are sold
+    boolean decreaseProductionStock(int productionId, double soldQuantity);
     
     int insertSalesInvoiceAndGetId(String invoiceNumber, int customerId, String salesDate, 
                                   double totalAmount, double discountAmount, double paidAmount);

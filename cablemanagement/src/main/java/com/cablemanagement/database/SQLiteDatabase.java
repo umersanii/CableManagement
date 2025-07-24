@@ -1,7 +1,6 @@
 package com.cablemanagement.database;
 
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -150,8 +149,6 @@ public class SQLiteDatabase implements db {
             connect(null, null, null);
             // Initialize all required tables
             initializeDatabase();
-            // Migrate schema if needed
-            migrateSchema();
             // Add sample data for testing reports
             addSampleDataForTesting();
         }
@@ -162,8 +159,6 @@ public class SQLiteDatabase implements db {
         connect(databasePath, null, null);
         // Initialize all required tables
         initializeDatabase();
-        // Migrate schema if needed
-        migrateSchema();
         // Add sample data for testing reports
         addSampleDataForTesting();
     }
@@ -175,7 +170,21 @@ public class SQLiteDatabase implements db {
             connection = DriverManager.getConnection(jdbcUrl);
             
             try (Statement stmt = connection.createStatement()) {
+                // Enable foreign keys
                 stmt.execute("PRAGMA foreign_keys = ON");
+                
+                // Set timeout for busy connections (in milliseconds)
+                stmt.execute("PRAGMA busy_timeout = 30000");
+                
+                // Use WAL mode for better concurrency
+                stmt.execute("PRAGMA journal_mode = WAL");
+                
+                // Optimize for better performance
+                stmt.execute("PRAGMA synchronous = NORMAL");
+                stmt.execute("PRAGMA cache_size = 10000");
+                stmt.execute("PRAGMA temp_store = memory");
+                
+                System.out.println("DEBUG: SQLite connection configured with lock prevention settings");
             }
             
             return "Connected to SQLite database successfully";
@@ -535,6 +544,7 @@ public class SQLiteDatabase implements db {
                     "unit_cost REAL NOT NULL," +
                     "total_cost REAL NOT NULL," +
                     "production_date TEXT DEFAULT CURRENT_TIMESTAMP," +
+                    "sale_price REAL DEFAULT 0.0," +
                     "FOREIGN KEY (brand_id) REFERENCES Brand(brand_id)" +
                     ")",
 
@@ -697,80 +707,6 @@ public class SQLiteDatabase implements db {
         }
     }
     
-    private void migrateSchema() {
-        try {
-            Statement stmt = connection.createStatement();
-            
-            // Check if Employee table has the new schema columns
-            DatabaseMetaData metaData = connection.getMetaData();
-            ResultSet columns = metaData.getColumns(null, null, "Employee", null);
-            
-            boolean hasDesignationId = false;
-            boolean hasSalaryType = false;
-            boolean hasSalaryAmount = false;
-            boolean hasPhoneNumber = false;
-            boolean hasCnic = false;
-            boolean hasIsActive = false;
-            
-            while (columns.next()) {
-                String columnName = columns.getString("COLUMN_NAME");
-                switch (columnName.toLowerCase()) {
-                    case "designation_id":
-                        hasDesignationId = true;
-                        break;
-                    case "salary_type":
-                        hasSalaryType = true;
-                        break;
-                    case "salary_amount":
-                        hasSalaryAmount = true;
-                        break;
-                    case "phone_number":
-                        hasPhoneNumber = true;
-                        break;
-                    case "cnic":
-                        hasCnic = true;
-                        break;
-                    case "is_active":
-                        hasIsActive = true;
-                        break;
-                }
-            }
-            columns.close();
-            
-            // Add missing columns if they don't exist
-            if (!hasDesignationId) {
-                stmt.execute("ALTER TABLE Employee ADD COLUMN designation_id INTEGER");
-                System.out.println("Added designation_id column to Employee table");
-            }
-            if (!hasSalaryType) {
-                stmt.execute("ALTER TABLE Employee ADD COLUMN salary_type TEXT DEFAULT 'monthly'");
-                System.out.println("Added salary_type column to Employee table");
-            }
-            if (!hasSalaryAmount) {
-                stmt.execute("ALTER TABLE Employee ADD COLUMN salary_amount REAL DEFAULT 0");
-                System.out.println("Added salary_amount column to Employee table");
-            }
-            if (!hasPhoneNumber) {
-                stmt.execute("ALTER TABLE Employee ADD COLUMN phone_number TEXT");
-                System.out.println("Added phone_number column to Employee table");
-            }
-            if (!hasCnic) {
-                stmt.execute("ALTER TABLE Employee ADD COLUMN cnic TEXT");
-                System.out.println("Added cnic column to Employee table");
-            }
-            if (!hasIsActive) {
-                stmt.execute("ALTER TABLE Employee ADD COLUMN is_active INTEGER DEFAULT 1");
-                System.out.println("Added is_active column to Employee table");
-            }
-            
-            stmt.close();
-            
-        } catch (SQLException e) {
-            System.err.println("Error during schema migration: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-    
     private void insertDefaultData(Statement stmt) throws SQLException {
         // Check if Province table is empty and insert default data
         ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM Province");
@@ -848,11 +784,11 @@ public class SQLiteDatabase implements db {
         rs = stmt.executeQuery("SELECT COUNT(*) FROM ProductionStock");
         rs.next();
         if (rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO ProductionStock (product_name, brand_id, quantity, unit_cost, total_cost) VALUES " +
-                        "('Copper Cable 10mm', 1, 50, 450.00, 22500.00), " +
-                        "('PVC Sheathed Wire 6mm', 2, 30, 320.00, 9600.00), " +
-                        "('Fiber Optic Cable', 1, 25, 800.00, 20000.00), " +
-                        "('Power Cable 16mm', 3, 40, 650.00, 26000.00)");
+            stmt.execute("INSERT INTO ProductionStock (product_name, brand_id, quantity, unit_cost, total_cost, sale_price) VALUES " +
+                        "('Copper Cable 10mm', 1, 50, 450.00, 22500.00, 540.00), " +
+                        "('PVC Sheathed Wire 6mm', 2, 30, 320.00, 9600.00, 384.00), " +
+                        "('Fiber Optic Cable', 1, 25, 800.00, 20000.00, 960.00), " +
+                        "('Power Cable 16mm', 3, 40, 650.00, 26000.00, 780.00)");
         }
         rs.close();
         
@@ -2502,8 +2438,8 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllProductionStocks() {
         List<Object[]> productionStocks = new ArrayList<>();
-        String query = "SELECT ps.production_id, ps.product_name, b.brand_name, " +
-                      "ps.quantity, ps.unit_cost, ps.total_cost, ps.production_date " +
+        String query = "SELECT ps.production_id, ps.product_name, ps.product_description, " +
+                      "b.brand_name, b.brand_description, ps.quantity, ps.unit_cost, ps.sale_price, ps.total_cost, ps.production_date " +
                       "FROM ProductionStock ps " +
                       "JOIN Brand b ON ps.brand_id = b.brand_id " +
                       "ORDER BY ps.product_name";
@@ -2513,17 +2449,21 @@ public class SQLiteDatabase implements db {
             
             while (rs.next()) {
                 Object[] row = {
-                    rs.getInt("production_id"),
-                    rs.getString("product_name"),
-                    rs.getString("brand_name"),
-                    rs.getInt("quantity"),
-                    rs.getDouble("unit_cost"),
-                    rs.getDouble("total_cost"),
-                    rs.getString("production_date")
+                    rs.getInt("production_id"),        // 0
+                    rs.getString("product_name"),      // 1
+                    rs.getString("product_description"), // 2
+                    rs.getString("brand_name"),        // 3
+                    rs.getString("brand_description"), // 4
+                    rs.getInt("quantity"),             // 5
+                    rs.getDouble("unit_cost"),         // 6
+                    rs.getDouble("sale_price"),        // 7
+                    rs.getDouble("total_cost"),        // 8
+                    rs.getString("production_date")    // 9
                 };
                 productionStocks.add(row);
             }
         } catch (SQLException e) {
+            System.err.println("ERROR: Failed to get all production stocks: " + e.getMessage());
             e.printStackTrace();
         }
         return productionStocks;
@@ -2689,24 +2629,32 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean insertProductionStock(String name, String category, String brand, String unit, 
                                        double openingQty, double salePrice, double reorderLevel) {
-        String query = "INSERT INTO ProductionStock (product_name, brand_id, quantity, unit_cost, total_cost) " +
-                      "VALUES (?, (SELECT brand_id FROM Brand WHERE brand_name = ? LIMIT 1), ?, ?, ?)";
+        // For this method, we'll use salePrice as both cost and sale price
+        // In a real implementation, you'd want separate parameters for unit_cost and sale_price
+        double unitCost = salePrice * 0.8; // Assume cost is 80% of sale price
         
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        String query = "INSERT INTO ProductionStock (product_name, brand_id, quantity, unit_cost, total_cost, sale_price) " +
+                      "VALUES (?, (SELECT brand_id FROM Brand WHERE brand_name = ? LIMIT 1), ?, ?, ?, ?)";
+        
+        try {
             connection.setAutoCommit(false); // Start transaction
             
             // Ensure brand exists
             ensureBrandExists(brand, 1); // Default tehsil_id = 1
             
-            double totalCost = openingQty * salePrice;
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            double totalCost = openingQty * unitCost;
             
             pstmt.setString(1, name);
             pstmt.setString(2, brand);
             pstmt.setInt(3, (int) openingQty);
-            pstmt.setDouble(4, salePrice);
+            pstmt.setDouble(4, unitCost);
             pstmt.setDouble(5, totalCost);
+            pstmt.setDouble(6, salePrice);
             
             int result = pstmt.executeUpdate();
+            pstmt.close();
+            
             connection.commit(); // Commit transaction
             connection.setAutoCommit(true); // Reset auto-commit
             
@@ -2714,10 +2662,55 @@ public class SQLiteDatabase implements db {
         } catch (SQLException e) {
             try {
                 connection.rollback(); // Rollback on error
-                connection.setAutoCommit(true);
+                connection.setAutoCommit(true); // Reset auto-commit
             } catch (SQLException rollbackEx) {
                 rollbackEx.printStackTrace();
             }
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // New overloaded method with separate unit cost and sale price parameters
+    public boolean insertProductionStock(String name, String category, String brand, String unit, 
+                                       double openingQty, double unitCost, double salePrice, double reorderLevel) {
+        String query = "INSERT INTO ProductionStock (product_name, brand_id, quantity, unit_cost, total_cost, sale_price) " +
+                      "VALUES (?, (SELECT brand_id FROM Brand WHERE brand_name = ? LIMIT 1), ?, ?, ?, ?)";
+        
+        try {
+            connection.setAutoCommit(false); // Start transaction
+            
+            // Ensure brand exists
+            ensureBrandExists(brand, 1); // Default tehsil_id = 1
+            
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            double totalCost = openingQty * unitCost;
+            
+            pstmt.setString(1, name);
+            pstmt.setString(2, brand);
+            pstmt.setInt(3, (int) openingQty);
+            pstmt.setDouble(4, unitCost);      // Use the actual unit cost passed
+            pstmt.setDouble(5, totalCost);
+            pstmt.setDouble(6, salePrice);     // Use the actual sale price passed
+            
+            int result = pstmt.executeUpdate();
+            pstmt.close();
+            
+            connection.commit(); // Commit transaction
+            connection.setAutoCommit(true); // Reset auto-commit
+            
+            System.out.println("DEBUG: Inserted ProductionStock - Name: " + name + 
+                             ", Unit Cost: " + unitCost + ", Sale Price: " + salePrice);
+            
+            return result > 0;
+        } catch (SQLException e) {
+            try {
+                connection.rollback(); // Rollback on error
+                connection.setAutoCommit(true); // Reset auto-commit
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
+            System.err.println("ERROR: Failed to insert production stock: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -3064,6 +3057,67 @@ public class SQLiteDatabase implements db {
         }
     }
 
+    // Method to decrease production stock when items are sold
+    public boolean decreaseProductionStock(int productionId, double soldQuantity) {
+        String query = "UPDATE ProductionStock SET quantity = quantity - ? WHERE production_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDouble(1, soldQuantity);
+            pstmt.setInt(2, productionId);
+            int rowsAffected = pstmt.executeUpdate();
+            System.out.println("DEBUG: Decreased stock for production_id " + productionId + " by " + soldQuantity + ", rows affected: " + rowsAffected);
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            System.err.println("ERROR: Failed to decrease production stock: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Check if production stock with same name and brand already exists
+    public boolean productionStockExists(String productName, String brandName) {
+        String query = "SELECT COUNT(*) FROM ProductionStock ps " +
+                      "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                      "WHERE ps.product_name = ? AND b.brand_name = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, productName);
+            pstmt.setString(2, brandName);
+            
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
+            return false;
+        } catch (SQLException e) {
+            System.err.println("ERROR: Failed to check production stock existence: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Add quantity to existing production stock
+    public boolean addToProductionStock(String productName, String brandName, int addedQuantity, double unitCost, double salePrice) {
+        String query = "UPDATE ProductionStock " +
+                      "SET quantity = quantity + ?, unit_cost = ?, sale_price = ? " +
+                      "WHERE product_name = ? AND brand_id = (SELECT brand_id FROM Brand WHERE brand_name = ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, addedQuantity);
+            pstmt.setDouble(2, unitCost);
+            pstmt.setDouble(3, salePrice);
+            pstmt.setString(4, productName);
+            pstmt.setString(5, brandName);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            System.out.println("DEBUG: Added " + addedQuantity + " to existing stock for " + productName + " (" + brandName + "), rows affected: " + rowsAffected);
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            System.err.println("ERROR: Failed to add to production stock: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     /**
      * Get production return invoice details by ID
      */
@@ -3222,7 +3276,8 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllProductionStocksWithPriceForDropdown() {
         List<Object[]> products = new ArrayList<>();
-        String query = "SELECT ps.production_id, ps.product_name, ps.unit_cost, " +
+        String query = "SELECT ps.production_id, ps.product_name, " +
+                      "CASE WHEN ps.sale_price > 0 THEN ps.sale_price ELSE ps.unit_cost * 1.2 END as sale_price, " +
                       "ps.quantity, 'N/A' as category_name, b.brand_name, 'N/A' as unit_name " +
                       "FROM ProductionStock ps " +
                       "JOIN Brand b ON ps.brand_id = b.brand_id " +
@@ -3236,7 +3291,7 @@ public class SQLiteDatabase implements db {
                 Object[] row = {
                     rs.getInt("production_id"),
                     rs.getString("product_name"),
-                    rs.getDouble("unit_cost"),
+                    rs.getDouble("sale_price"),
                     rs.getDouble("quantity"),
                     rs.getString("category_name"),
                     rs.getString("brand_name"),
@@ -3274,7 +3329,8 @@ public class SQLiteDatabase implements db {
         String query = "INSERT INTO Sales_Invoice (sales_invoice_number, customer_id, sales_date, " +
                       "total_amount, discount_amount, paid_amount) VALUES (?, ?, ?, ?, ?, ?)";
         
-        try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+        try {
+            PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
             pstmt.setString(1, invoiceNumber);
             pstmt.setInt(2, customerId);
             pstmt.setString(3, salesDate);
@@ -3284,13 +3340,18 @@ public class SQLiteDatabase implements db {
             
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows > 0) {
-                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        return generatedKeys.getInt(1);
-                    }
+                ResultSet generatedKeys = pstmt.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    int generatedId = generatedKeys.getInt(1);
+                    generatedKeys.close();
+                    pstmt.close();
+                    return generatedId;
                 }
+                generatedKeys.close();
             }
+            pstmt.close();
         } catch (SQLException e) {
+            System.err.println("Error inserting sales invoice: " + e.getMessage());
             e.printStackTrace();
         }
         return -1;
@@ -3301,24 +3362,40 @@ public class SQLiteDatabase implements db {
         String query = "INSERT INTO Sales_Invoice_Item (sales_invoice_id, production_stock_id, quantity, unit_price, total_price) " +
                       "VALUES (?, ?, ?, ?, ?)";
         
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try {
+            PreparedStatement pstmt = connection.prepareStatement(query);
             for (Object[] item : items) {
+                int productionStockId = (Integer) item[0];
+                double quantity = (Double) item[1];
+                double unitPrice = (Double) item[2];
+                
                 pstmt.setInt(1, salesInvoiceId);
-                pstmt.setInt(2, (Integer) item[0]); // production_stock_id
-                pstmt.setDouble(3, (Double) item[1]); // quantity
-                pstmt.setDouble(4, (Double) item[2]); // unit_price
-                pstmt.setDouble(5, (Double) item[1] * (Double) item[2]); // total_price = quantity * unit_price
+                pstmt.setInt(2, productionStockId);
+                pstmt.setDouble(3, quantity);
+                pstmt.setDouble(4, unitPrice);
+                pstmt.setDouble(5, quantity * unitPrice); // total_price = quantity * unit_price
                 pstmt.addBatch();
+                
+                // Decrease production stock for each sold item
+                if (!decreaseProductionStock(productionStockId, quantity)) {
+                    System.err.println("WARNING: Failed to decrease production stock for product ID: " + productionStockId);
+                    pstmt.close();
+                    return false;
+                }
             }
             
             int[] results = pstmt.executeBatch();
+            pstmt.close();
+            
             for (int result : results) {
                 if (result <= 0) {
                     return false;
                 }
             }
+            System.out.println("DEBUG: Successfully inserted sales invoice items and updated stock levels");
             return true;
         } catch (SQLException e) {
+            System.err.println("Error inserting sales invoice items: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -3329,22 +3406,39 @@ public class SQLiteDatabase implements db {
                                      double totalAmount, double discountAmount, double paidAmount, 
                                      List<Object[]> items) {
         try {
+            // Set a timeout for database operations to prevent indefinite locks
             connection.setAutoCommit(false);
+            
+            System.out.println("DEBUG: Starting sales invoice transaction...");
             
             int salesInvoiceId = insertSalesInvoiceAndGetId(invoiceNumber, customerId, salesDate, 
                                                            totalAmount, discountAmount, paidAmount);
             
-            if (salesInvoiceId > 0 && insertSalesInvoiceItems(salesInvoiceId, items)) {
-                connection.commit();
-                return true;
+            if (salesInvoiceId > 0) {
+                System.out.println("DEBUG: Sales invoice created with ID: " + salesInvoiceId);
+                
+                if (insertSalesInvoiceItems(salesInvoiceId, items)) {
+                    System.out.println("DEBUG: Sales invoice items inserted successfully");
+                    connection.commit();
+                    System.out.println("DEBUG: Transaction committed successfully");
+                    return true;
+                } else {
+                    System.out.println("DEBUG: Failed to insert sales invoice items, rolling back");
+                    connection.rollback();
+                    return false;
+                }
             } else {
+                System.out.println("DEBUG: Failed to create sales invoice, rolling back");
                 connection.rollback();
                 return false;
             }
         } catch (SQLException e) {
+            System.err.println("DEBUG: SQLException in insertSalesInvoice: " + e.getMessage());
             try {
                 connection.rollback();
+                System.out.println("DEBUG: Transaction rolled back due to exception");
             } catch (SQLException rollbackEx) {
+                System.err.println("DEBUG: Failed to rollback transaction: " + rollbackEx.getMessage());
                 rollbackEx.printStackTrace();
             }
             e.printStackTrace();
@@ -3352,7 +3446,9 @@ public class SQLiteDatabase implements db {
         } finally {
             try {
                 connection.setAutoCommit(true);
+                System.out.println("DEBUG: AutoCommit restored to true");
             } catch (SQLException e) {
+                System.err.println("DEBUG: Failed to restore AutoCommit: " + e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -4910,14 +5006,81 @@ public class SQLiteDatabase implements db {
 
     @Override
     public ResultSet getProfitReport(Date fromDate, Date toDate) {
-        String query = "SELECT product_name, SUM(quantity) AS total_sold, SUM(quantity * unit_cost) AS cost, SUM(quantity * unit_price) AS revenue, " +
-                    "(SUM(quantity * unit_price) - SUM(quantity * unit_cost)) AS profit " +
-                    "FROM Sales_Invoice_Item WHERE invoice_date BETWEEN ? AND ? GROUP BY product_name";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setDate(1, fromDate);
-            pstmt.setDate(2, toDate);
-            return pstmt.executeQuery();
+        System.out.println("DEBUG: Profit Report - Getting data from " + fromDate + " to " + toDate);
+        
+        // First, let's check table counts for debugging
+        try {
+            Statement stmt = connection.createStatement();
+            ResultSet countRs = stmt.executeQuery("SELECT COUNT(*) as count FROM Sales_Invoice");
+            if (countRs.next()) {
+                System.out.println("DEBUG: Total Sales_Invoice records: " + countRs.getInt("count"));
+            }
+            
+            countRs = stmt.executeQuery("SELECT COUNT(*) as count FROM Sales_Invoice_Item");
+            if (countRs.next()) {
+                System.out.println("DEBUG: Total Sales_Invoice_Item records: " + countRs.getInt("count"));
+            }
+            
+            countRs = stmt.executeQuery("SELECT COUNT(*) as count FROM ProductionStock");
+            if (countRs.next()) {
+                System.out.println("DEBUG: Total ProductionStock records: " + countRs.getInt("count"));
+            }
         } catch (SQLException e) {
+            System.out.println("DEBUG: Error getting table counts: " + e.getMessage());
+        }
+        
+        String query = "SELECT " +
+                      "si.sales_invoice_number, " +
+                      "si.sales_date, " +
+                      "SUM(sii.quantity * CASE WHEN ps.sale_price > 0 THEN ps.sale_price ELSE sii.unit_price END) as sale_amount, " +
+                      "SUM(sii.quantity * ps.unit_cost) as cost_amount, " +
+                      "(SUM(sii.quantity * CASE WHEN ps.sale_price > 0 THEN ps.sale_price ELSE sii.unit_price END) - SUM(sii.quantity * ps.unit_cost)) as profit " +
+                      "FROM Sales_Invoice si " +
+                      "JOIN Sales_Invoice_Item sii ON si.sales_invoice_id = sii.sales_invoice_id " +
+                      "JOIN ProductionStock ps ON sii.production_stock_id = ps.production_id " +
+                      "WHERE si.sales_date BETWEEN ? AND ? " +
+                      "GROUP BY si.sales_invoice_number, si.sales_date " +
+                      "ORDER BY si.sales_date DESC";
+        
+        System.out.println("DEBUG: Executing profit query: " + query);
+        System.out.println("DEBUG: Date range: " + fromDate + " to " + toDate);
+        
+        try {
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            pstmt.setString(1, fromDate.toString());
+            pstmt.setString(2, toDate.toString());
+            
+            ResultSet rs = pstmt.executeQuery();
+            System.out.println("DEBUG: Profit query executed successfully");
+            
+            // Test query without date filter to see if we get any results
+            try {
+                Statement testStmt = connection.createStatement();
+                ResultSet testRs = testStmt.executeQuery(
+                    "SELECT si.sales_invoice_number, si.sales_date, " +
+                    "SUM(sii.quantity * CASE WHEN ps.sale_price > 0 THEN ps.sale_price ELSE sii.unit_price END) as sale_amount, " +
+                    "SUM(sii.quantity * ps.unit_cost) as cost_amount " +
+                    "FROM Sales_Invoice si " +
+                    "JOIN Sales_Invoice_Item sii ON si.sales_invoice_id = sii.sales_invoice_id " +
+                    "JOIN ProductionStock ps ON sii.production_stock_id = ps.production_id " +
+                    "GROUP BY si.sales_invoice_number, si.sales_date LIMIT 3"
+                );
+                int testCount = 0;
+                while (testRs.next()) {
+                    System.out.println("DEBUG: Test result - Invoice: " + testRs.getString("sales_invoice_number") + 
+                                     ", Date: " + testRs.getString("sales_date") + 
+                                     ", Sale: " + testRs.getDouble("sale_amount") + 
+                                     ", Cost: " + testRs.getDouble("cost_amount"));
+                    testCount++;
+                }
+                System.out.println("DEBUG: Test query returned " + testCount + " results");
+            } catch (SQLException e) {
+                System.out.println("DEBUG: Test query failed: " + e.getMessage());
+            }
+            
+            return rs;
+        } catch (SQLException e) {
+            System.out.println("DEBUG: Error executing profit query: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
