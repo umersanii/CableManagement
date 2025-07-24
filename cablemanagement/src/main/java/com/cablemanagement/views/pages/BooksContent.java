@@ -66,8 +66,8 @@ public class BooksContent {
             "Return Raw Stock Book",
             "Production Book",
             "Return Production Book",
-            "Sales Book",
-            "Return Sales Book"
+            // "Sales Book",
+            // "Return Sales Book"
         };
 
         Runnable[] actions = {
@@ -77,8 +77,8 @@ public class BooksContent {
             () -> formArea.getChildren().setAll(createReturnRawStockBookForm()),
             () -> formArea.getChildren().setAll(createProductionBookForm()),
             () -> formArea.getChildren().setAll(createReturnProductionBookForm()),
-            () -> formArea.getChildren().setAll(createSalesBookForm()),
-            () -> formArea.getChildren().setAll(createReturnSalesBookForm())
+            // () -> formArea.getChildren().setAll(createSalesBookForm()),
+            // () -> formArea.getChildren().setAll(createReturnSalesBookForm())
         };
 
         for (int i = 0; i < buttonLabels.length; i++) {
