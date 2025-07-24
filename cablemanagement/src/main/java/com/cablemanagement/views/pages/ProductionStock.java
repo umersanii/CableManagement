@@ -652,6 +652,10 @@ public class ProductionStock {
         form.getStyleClass().add("form-container");
 
         Label heading = createHeading("Create Sales Invoice");
+        
+        // Create a VBox for scrollable content
+        VBox scrollableContent = new VBox(20);
+        scrollableContent.setPadding(new Insets(0, 20, 20, 20));
 
         // === INVOICE HEADER SECTION ===
         VBox headerSection = new VBox(15);
@@ -954,15 +958,27 @@ public class ProductionStock {
         
         actionButtons.getChildren().addAll(submitBtn, resetFormBtn);
 
-        // Add all sections to form
-        form.getChildren().addAll(
-            heading,
+        // Add all sections to scrollable content
+        scrollableContent.getChildren().addAll(
             headerSection,
             productSection,  
             tableSection,
             paymentSection,
             actionButtons
         );
+        
+        // Create ScrollPane for the form content
+        ScrollPane scrollPane = new ScrollPane(scrollableContent);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(false);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setPrefViewportHeight(600);
+        scrollPane.setMaxHeight(600);
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        
+        // Add heading and scrollable content to main form
+        form.getChildren().addAll(heading, scrollPane);
 
         // === EVENT HANDLERS ===
         
