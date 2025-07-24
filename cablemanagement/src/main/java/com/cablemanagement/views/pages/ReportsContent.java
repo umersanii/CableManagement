@@ -57,7 +57,7 @@ public class ReportsContent {
             "Brand Profit Report",
             "Customer Sales Report",
             "Supplier Sales Report",
-            "Attendance Report"
+            // "Attendance Report"
         };
 
         Runnable[] actions = {
@@ -76,7 +76,7 @@ public class ReportsContent {
             () -> reportArea.getChildren().setAll(createBrandProfitReport()),
             () -> reportArea.getChildren().setAll(createCustomerSalesReport()),
             () -> reportArea.getChildren().setAll(createSupplierSalesReport()),
-            () -> reportArea.getChildren().setAll(createAttendanceReport())
+            // () -> reportArea.getChildren().setAll(createAttendanceReport())
         };
 
         for (int i = 0; i < buttonLabels.length; i++) {
@@ -1021,12 +1021,19 @@ public class ReportsContent {
         Label heading = createHeading("Brand-Wise Sales Report");
 
         // Date range filters
-        HBox dateRangeBox = createDateRangeFilter();
+        HBox dateRangeBox = new HBox(10);
+        Label fromLabel = new Label("From:");
+        DatePicker fromDatePicker = new DatePicker(LocalDate.now().minusDays(7));
+        Label toLabel = new Label("To:");
+        DatePicker toDatePicker = new DatePicker(LocalDate.now());
+        Button filterBtn = createActionButton("Filter");
+        dateRangeBox.getChildren().addAll(fromLabel, fromDatePicker, toLabel, toDatePicker, filterBtn);
+        dateRangeBox.setAlignment(Pos.CENTER_LEFT);
 
         // Action buttons
         HBox buttons = createReportActionButtons();
 
-        // Brand sales report table - maps to View_Brand_Wise_Salesman_Sales_Report
+        // Brand sales report table - maps to Sales_Invoice_Item joined with Brand and ProductionStock
         TableView<BrandSalesReport> table = new TableView<>();
         
         TableColumn<BrandSalesReport, String> salesmanCol = new TableColumn<>("Salesman");
@@ -1043,15 +1050,122 @@ public class ReportsContent {
         
         table.getColumns().addAll(salesmanCol, brandCol, quantityCol, salesCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        
-        // Sample data - in real app, fetch from View_Brand_Wise_Salesman_Sales_Report
-        ObservableList<BrandSalesReport> data = FXCollections.observableArrayList(
-            new BrandSalesReport("Imran Khan", "PowerFlex", "50", "37500.00"),
-            new BrandSalesReport("Ali Shah", "SafeWire", "30", "36000.00")
-        );
-        table.setItems(data);
 
-        form.getChildren().addAll(heading, dateRangeBox, buttons, table);
+        // Error label for feedback
+        Label errorLabel = new Label("");
+        errorLabel.setStyle("-fx-text-fill: red;");
+
+        // Load data from backend
+        filterBtn.setOnAction(e -> {
+            table.getItems().clear();
+            errorLabel.setText("");
+            try {
+                System.out.println("DEBUG: Brand Sales Report - Loading data...");
+                if (config.database != null && config.database.isConnected()) {
+                    java.sql.Date from = java.sql.Date.valueOf(fromDatePicker.getValue());
+                    java.sql.Date to = java.sql.Date.valueOf(toDatePicker.getValue());
+                    
+                    System.out.println("DEBUG: Date range: " + from + " to " + to);
+                    
+                    java.sql.ResultSet rs = config.database.getBrandSalesReport(from, to);
+                    int count = 0;
+                    while (rs != null && rs.next()) {
+                        String brandName = rs.getString("brand_name");
+                        String totalQuantity = String.format("%.2f", rs.getDouble("total_quantity"));
+                        String totalSales = String.format("%.2f", rs.getDouble("total_sales"));
+                        String salesmanName = rs.getString("salesman_name");
+                        
+                        System.out.println("DEBUG: Processing record - Brand: " + brandName + ", Quantity: " + totalQuantity + ", Sales: " + totalSales);
+                        
+                        // Handle null values
+                        if (brandName == null) brandName = "Unknown Brand";
+                        if (salesmanName == null) salesmanName = "N/A";
+                        
+                        table.getItems().add(new BrandSalesReport(salesmanName, brandName, totalQuantity, totalSales));
+                        count++;
+                    }
+                    
+                    System.out.println("BrandSalesReport rows loaded: " + count);
+                    if (count == 0) {
+                        errorLabel.setText("No brand sales data found for selected date range.");
+                    }
+                } else {
+                    System.out.println("DEBUG: Database is null or not connected");
+                    errorLabel.setText("Database not connected.");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error loading brand sales data: " + ex.getMessage());
+            }
+        });
+
+        // Refresh button action
+        ((Button) buttons.getChildren().get(0)).setOnAction(e -> filterBtn.fire());
+
+        // Print button action
+        ((Button) buttons.getChildren().get(1)).setOnAction(e -> {
+            try {
+                // Create a print-friendly representation
+                StringBuilder printContent = new StringBuilder();
+                printContent.append("Brand-Wise Sales Report\n");
+                printContent.append("Date Range: ").append(fromDatePicker.getValue()).append(" to ").append(toDatePicker.getValue()).append("\n");
+                printContent.append("Generated on: ").append(LocalDate.now()).append("\n\n");
+                printContent.append(String.format("%-20s %-20s %-15s %-15s\n", "Salesman", "Brand", "Quantity", "Total Sales"));
+                printContent.append("=".repeat(70)).append("\n");
+                
+                for (BrandSalesReport item : table.getItems()) {
+                    printContent.append(String.format("%-20s %-20s %-15s %-15s\n", 
+                        item.getSalesmanName(), 
+                        item.getBrandName(), 
+                        item.getTotalQuantity(), 
+                        item.getTotalSale()));
+                }
+                
+                // For now, just show print dialog (actual printing implementation depends on requirements)
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Print Report");
+                alert.setHeaderText("Brand Sales Report");
+                alert.setContentText("Print functionality would be implemented here.\nReport contains " + table.getItems().size() + " records.");
+                alert.showAndWait();
+                
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error preparing report for printing: " + ex.getMessage());
+            }
+        });
+
+        // Export button action
+        ((Button) buttons.getChildren().get(2)).setOnAction(e -> {
+            try {
+                // Create CSV export content
+                StringBuilder csvContent = new StringBuilder();
+                csvContent.append("Salesman,Brand,Quantity,Total Sales\n");
+                
+                for (BrandSalesReport item : table.getItems()) {
+                    csvContent.append(String.format("%s,%s,%s,%s\n", 
+                        item.getSalesmanName(), 
+                        item.getBrandName(), 
+                        item.getTotalQuantity(), 
+                        item.getTotalSale()));
+                }
+                
+                // For now, just show export dialog (actual file saving implementation depends on requirements)
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Export Report");
+                alert.setHeaderText("Brand Sales Report Export");
+                alert.setContentText("Export functionality would be implemented here.\nReport contains " + table.getItems().size() + " records ready for CSV export.");
+                alert.showAndWait();
+                
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error preparing report for export: " + ex.getMessage());
+            }
+        });
+
+        // Optionally, trigger filter on load
+        filterBtn.fire();
+
+        form.getChildren().addAll(heading, dateRangeBox, buttons, errorLabel, table);
         return form;
     }
 
@@ -1175,48 +1289,48 @@ public class ReportsContent {
         return form;
     }
 
-    private static VBox createAttendanceReport() {
-        VBox form = new VBox(15);
-        form.setPadding(new Insets(20));
-        form.getStyleClass().add("form-container");
+    // private static VBox createAttendanceReport() {
+    //     VBox form = new VBox(15);
+    //     form.setPadding(new Insets(20));
+    //     form.getStyleClass().add("form-container");
 
-        Label heading = createHeading("Attendance Report");
+    //     Label heading = createHeading("Attendance Report");
 
-        // Date range filters
-        HBox dateRangeBox = createDateRangeFilter();
+    //     // Date range filters
+    //     HBox dateRangeBox = createDateRangeFilter();
 
-        // Action buttons
-        HBox buttons = createReportActionButtons();
+    //     // Action buttons
+    //     HBox buttons = createReportActionButtons();
 
-        // Attendance report table - maps to View_Attendance_Report
-        TableView<AttendanceReport> table = new TableView<>();
+    //     // Attendance report table - maps to View_Attendance_Report
+    //     TableView<AttendanceReport> table = new TableView<>();
         
-        TableColumn<AttendanceReport, String> nameCol = new TableColumn<>("Employee");
-        nameCol.setCellValueFactory(new PropertyValueFactory<>("employeeName"));
+    //     TableColumn<AttendanceReport, String> nameCol = new TableColumn<>("Employee");
+    //     nameCol.setCellValueFactory(new PropertyValueFactory<>("employeeName"));
         
-        TableColumn<AttendanceReport, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(new PropertyValueFactory<>("attendanceDate"));
+    //     TableColumn<AttendanceReport, String> dateCol = new TableColumn<>("Date");
+    //     dateCol.setCellValueFactory(new PropertyValueFactory<>("attendanceDate"));
         
-        TableColumn<AttendanceReport, String> statusCol = new TableColumn<>("Status");
-        statusCol.setCellValueFactory(new PropertyValueFactory<>("status"));
+    //     TableColumn<AttendanceReport, String> statusCol = new TableColumn<>("Status");
+    //     statusCol.setCellValueFactory(new PropertyValueFactory<>("status"));
         
-        TableColumn<AttendanceReport, String> hoursCol = new TableColumn<>("Hours");
-        hoursCol.setCellValueFactory(new PropertyValueFactory<>("workingHours"));
+    //     TableColumn<AttendanceReport, String> hoursCol = new TableColumn<>("Hours");
+    //     hoursCol.setCellValueFactory(new PropertyValueFactory<>("workingHours"));
         
-        table.getColumns().addAll(nameCol, dateCol, statusCol, hoursCol);
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+    //     table.getColumns().addAll(nameCol, dateCol, statusCol, hoursCol);
+    //     table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
-        // Sample data - in real app, fetch from View_Attendance_Report
-        ObservableList<AttendanceReport> data = FXCollections.observableArrayList(
-            new AttendanceReport("Zahid Khan", "2025-07-01", "present", "8"),
-            new AttendanceReport("Zahid Khan", "2025-07-02", "present", "8"),
-            new AttendanceReport("Faisal Mehmood", "2025-07-01", "absent", "0")
-        );
-        table.setItems(data);
+    //     // Sample data - in real app, fetch from View_Attendance_Report
+    //     ObservableList<AttendanceReport> data = FXCollections.observableArrayList(
+    //         new AttendanceReport("Zahid Khan", "2025-07-01", "present", "8"),
+    //         new AttendanceReport("Zahid Khan", "2025-07-02", "present", "8"),
+    //         new AttendanceReport("Faisal Mehmood", "2025-07-01", "absent", "0")
+    //     );
+    //     table.setItems(data);
 
-        form.getChildren().addAll(heading, dateRangeBox, buttons, table);
-        return form;
-    }
+    //     form.getChildren().addAll(heading, dateRangeBox, buttons, table);
+    //     return form;
+    // }
 
     // Helper methods
     private static HBox createDateRangeFilter() {

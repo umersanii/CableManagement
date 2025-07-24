@@ -5011,14 +5011,110 @@ public class SQLiteDatabase implements db {
 
     @Override
     public ResultSet getBrandSalesReport(Date fromDate, Date toDate) {
-        String query = "SELECT b.brand_name, SUM(s.quantity) AS total_sold FROM Brand b " +
-                    "JOIN Sales_Invoice_Item s ON b.brand_id = s.brand_id " +
-                    "WHERE s.invoice_date BETWEEN ? AND ? GROUP BY b.brand_name";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setDate(1, fromDate);
-            pstmt.setDate(2, toDate);
-            return pstmt.executeQuery();
+        System.out.println("DEBUG: getBrandSalesReport called with dates: " + fromDate + " to " + toDate);
+        
+        // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        String fromDateStr = sdf.format(fromDate);
+        String toDateStr = sdf.format(toDate);
+        
+        System.out.println("DEBUG: Date strings: " + fromDateStr + " to " + toDateStr);
+        
+        // First, let's check what tables exist and have data
+        try {
+            // Check Sales_Invoice table
+            String checkSalesQuery = "SELECT COUNT(*) as count FROM Sales_Invoice";
+            try (PreparedStatement checkStmt = connection.prepareStatement(checkSalesQuery)) {
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    System.out.println("DEBUG: Total Sales_Invoice records: " + rs.getInt("count"));
+                }
+                rs.close();
+            }
+            
+            // Check Sales_Invoice_Item table
+            String checkItemsQuery = "SELECT COUNT(*) as count FROM Sales_Invoice_Item";
+            try (PreparedStatement checkStmt = connection.prepareStatement(checkItemsQuery)) {
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    System.out.println("DEBUG: Total Sales_Invoice_Item records: " + rs.getInt("count"));
+                }
+                rs.close();
+            }
+            
+            // Check ProductionStock table
+            String checkProdQuery = "SELECT COUNT(*) as count FROM ProductionStock";
+            try (PreparedStatement checkStmt = connection.prepareStatement(checkProdQuery)) {
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    System.out.println("DEBUG: Total ProductionStock records: " + rs.getInt("count"));
+                }
+                rs.close();
+            }
+            
+            // Check Brand table
+            String checkBrandQuery = "SELECT COUNT(*) as count FROM Brand";
+            try (PreparedStatement checkStmt = connection.prepareStatement(checkBrandQuery)) {
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    System.out.println("DEBUG: Total Brand records: " + rs.getInt("count"));
+                }
+                rs.close();
+            }
+            
+            // Check dates in Sales_Invoice
+            String checkDatesQuery = "SELECT MIN(sales_date) as min_date, MAX(sales_date) as max_date FROM Sales_Invoice";
+            try (PreparedStatement checkStmt = connection.prepareStatement(checkDatesQuery)) {
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    System.out.println("DEBUG: Sales_Invoice date range: " + rs.getString("min_date") + " to " + rs.getString("max_date"));
+                }
+                rs.close();
+            }
+            
+            // Test the query first without parameters to see all data
+            String testQuery = "SELECT b.brand_name, SUM(sii.quantity) AS total_quantity, SUM(sii.total_price) AS total_sales FROM Sales_Invoice si JOIN Sales_Invoice_Item sii ON si.sales_invoice_id = sii.sales_invoice_id JOIN ProductionStock ps ON sii.production_stock_id = ps.production_id JOIN Brand b ON ps.brand_id = b.brand_id GROUP BY b.brand_name";
+            try (PreparedStatement testStmt = connection.prepareStatement(testQuery)) {
+                ResultSet testRs = testStmt.executeQuery();
+                System.out.println("DEBUG: All brand sales data (no date filter):");
+                while (testRs.next()) {
+                    System.out.println("  Brand: " + testRs.getString("brand_name") + 
+                                     ", Quantity: " + testRs.getDouble("total_quantity") + 
+                                     ", Sales: " + testRs.getDouble("total_sales"));
+                }
+                testRs.close();
+            }
+            
         } catch (SQLException e) {
+            System.err.println("DEBUG: Error checking table data: " + e.getMessage());
+        }
+        
+        String query = "SELECT " +
+                      "b.brand_name, " +
+                      "SUM(sii.quantity) AS total_quantity, " +
+                      "SUM(sii.total_price) AS total_sales, " +
+                      "'N/A' AS salesman_name " +
+                      "FROM Sales_Invoice si " +
+                      "JOIN Sales_Invoice_Item sii ON si.sales_invoice_id = sii.sales_invoice_id " +
+                      "JOIN ProductionStock ps ON sii.production_stock_id = ps.production_id " +
+                      "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                      "WHERE si.sales_date >= ? AND si.sales_date <= ? " +
+                      "GROUP BY b.brand_name " +
+                      "ORDER BY total_sales DESC";
+        
+        System.out.println("DEBUG: Executing brand sales query: " + query);
+        System.out.println("DEBUG: Parameters: " + fromDateStr + ", " + toDateStr);
+        
+        try {
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            pstmt.setString(1, fromDateStr);
+            pstmt.setString(2, toDateStr);
+            
+            ResultSet rs = pstmt.executeQuery();
+            System.out.println("DEBUG: Query executed successfully, returning ResultSet");
+            return rs;
+        } catch (SQLException e) {
+            System.err.println("DEBUG: SQLException in getBrandSalesReport: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
