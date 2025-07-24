@@ -709,7 +709,7 @@ public class ReportsContent {
         // Action buttons
         HBox buttons = createReportActionButtons();
 
-        // Customers report table - maps to View_Customers_General_Report
+        // Customers report table - maps to Customer table
         TableView<CustomerReport> table = new TableView<>();
         
         TableColumn<CustomerReport, String> nameCol = new TableColumn<>("Customer Name");
@@ -723,15 +723,85 @@ public class ReportsContent {
         
         table.getColumns().addAll(nameCol, phoneCol, addressCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        
-        // Sample data - in real app, fetch from View_Customers_General_Report
-        ObservableList<CustomerReport> data = FXCollections.observableArrayList(
-            new CustomerReport("Ali Traders", "03001234567", "Model Town, Lahore"),
-            new CustomerReport("Pak Electric House", "03111234567", "Gulshan-e-Iqbal, Karachi")
-        );
-        table.setItems(data);
 
-        form.getChildren().addAll(heading, buttons, table);
+        // Error label for feedback
+        Label errorLabel = new Label("");
+        errorLabel.setStyle("-fx-text-fill: red;");
+
+        // Load data from backend
+        try {
+            System.out.println("DEBUG: Starting to load customer data...");
+            if (config.database != null && config.database.isConnected()) {
+                System.out.println("DEBUG: Database is connected, executing query...");
+                java.sql.ResultSet rs = config.database.getCustomersReport();
+                int count = 0;
+                if (rs != null) {
+                    System.out.println("DEBUG: ResultSet is not null, processing results...");
+                    while (rs.next()) {
+                        String customerName = rs.getString("customer_name");
+                        String phoneNumber = rs.getString("contact_number");
+                        String address = rs.getString("address");
+                        
+                        System.out.println("DEBUG: Processing customer: " + customerName + ", phone: " + phoneNumber);
+                        
+                        // Handle null values
+                        if (customerName == null) customerName = "Unknown";
+                        if (phoneNumber == null) phoneNumber = "N/A";
+                        if (address == null) address = "N/A";
+                        
+                        table.getItems().add(new CustomerReport(customerName, phoneNumber, address));
+                        count++;
+                    }
+                } else {
+                    System.out.println("DEBUG: ResultSet is null!");
+                }
+                System.out.println("CustomersReport rows loaded: " + count);
+                if (count == 0) {
+                    errorLabel.setText("No customer data found.");
+                }
+            } else {
+                errorLabel.setText("Database not connected.");
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            errorLabel.setText("Error loading customer data: " + ex.getMessage());
+        }
+
+        // Refresh button action
+        ((Button) buttons.getChildren().get(0)).setOnAction(e -> {
+            table.getItems().clear();
+            errorLabel.setText("");
+            try {
+                if (config.database != null && config.database.isConnected()) {
+                    java.sql.ResultSet rs = config.database.getCustomersReport();
+                    int count = 0;
+                    while (rs != null && rs.next()) {
+                        String customerName = rs.getString("customer_name");
+                        String phoneNumber = rs.getString("contact_number");
+                        String address = rs.getString("address");
+                        
+                        // Handle null values
+                        if (customerName == null) customerName = "Unknown";
+                        if (phoneNumber == null) phoneNumber = "N/A";
+                        if (address == null) address = "N/A";
+                        
+                        table.getItems().add(new CustomerReport(customerName, phoneNumber, address));
+                        count++;
+                    }
+                    System.out.println("CustomersReport rows refreshed: " + count);
+                    if (count == 0) {
+                        errorLabel.setText("No customer data found.");
+                    }
+                } else {
+                    errorLabel.setText("Database not connected.");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error refreshing customer data: " + ex.getMessage());
+            }
+        });
+
+        form.getChildren().addAll(heading, buttons, errorLabel, table);
         return form;
     }
 
@@ -745,7 +815,7 @@ public class ReportsContent {
         // Action buttons
         HBox buttons = createReportActionButtons();
 
-        // Suppliers report table - maps to View_Suppliers_General_Report
+        // Suppliers report table - maps to Supplier table
         TableView<SupplierReport> table = new TableView<>();
         
         TableColumn<SupplierReport, String> nameCol = new TableColumn<>("Supplier Name");
@@ -759,15 +829,76 @@ public class ReportsContent {
         
         table.getColumns().addAll(nameCol, phoneCol, addressCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        
-        // Sample data - in real app, fetch from View_Suppliers_General_Report
-        ObservableList<SupplierReport> data = FXCollections.observableArrayList(
-            new SupplierReport("RawMetals Pvt Ltd", "03221234567", "Model Town, Lahore"),
-            new SupplierReport("Insulation Depot", "03331234567", "Gulshan-e-Iqbal, Karachi")
-        );
-        table.setItems(data);
 
-        form.getChildren().addAll(heading, buttons, table);
+        // Error label for feedback
+        Label errorLabel = new Label("");
+        errorLabel.setStyle("-fx-text-fill: red;");
+
+        // Load data from backend
+        try {
+            if (config.database != null && config.database.isConnected()) {
+                java.sql.ResultSet rs = config.database.getSuppliersReport();
+                int count = 0;
+                while (rs != null && rs.next()) {
+                    String supplierName = rs.getString("supplier_name");
+                    String phoneNumber = rs.getString("contact_number");
+                    String address = rs.getString("address");
+                    
+                    // Handle null values
+                    if (supplierName == null) supplierName = "Unknown";
+                    if (phoneNumber == null) phoneNumber = "N/A";
+                    if (address == null) address = "N/A";
+                    
+                    table.getItems().add(new SupplierReport(supplierName, phoneNumber, address));
+                    count++;
+                }
+                System.out.println("SuppliersReport rows loaded: " + count);
+                if (count == 0) {
+                    errorLabel.setText("No supplier data found.");
+                }
+            } else {
+                errorLabel.setText("Database not connected.");
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            errorLabel.setText("Error loading supplier data: " + ex.getMessage());
+        }
+
+        // Refresh button action
+        ((Button) buttons.getChildren().get(0)).setOnAction(e -> {
+            table.getItems().clear();
+            errorLabel.setText("");
+            try {
+                if (config.database != null && config.database.isConnected()) {
+                    java.sql.ResultSet rs = config.database.getSuppliersReport();
+                    int count = 0;
+                    while (rs != null && rs.next()) {
+                        String supplierName = rs.getString("supplier_name");
+                        String phoneNumber = rs.getString("contact_number");
+                        String address = rs.getString("address");
+                        
+                        // Handle null values
+                        if (supplierName == null) supplierName = "Unknown";
+                        if (phoneNumber == null) phoneNumber = "N/A";
+                        if (address == null) address = "N/A";
+                        
+                        table.getItems().add(new SupplierReport(supplierName, phoneNumber, address));
+                        count++;
+                    }
+                    System.out.println("SuppliersReport rows refreshed: " + count);
+                    if (count == 0) {
+                        errorLabel.setText("No supplier data found.");
+                    }
+                } else {
+                    errorLabel.setText("Database not connected.");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error refreshing supplier data: " + ex.getMessage());
+            }
+        });
+
+        form.getChildren().addAll(heading, buttons, errorLabel, table);
         return form;
     }
 
@@ -781,7 +912,7 @@ public class ReportsContent {
         // Action buttons
         HBox buttons = createReportActionButtons();
 
-        // Area-wise report table - maps to View_Area_Wise_Customer_Supplier_Report
+        // Area-wise report table - maps to Customer and Supplier tables with area data
         TableView<AreaWiseReport> table = new TableView<>();
         
         TableColumn<AreaWiseReport, String> typeCol = new TableColumn<>("Type");
@@ -801,16 +932,84 @@ public class ReportsContent {
         
         table.getColumns().addAll(typeCol, nameCol, tehsilCol, districtCol, provinceCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        
-        // Sample data - in real app, fetch from View_Area_Wise_Customer_Supplier_Report
-        ObservableList<AreaWiseReport> data = FXCollections.observableArrayList(
-            new AreaWiseReport("Customer", "Ali Traders", "Model Town", "Lahore", "Punjab"),
-            new AreaWiseReport("Supplier", "RawMetals Pvt Ltd", "Model Town", "Lahore", "Punjab"),
-            new AreaWiseReport("Customer", "Pak Electric House", "Gulshan-e-Iqbal", "Karachi", "Sindh")
-        );
-        table.setItems(data);
 
-        form.getChildren().addAll(heading, buttons, table);
+        // Error label for feedback
+        Label errorLabel = new Label("");
+        errorLabel.setStyle("-fx-text-fill: red;");
+
+        // Load data from backend
+        try {
+            if (config.database != null && config.database.isConnected()) {
+                java.sql.ResultSet rs = config.database.getAreaWiseReport();
+                int count = 0;
+                while (rs != null && rs.next()) {
+                    String partyType = rs.getString("party_type");
+                    String name = rs.getString("name");
+                    String tehsilName = rs.getString("tehsil_name");
+                    String districtName = rs.getString("district_name");
+                    String provinceName = rs.getString("province_name");
+                    
+                    // Handle null values
+                    if (partyType == null) partyType = "Unknown";
+                    if (name == null) name = "Unknown";
+                    if (tehsilName == null) tehsilName = "Unknown";
+                    if (districtName == null) districtName = "Unknown";
+                    if (provinceName == null) provinceName = "Unknown";
+                    
+                    table.getItems().add(new AreaWiseReport(partyType, name, tehsilName, districtName, provinceName));
+                    count++;
+                }
+                System.out.println("AreaWiseReport rows loaded: " + count);
+                if (count == 0) {
+                    errorLabel.setText("No area-wise data found. Please ensure customers and suppliers have proper area assignments.");
+                }
+            } else {
+                errorLabel.setText("Database not connected.");
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            errorLabel.setText("Error loading area-wise data: " + ex.getMessage());
+        }
+
+        // Refresh button action
+        ((Button) buttons.getChildren().get(0)).setOnAction(e -> {
+            table.getItems().clear();
+            errorLabel.setText("");
+            try {
+                if (config.database != null && config.database.isConnected()) {
+                    java.sql.ResultSet rs = config.database.getAreaWiseReport();
+                    int count = 0;
+                    while (rs != null && rs.next()) {
+                        String partyType = rs.getString("party_type");
+                        String name = rs.getString("name");
+                        String tehsilName = rs.getString("tehsil_name");
+                        String districtName = rs.getString("district_name");
+                        String provinceName = rs.getString("province_name");
+                        
+                        // Handle null values
+                        if (partyType == null) partyType = "Unknown";
+                        if (name == null) name = "Unknown";
+                        if (tehsilName == null) tehsilName = "Unknown";
+                        if (districtName == null) districtName = "Unknown";
+                        if (provinceName == null) provinceName = "Unknown";
+                        
+                        table.getItems().add(new AreaWiseReport(partyType, name, tehsilName, districtName, provinceName));
+                        count++;
+                    }
+                    System.out.println("AreaWiseReport rows refreshed: " + count);
+                    if (count == 0) {
+                        errorLabel.setText("No area-wise data found. Please ensure customers and suppliers have proper area assignments.");
+                    }
+                } else {
+                    errorLabel.setText("Database not connected.");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error refreshing area-wise data: " + ex.getMessage());
+            }
+        });
+
+        form.getChildren().addAll(heading, buttons, errorLabel, table);
         return form;
     }
 

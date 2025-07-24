@@ -152,6 +152,8 @@ public class SQLiteDatabase implements db {
             initializeDatabase();
             // Migrate schema if needed
             migrateSchema();
+            // Add sample data for testing reports
+            addSampleDataForTesting();
         }
     
     public SQLiteDatabase(String databasePath) {
@@ -162,6 +164,8 @@ public class SQLiteDatabase implements db {
         initializeDatabase();
         // Migrate schema if needed
         migrateSchema();
+        // Add sample data for testing reports
+        addSampleDataForTesting();
     }
 
     @Override
@@ -4950,9 +4954,27 @@ public class SQLiteDatabase implements db {
     @Override
     public ResultSet getCustomersReport() {
         String query = "SELECT * FROM Customer";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            return pstmt.executeQuery();
+        System.out.println("DEBUG: Executing customers report query: " + query);
+        
+        try {
+            // First check if the table exists and has data
+            String countQuery = "SELECT COUNT(*) as total FROM Customer";
+            try (PreparedStatement countStmt = connection.prepareStatement(countQuery)) {
+                ResultSet countRs = countStmt.executeQuery();
+                if (countRs.next()) {
+                    int totalCustomers = countRs.getInt("total");
+                    System.out.println("DEBUG: Total customers in database: " + totalCustomers);
+                }
+                countRs.close();
+            }
+            
+            // Now execute the main query
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            ResultSet rs = pstmt.executeQuery();
+            System.out.println("DEBUG: Successfully executed customers report query");
+            return rs;
         } catch (SQLException e) {
+            System.err.println("DEBUG: SQLException in getCustomersReport: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
@@ -4961,9 +4983,27 @@ public class SQLiteDatabase implements db {
     @Override
     public ResultSet getSuppliersReport() {
         String query = "SELECT * FROM Supplier";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            return pstmt.executeQuery();
+        System.out.println("DEBUG: Executing suppliers report query: " + query);
+        
+        try {
+            // First check if the table exists and has data
+            String countQuery = "SELECT COUNT(*) as total FROM Supplier";
+            try (PreparedStatement countStmt = connection.prepareStatement(countQuery)) {
+                ResultSet countRs = countStmt.executeQuery();
+                if (countRs.next()) {
+                    int totalSuppliers = countRs.getInt("total");
+                    System.out.println("DEBUG: Total suppliers in database: " + totalSuppliers);
+                }
+                countRs.close();
+            }
+            
+            // Now execute the main query
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            ResultSet rs = pstmt.executeQuery();
+            System.out.println("DEBUG: Successfully executed suppliers report query");
+            return rs;
         } catch (SQLException e) {
+            System.err.println("DEBUG: SQLException in getSuppliersReport: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
@@ -5044,11 +5084,52 @@ public class SQLiteDatabase implements db {
 
     @Override
     public ResultSet getAreaWiseReport() {
-        String query = "SELECT t.tehsil_name, COUNT(c.customer_id) AS total_customers " +
-                    "FROM Tehsil t LEFT JOIN Customer c ON t.tehsil_id = c.tehsil_id GROUP BY t.tehsil_name";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            return pstmt.executeQuery();
+        String query = "SELECT 'Customer' as party_type, c.customer_name as name, " +
+                    "t.tehsil_name, d.district_name, p.province_name " +
+                    "FROM Customer c " +
+                    "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                    "LEFT JOIN District d ON t.district_id = d.district_id " +
+                    "LEFT JOIN Province p ON d.province_id = p.province_id " +
+                    "UNION ALL " +
+                    "SELECT 'Supplier' as party_type, s.supplier_name as name, " +
+                    "t.tehsil_name, d.district_name, p.province_name " +
+                    "FROM Supplier s " +
+                    "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                    "LEFT JOIN District d ON t.district_id = d.district_id " +
+                    "LEFT JOIN Province p ON d.province_id = p.province_id " +
+                    "ORDER BY party_type, name";
+        
+        System.out.println("DEBUG: Executing area-wise report query: " + query);
+        
+        try {
+            // First check if the tables exist and have data
+            String countCustomersQuery = "SELECT COUNT(*) as total FROM Customer";
+            try (PreparedStatement countStmt = connection.prepareStatement(countCustomersQuery)) {
+                ResultSet countRs = countStmt.executeQuery();
+                if (countRs.next()) {
+                    int totalCustomers = countRs.getInt("total");
+                    System.out.println("DEBUG: Total customers for area-wise report: " + totalCustomers);
+                }
+                countRs.close();
+            }
+            
+            String countSuppliersQuery = "SELECT COUNT(*) as total FROM Supplier";
+            try (PreparedStatement countStmt = connection.prepareStatement(countSuppliersQuery)) {
+                ResultSet countRs = countStmt.executeQuery();
+                if (countRs.next()) {
+                    int totalSuppliers = countRs.getInt("total");
+                    System.out.println("DEBUG: Total suppliers for area-wise report: " + totalSuppliers);
+                }
+                countRs.close();
+            }
+            
+            // Now execute the main query
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            ResultSet rs = pstmt.executeQuery();
+            System.out.println("DEBUG: Successfully executed area-wise report query");
+            return rs;
         } catch (SQLException e) {
+            System.err.println("DEBUG: SQLException in getAreaWiseReport: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
@@ -5180,5 +5261,43 @@ public class SQLiteDatabase implements db {
         }
     }
 
+    /**
+     * Add sample data for testing reports
+     */
+    public void addSampleDataForTesting() {
+        System.out.println("DEBUG: Adding sample data for testing...");
+        
+        try {
+            // Check if we already have data
+            String countCustomersQuery = "SELECT COUNT(*) as total FROM Customer";
+            try (PreparedStatement countStmt = connection.prepareStatement(countCustomersQuery)) {
+                ResultSet countRs = countStmt.executeQuery();
+                if (countRs.next() && countRs.getInt("total") > 0) {
+                    System.out.println("DEBUG: Sample customer data already exists");
+                    countRs.close();
+                    return;
+                }
+                countRs.close();
+            }
+            
+            // Insert sample customers with tehsil assignments
+            insertCustomer("Ali Traders", "03001234567", "Lahore");
+            insertCustomer("Pak Electric House", "03111234567", "Karachi");
+            insertCustomer("Modern Cables Ltd", "03221234567", "Islamabad");
+            insertCustomer("Cable World", "03331234567", "Faisalabad");
+            
+            // Insert sample suppliers with tehsil assignments  
+            insertSupplier("RawMetals Pvt Ltd", "03441234567", "Lahore");
+            insertSupplier("Insulation Depot", "03551234567", "Karachi");
+            insertSupplier("Wire Masters", "03661234567", "Islamabad");
+            insertSupplier("Industrial Supplies Co", "03771234567", "Multan");
+            
+            System.out.println("DEBUG: Sample data added successfully");
+            
+        } catch (Exception e) {
+            System.err.println("DEBUG: Error adding sample data: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
 
 }
