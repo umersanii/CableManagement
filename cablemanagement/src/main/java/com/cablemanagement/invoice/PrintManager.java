@@ -4,6 +4,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceDialog;
 
+import java.awt.Desktop;
 import java.io.File;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -221,6 +222,85 @@ public class PrintManager {
         } catch (Exception e) {
             e.printStackTrace();
             showErrorAlert("Preview Error", "An error occurred while generating preview: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Open invoice PDF for preview and allow user to print using system print dialog (like Ctrl+P)
+     * This opens the PDF in the default PDF viewer where users can use Ctrl+P to print
+     * @param invoiceData The invoice data
+     * @param invoiceType The type of invoice
+     * @return true if PDF was successfully opened for preview
+     */
+    public static boolean openInvoiceForPrintPreview(InvoiceData invoiceData, String invoiceType) {
+        File pdfFile = null;
+        try {
+            // Generate temporary filename for preview
+            String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMAT);
+            String filename = TEMP_DIR + File.separator + invoiceType + "_PrintPreview_" + 
+                             invoiceData.getInvoiceNumber() + "_" + timestamp + ".pdf";
+            
+            // Generate PDF and ensure it's properly created
+            System.out.println("Generating PDF: " + filename);
+            
+            try {
+                InvoiceGenerator.generatePDF(invoiceData, filename);
+            } catch (Exception pdfEx) {
+                showErrorAlert("PDF Generation Error", "Failed to generate PDF: " + pdfEx.getMessage());
+                return false;
+            }
+            
+            // Verify the PDF file was created and is not empty
+            pdfFile = new File(filename);
+            if (!pdfFile.exists()) {
+                showErrorAlert("PDF Generation Failed", "The PDF file could not be created.\nFile: " + filename);
+                return false;
+            }
+            
+            if (pdfFile.length() == 0) {
+                showErrorAlert("PDF Generation Failed", "The PDF file is empty or corrupted.\nFile: " + filename);
+                return false;
+            }
+            
+            System.out.println("PDF generated successfully: " + pdfFile.length() + " bytes");
+            
+            // Add a small delay to ensure file is completely written and closed
+            Thread.sleep(1000);
+            
+            // Open PDF in default viewer (like when pressing Ctrl+P)
+            if (Desktop.isDesktopSupported()) {
+                Desktop desktop = Desktop.getDesktop();
+                if (desktop.isSupported(Desktop.Action.OPEN)) {
+                    System.out.println("Opening PDF in default viewer...");
+                    desktop.open(pdfFile);
+                    
+                    // Show information dialog
+                    Alert infoAlert = new Alert(Alert.AlertType.INFORMATION);
+                    infoAlert.setTitle("Print Preview Opened");
+                    infoAlert.setHeaderText(invoiceType + " Invoice #" + invoiceData.getInvoiceNumber());
+                    infoAlert.setContentText("The invoice has been opened in your default PDF viewer.\n\n" +
+                                           "You can now:\n" +
+                                           "• Review the invoice\n" +
+                                           "• Press Ctrl+P to open the print dialog\n" +
+                                           "• Choose your printer and print settings\n\n" +
+                                           "File saved at: " + filename);
+                    infoAlert.showAndWait();
+                    
+                    return true;
+                } else {
+                    showErrorAlert("Cannot Open File", "Your system doesn't support opening files automatically.\n\nThe PDF has been saved at:\n" + filename + "\n\nYou can manually open this file with any PDF viewer.");
+                    return false;
+                }
+            } else {
+                showErrorAlert("Desktop Not Supported", "Desktop operations are not supported on this system.\n\nThe PDF has been saved at:\n" + filename + "\n\nYou can manually open this file with any PDF viewer.");
+                return false;
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            showErrorAlert("Preview Error", "An error occurred while opening the invoice for preview:\n\n" + e.getMessage() + 
+                          (pdfFile != null ? "\n\nFile location: " + pdfFile.getAbsolutePath() : ""));
             return false;
         }
     }

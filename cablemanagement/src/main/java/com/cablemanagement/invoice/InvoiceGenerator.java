@@ -31,11 +31,21 @@ public class InvoiceGenerator {
             Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.BLACK);
             Font regularFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.BLACK);
 
-            // Logo (Optional - comment out if no logo)
-            Image logo = Image.getInstance("CableManagement/cablemanagement/src/main/java/com/cablemanagement/invoice/logo.png");
-            logo.scaleToFit(100, 100);
-            logo.setAlignment(Element.ALIGN_CENTER);
-            document.add(logo);
+            // Logo (Optional - only add if logo file exists)
+            try {
+                String logoPath = "src/main/resources/LOGO.jpg";
+                File logoFile = new File(logoPath);
+                if (logoFile.exists()) {
+                    Image logo = Image.getInstance(logoPath);
+                    logo.scaleToFit(100, 100);
+                    logo.setAlignment(Element.ALIGN_CENTER);
+                    document.add(logo);
+                } else {
+                    System.out.println("Logo file not found at: " + logoPath + " - proceeding without logo");
+                }
+            } catch (Exception logoEx) {
+                System.out.println("Could not load logo: " + logoEx.getMessage() + " - proceeding without logo");
+            }
 
             // Header
             Paragraph header = new Paragraph("HASEEB WIRE & CABLES", titleFont);
@@ -176,9 +186,11 @@ public class InvoiceGenerator {
             document.add(thankYou);
 
             document.close();
-            System.out.println("Invoice generated: " + filename);
+            System.out.println("Invoice generated successfully: " + filename);
         } catch (Exception e) {
+            System.err.println("Error generating PDF: " + e.getMessage());
             e.printStackTrace();
+            throw new RuntimeException("Failed to generate PDF: " + e.getMessage(), e);
         }
     }
     

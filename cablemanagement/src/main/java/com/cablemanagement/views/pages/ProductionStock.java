@@ -1244,13 +1244,19 @@ public class ProductionStock {
                             printItems
                         );
                         
-                        // Print invoice using PrintManager
-                        boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Sales");
+                        // Open invoice for print preview (like Ctrl+P behavior)
+                        boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Sales");
                         
-                        if (printSuccess) {
-                            showAlert("Success", "Sales invoice created and printed successfully!\n\nInvoice Number: " + invoiceNumber);
+                        if (previewSuccess) {
+                            showAlert("Success", "Sales invoice created successfully!\n\nInvoice Number: " + invoiceNumber + "\n\nThe invoice has been opened for preview and printing.");
                         } else {
-                            showAlert("Partial Success", "Sales invoice created successfully but printing failed.\n\nInvoice Number: " + invoiceNumber);
+                            // Fallback to printer selection if preview fails
+                            boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Sales");
+                            if (printSuccess) {
+                                showAlert("Success", "Sales invoice created and printed successfully!\n\nInvoice Number: " + invoiceNumber);
+                            } else {
+                                showAlert("Partial Success", "Sales invoice created successfully but printing failed.\n\nInvoice Number: " + invoiceNumber);
+                            }
                         }
                         
                         // Reset form for next invoice
