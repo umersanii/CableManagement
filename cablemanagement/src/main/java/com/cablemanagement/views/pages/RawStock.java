@@ -2175,3 +2175,5 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         public Double getTotalCost() { return totalCost; }
     }
 }
+
+

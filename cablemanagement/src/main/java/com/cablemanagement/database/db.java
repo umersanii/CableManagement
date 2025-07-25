@@ -406,3 +406,4 @@ List<Object[]> getInvoiceItemsByID(Integer invoiceID);
     ResultSet getAttendanceReport(int employeeId, Date fromDate, Date toDate);
 
 }
+
