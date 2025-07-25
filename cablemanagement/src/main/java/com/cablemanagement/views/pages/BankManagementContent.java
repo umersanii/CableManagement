@@ -71,12 +71,13 @@ public class BankManagementContent {
             List<Object[]> bankRows = config.database.getAllBanks();
             List<Bank> banks = FXCollections.observableArrayList();
             for (Object[] row : bankRows) {
-                // Assuming columns: id, name, branch, accNum, balance
+                // Columns: bank_id, bank_name, account_number, branch_name, balance
                 int id = (int) row[0];
                 String name = (String) row[1];
-                String branch = (String) row[2];
-                String accNum = (String) row[3];
+                String accNum = (String) row[2];
+                String branch = (String) row[3];
                 double balance = (double) row[4];
+                // Bank constructor: (bankId, bankName, branchName, accountNumber, balance)
                 banks.add(new Bank(id, name, branch, accNum, balance));
             }
             registeredBanks.addAll(banks);

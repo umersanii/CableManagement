@@ -1233,7 +1233,7 @@ public class ProductionStock {
         return form;
     }
 
-    private static VBox createReturnSalesInvoiceForm() {
+    private static ScrollPane createReturnSalesInvoiceForm() {
         VBox form = new VBox(15);
         form.setPadding(new Insets(20));
         form.getStyleClass().add("form-container");
@@ -1282,7 +1282,6 @@ public class ProductionStock {
         // Return items table
         TableView<SalesInvoiceItemUI> returnItemsTable = new TableView<>();
         returnItemsTable.setPrefHeight(250);
-        returnItemsTable.setMaxHeight(250);
         returnItemsTable.getStyleClass().add("table-view");
         returnItemsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
@@ -1311,10 +1310,17 @@ public class ProductionStock {
         ObservableList<SalesInvoiceItemUI> returnItems = FXCollections.observableArrayList();
         returnItemsTable.setItems(returnItems);
         
+        // Wrap return items table in ScrollPane
+        ScrollPane returnItemsScrollPane = new ScrollPane(returnItemsTable);
+        returnItemsScrollPane.setFitToWidth(true);
+        returnItemsScrollPane.setFitToHeight(true);
+        returnItemsScrollPane.setPrefHeight(250);
+        returnItemsScrollPane.setMaxHeight(250);
+        returnItemsScrollPane.getStyleClass().addAll("scroll-pane", "custom-scroll");
+        
         // Available items table (from original invoice)
         TableView<SalesInvoiceItemUI> availableItemsTable = new TableView<>();
         availableItemsTable.setPrefHeight(200);
-        availableItemsTable.setMaxHeight(200);
         availableItemsTable.getStyleClass().add("table-view");
         
         TableColumn<SalesInvoiceItemUI, String> availableProductCol = new TableColumn<>("Product Name");
@@ -1333,6 +1339,14 @@ public class ProductionStock {
         
         ObservableList<SalesInvoiceItemUI> availableItems = FXCollections.observableArrayList();
         availableItemsTable.setItems(availableItems);
+        
+        // Wrap available items table in ScrollPane
+        ScrollPane availableItemsScrollPane = new ScrollPane(availableItemsTable);
+        availableItemsScrollPane.setFitToWidth(true);
+        availableItemsScrollPane.setFitToHeight(true);
+        availableItemsScrollPane.setPrefHeight(200);
+        availableItemsScrollPane.setMaxHeight(200);
+        availableItemsScrollPane.getStyleClass().addAll("scroll-pane", "custom-scroll");
         
         // Add return item controls
         VBox addReturnSection = new VBox(10);
@@ -1387,15 +1401,23 @@ public class ProductionStock {
             ),
             new VBox(15,
                 createSubheading("Available Items from Original Invoice:"),
-                availableItemsTable,
+                availableItemsScrollPane,
                 addReturnSection,
                 createSubheading("Return Items:"),
-                returnItemsTable
+                returnItemsScrollPane
             ),
             actionButtons
         );
         
         form.getChildren().add(formContent);
+        
+        // Create main ScrollPane for the entire form
+        ScrollPane mainScrollPane = new ScrollPane(form);
+        mainScrollPane.setFitToWidth(true);
+        mainScrollPane.setFitToHeight(false);
+        mainScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        mainScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        mainScrollPane.getStyleClass().addAll("scroll-pane", "custom-scroll");
 
         // Event handlers
         originalInvoiceComboBox.setOnAction(e -> {
@@ -1587,7 +1609,7 @@ public class ProductionStock {
             }
         });
 
-        return form;
+        return mainScrollPane;
     }
 
     private static VBox createProductionStockUsageReportForm() {
