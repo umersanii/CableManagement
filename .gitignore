@@ -1,7 +1,13 @@
-cablemanagement/target
-*.class
-*.pdf
+﻿# Database files
 *.db
 *.db-shm
 *.db-wal
-.fuse_hidden00028ce2000000a8
+
+# Maven build files
+target/
+dependency-reduced-pom.xml
+
+# IDE files
+.vscode/
+.idea/
+*.iml
