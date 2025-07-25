@@ -745,11 +745,9 @@ private static double safeParseDouble(Object value) {
         // Cash Transaction Form
         VBox transactionForm = createCashTransactionForm(balanceLabel);
         
-        // Cash Transactions Table
-        TableView<BankTransaction> cashTable = createCashTransactionsTable();
-        loadCashTransactionsTable(cashTable);
+     
 
-        box.getChildren().addAll(balanceLabel, transactionForm, new Label("Cash Transaction History:"), cashTable);
+        box.getChildren().addAll(balanceLabel, transactionForm );
         return box;
     }
 

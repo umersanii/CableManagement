@@ -178,7 +178,7 @@ public class SQLiteDatabase implements db {
             // Initialize all required tables
             initializeDatabase();
             // Add sample data for testing reports
-            addSampleDataForTesting();
+            // addSampleDataForTesting();
         }
     
     public SQLiteDatabase(String databasePath) {
@@ -188,7 +188,7 @@ public class SQLiteDatabase implements db {
         // Initialize all required tables
         initializeDatabase();
         // Add sample data for testing reports
-        addSampleDataForTesting();
+        // addSampleDataForTesting();
     }
 
     @Override
@@ -724,7 +724,7 @@ public class SQLiteDatabase implements db {
             }
             
             // Insert some default data if tables are empty
-            insertDefaultData(stmt);
+            // insertDefaultData(stmt);
             
             stmt.close();
             System.out.println("Database initialized successfully with all required tables.");
@@ -735,94 +735,94 @@ public class SQLiteDatabase implements db {
         }
     }
     
-    private void insertDefaultData(Statement stmt) throws SQLException {
-        // Check if Province table is empty and insert default data
-        ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM Province");
-        rs.next();
-        if (rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO Province (province_name) VALUES " +
-                        "('Punjab'), ('Sindh'), ('KPK'), ('Balochistan'), ('Gilgit-Baltistan')");
-        }
-        rs.close();
+    // private void insertDefaultData(Statement stmt) throws SQLException {
+    //     // Check if Province table is empty and insert default data
+    //     ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM Province");
+    //     rs.next();
+    //     if (rs.getInt(1) == 0) {
+    //         stmt.execute("INSERT INTO Province (province_name) VALUES " +
+    //                     "('Punjab'), ('Sindh'), ('KPK'), ('Balochistan'), ('Gilgit-Baltistan')");
+    //     }
+    //     rs.close();
         
-        // Check if Category table is empty and insert default data
-        rs = stmt.executeQuery("SELECT COUNT(*) FROM Category");
-        rs.next();
-        if (rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO Category (category_name) VALUES " +
-                        "('Electric Cables'), ('Fiber Optic'), ('Coaxial'), ('Network Cables'), ('Power Cables'), ('ABC')");
-        }
-        rs.close();
+    //     // Check if Category table is empty and insert default data
+    //     rs = stmt.executeQuery("SELECT COUNT(*) FROM Category");
+    //     rs.next();
+    //     if (rs.getInt(1) == 0) {
+    //         stmt.execute("INSERT INTO Category (category_name) VALUES " +
+    //                     "('Electric Cables'), ('Fiber Optic'), ('Coaxial'), ('Network Cables'), ('Power Cables'), ('ABC')");
+    //     }
+    //     rs.close();
         
-        // Check if District table is empty and insert some default districts
-        rs = stmt.executeQuery("SELECT COUNT(*) FROM District");
-        rs.next();
-        if (rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO District (district_name, province_id) VALUES " +
-                        "('Lahore', 1), ('Karachi', 2), ('Peshawar', 3), ('Quetta', 4), ('Islamabad', 1)");
-        }
-        rs.close();
+    //     // Check if District table is empty and insert some default districts
+    //     rs = stmt.executeQuery("SELECT COUNT(*) FROM District");
+    //     rs.next();
+    //     if (rs.getInt(1) == 0) {
+    //         stmt.execute("INSERT INTO District (district_name, province_id) VALUES " +
+    //                     "('Lahore', 1), ('Karachi', 2), ('Peshawar', 3), ('Quetta', 4), ('Islamabad', 1)");
+    //     }
+    //     rs.close();
         
-        // Check if Designation table is empty and insert default data
-        rs = stmt.executeQuery("SELECT COUNT(*) FROM Designation");
-        rs.next();
-        if (rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO Designation (designation_title) VALUES " +
-                        "('Manager'), ('Technician'), ('Sales Representative'), ('Accountant'), ('Supervisor')");
-        }
-        rs.close();
+    //     // Check if Designation table is empty and insert default data
+    //     rs = stmt.executeQuery("SELECT COUNT(*) FROM Designation");
+    //     rs.next();
+    //     if (rs.getInt(1) == 0) {
+    //         stmt.execute("INSERT INTO Designation (designation_title) VALUES " +
+    //                     "('Manager'), ('Technician'), ('Sales Representative'), ('Accountant'), ('Supervisor')");
+    //     }
+    //     rs.close();
         
-        // Check if Tehsil table is empty and insert some default tehsils
-        rs = stmt.executeQuery("SELECT COUNT(*) FROM Tehsil");
-        rs.next();
-        if (rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO Tehsil (tehsil_name, district_id) VALUES " +
-                        "('Model Town', 1), ('Gulshan', 2), ('University Town', 3), ('Satellite Town', 4), ('F-10', 5)");
-        }
-        rs.close();
+    //     // Check if Tehsil table is empty and insert some default tehsils
+    //     rs = stmt.executeQuery("SELECT COUNT(*) FROM Tehsil");
+    //     rs.next();
+    //     if (rs.getInt(1) == 0) {
+    //         stmt.execute("INSERT INTO Tehsil (tehsil_name, district_id) VALUES " +
+    //                     "('Model Town', 1), ('Gulshan', 2), ('University Town', 3), ('Satellite Town', 4), ('F-10', 5)");
+    //     }
+    //     rs.close();
         
-        // Check if Unit table is empty and insert default data
-        rs = stmt.executeQuery("SELECT COUNT(*) FROM Unit");
-        rs.next();
-        if (rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO Unit (unit_name) VALUES " +
-                        "('Meter'), ('Roll'), ('Kg'), ('Gram'), ('Piece'), ('Box'), ('Liter')");
-        }
-        rs.close();
+    //     // Check if Unit table is empty and insert default data
+    //     rs = stmt.executeQuery("SELECT COUNT(*) FROM Unit");
+    //     rs.next();
+    //     if (rs.getInt(1) == 0) {
+    //         stmt.execute("INSERT INTO Unit (unit_name) VALUES " +
+    //                     "('Meter'), ('Roll'), ('Kg'), ('Gram'), ('Piece'), ('Box'), ('Liter')");
+    //     }
+    //     rs.close();
         
-        // Check if Manufacturer table is empty and insert some default manufacturers
-        rs = stmt.executeQuery("SELECT COUNT(*) FROM Manufacturer");
-        rs.next();
-        if (rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO Manufacturer (manufacturer_name, tehsil_id) VALUES " +
-                        "('CableTech Industries', 1), ('ABC Manufacturing', 1), ('Test Manufacturer', 1)");
-        }
-        rs.close();
+    //     // Check if Manufacturer table is empty and insert some default manufacturers
+    //     rs = stmt.executeQuery("SELECT COUNT(*) FROM Manufacturer");
+    //     rs.next();
+    //     if (rs.getInt(1) == 0) {
+    //         stmt.execute("INSERT INTO Manufacturer (manufacturer_name, tehsil_id) VALUES " +
+    //                     "('CableTech Industries', 1), ('ABC Manufacturing', 1), ('Test Manufacturer', 1)");
+    //     }
+    //     rs.close();
         
-        // Check if Brand table is empty and insert some default brands
-        rs = stmt.executeQuery("SELECT COUNT(*) FROM Brand");
-        rs.next();
-        if (rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO Brand (brand_name, manufacturer_id) VALUES " +
-                        "('PowerFlex', 1), ('ABC', 2), ('aa', 3)");
-        }
-        rs.close();
+    //     // Check if Brand table is empty and insert some default brands
+    //     rs = stmt.executeQuery("SELECT COUNT(*) FROM Brand");
+    //     rs.next();
+    //     if (rs.getInt(1) == 0) {
+    //         stmt.execute("INSERT INTO Brand (brand_name, manufacturer_id) VALUES " +
+    //                     "('PowerFlex', 1), ('ABC', 2), ('aa', 3)");
+    //     }
+    //     rs.close();
         
-        // Check if ProductionStock table is empty and insert some default production stock
-        rs = stmt.executeQuery("SELECT COUNT(*) FROM ProductionStock");
-        rs.next();
-        if (rs.getInt(1) == 0) {
-            stmt.execute("INSERT INTO ProductionStock (product_name, brand_id, quantity, unit_cost, total_cost, sale_price) VALUES " +
-                        "('Copper Cable 10mm', 1, 50, 450.00, 22500.00, 540.00), " +
-                        "('PVC Sheathed Wire 6mm', 2, 30, 320.00, 9600.00, 384.00), " +
-                        "('Fiber Optic Cable', 1, 25, 800.00, 20000.00, 960.00), " +
-                        "('Power Cable 16mm', 3, 40, 650.00, 26000.00, 780.00)");
-        }
-        rs.close();
+    //     // Check if ProductionStock table is empty and insert some default production stock
+    //     rs = stmt.executeQuery("SELECT COUNT(*) FROM ProductionStock");
+    //     rs.next();
+    //     if (rs.getInt(1) == 0) {
+    //         stmt.execute("INSERT INTO ProductionStock (product_name, brand_id, quantity, unit_cost, total_cost, sale_price) VALUES " +
+    //                     "('Copper Cable 10mm', 1, 50, 450.00, 22500.00, 540.00), " +
+    //                     "('PVC Sheathed Wire 6mm', 2, 30, 320.00, 9600.00, 384.00), " +
+    //                     "('Fiber Optic Cable', 1, 25, 800.00, 20000.00, 960.00), " +
+    //                     "('Power Cable 16mm', 3, 40, 650.00, 26000.00, 780.00)");
+    //     }
+    //     rs.close();
         
-        // Ensure all required views exist
-        ensureViewsExist();
-    }
+    //     // Ensure all required views exist
+    //     ensureViewsExist();
+    // }
     
     
 
@@ -2133,7 +2133,35 @@ public class SQLiteDatabase implements db {
     }
     
     /**
-     * Insert raw purchase return invoice items
+     * Get current stock quantity for a raw stock item
+     */
+    private double getCurrentStockQuantity(int stockId) throws SQLException {
+        String query = "SELECT quantity FROM Raw_Stock WHERE stock_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, stockId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("quantity");
+                }
+            }
+        }
+        return 0.0;
+    }
+
+    /**
+     * Get current stock quantity for a raw stock item (public method)
+     */
+    public double getCurrentRawStockQuantity(int stockId) {
+        try {
+            return getCurrentStockQuantity(stockId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0.0;
+        }
+    }
+
+    /**
+     * Insert raw purchase return invoice items and update stock quantities
      */
     public boolean insertRawPurchaseReturnInvoiceItems(int returnInvoiceId, 
                                                       List<com.cablemanagement.model.RawStockPurchaseItem> items) {
@@ -2141,18 +2169,70 @@ public class SQLiteDatabase implements db {
                            "(raw_purchase_return_invoice_id, raw_stock_id, quantity, unit_price) " +
                            "VALUES (?, ?, ?, ?)";
         
-        try (PreparedStatement pstmt = connection.prepareStatement(insertQuery)) {
+        try {
+            // Start transaction
+            connection.setAutoCommit(false);
+            
+            // First validate that we have enough stock for all items
             for (com.cablemanagement.model.RawStockPurchaseItem item : items) {
-                pstmt.setInt(1, returnInvoiceId);
-                pstmt.setInt(2, item.getRawStockId());
-                pstmt.setDouble(3, item.getQuantity());
-                pstmt.setDouble(4, item.getUnitPrice());
-                pstmt.addBatch();
+                double currentStock = getCurrentStockQuantity(item.getRawStockId());
+                if (currentStock < item.getQuantity()) {
+                    System.err.println("Insufficient stock for item ID " + item.getRawStockId() + 
+                                     ": Current=" + currentStock + ", Requested=" + item.getQuantity());
+                    connection.rollback();
+                    connection.setAutoCommit(true);
+                    return false;
+                }
             }
             
-            int[] result = pstmt.executeBatch();
-            return result.length == items.size();
+            // Insert return invoice items
+            try (PreparedStatement pstmt = connection.prepareStatement(insertQuery)) {
+                for (com.cablemanagement.model.RawStockPurchaseItem item : items) {
+                    pstmt.setInt(1, returnInvoiceId);
+                    pstmt.setInt(2, item.getRawStockId());
+                    pstmt.setDouble(3, item.getQuantity());
+                    pstmt.setDouble(4, item.getUnitPrice());
+                    pstmt.addBatch();
+                }
+                
+                int[] insertResults = pstmt.executeBatch();
+                
+                // Check if all items were inserted successfully
+                for (int result : insertResults) {
+                    if (result <= 0) {
+                        connection.rollback();
+                        connection.setAutoCommit(true);
+                        return false;
+                    }
+                }
+            }
+            
+            // Update raw stock quantities (reduce stock as items are being returned to supplier)
+            String updateStockQuery = "UPDATE Raw_Stock SET quantity = quantity - ?, total_cost = total_cost - ? " +
+                                    "WHERE stock_id = ?";
+            try (PreparedStatement updatePstmt = connection.prepareStatement(updateStockQuery)) {
+                for (com.cablemanagement.model.RawStockPurchaseItem item : items) {
+                    double totalCostReduction = item.getQuantity() * item.getUnitPrice();
+                    updatePstmt.setDouble(1, item.getQuantity()); // reduce quantity
+                    updatePstmt.setDouble(2, totalCostReduction); // reduce total cost
+                    updatePstmt.setInt(3, item.getRawStockId());
+                    updatePstmt.addBatch();
+                }
+                updatePstmt.executeBatch();
+            }
+            
+            // Commit transaction
+            connection.commit();
+            connection.setAutoCommit(true);
+            return true;
+            
         } catch (SQLException e) {
+            try {
+                connection.rollback();
+                connection.setAutoCommit(true);
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
             e.printStackTrace();
             return false;
         }
@@ -5670,40 +5750,48 @@ public class SQLiteDatabase implements db {
     /**
      * Add sample data for testing reports
      */
-    public void addSampleDataForTesting() {
-        System.out.println("DEBUG: Adding sample data for testing...");
+    // public void addSampleDataForTesting() {
+    //     System.out.println("DEBUG: Adding sample data for testing...");
         
-        try {
-            // Check if we already have data
-            String countCustomersQuery = "SELECT COUNT(*) as total FROM Customer";
-            try (PreparedStatement countStmt = connection.prepareStatement(countCustomersQuery)) {
-                ResultSet countRs = countStmt.executeQuery();
-                if (countRs.next() && countRs.getInt("total") > 0) {
-                    System.out.println("DEBUG: Sample customer data already exists");
-                    countRs.close();
-                    return;
-                }
-                countRs.close();
-            }
+    //     try {
+    //         // Check if we already have data
+    //         String countCustomersQuery = "SELECT COUNT(*) as total FROM Customer";
+    //         try (PreparedStatement countStmt = connection.prepareStatement(countCustomersQuery)) {
+    //             ResultSet countRs = countStmt.executeQuery();
+    //             if (countRs.next() && countRs.getInt("total") > 0) {
+    //                 System.out.println("DEBUG: Sample customer data already exists");
+    //                 countRs.close();
+    //                 return;
+    //             }
+    //             countRs.close();
+    //         }
             
-            // Insert sample customers with tehsil assignments
-            insertCustomer("Ali Traders", "03001234567", "Lahore");
-            insertCustomer("Pak Electric House", "03111234567", "Karachi");
-            insertCustomer("Modern Cables Ltd", "03221234567", "Islamabad");
-            insertCustomer("Cable World", "03331234567", "Faisalabad");
+    //         // // Insert sample customers with tehsil assignments
+    //         // insertCustomer("Ali Traders", "03001234567", "Lahore");
+    //         // insertCustomer("Pak Electric House", "03111234567", "Karachi");
+    //         // insertCustomer("Modern Cables Ltd", "03221234567", "Islamabad");
+    //         // insertCustomer("Cable World", "03331234567", "Faisalabad");
             
-            // Insert sample suppliers with tehsil assignments  
-            insertSupplier("RawMetals Pvt Ltd", "03441234567", "Lahore");
-            insertSupplier("Insulation Depot", "03551234567", "Karachi");
-            insertSupplier("Wire Masters", "03661234567", "Islamabad");
-            insertSupplier("Industrial Supplies Co", "03771234567", "Multan");
+    //         // // Insert sample suppliers with tehsil assignments  
+    //         // insertSupplier("RawMetals Pvt Ltd", "03441234567", "Lahore");
+    //         // insertSupplier("Insulation Depot", "03551234567", "Karachi");
+    //         // insertSupplier("Wire Masters", "03661234567", "Islamabad");
+    //         // insertSupplier("Industrial Supplies Co", "03771234567", "Multan");
             
-            System.out.println("DEBUG: Sample data added successfully");
+    //         // // Insert sample banks
+    //         // insertBank("Allied Bank Limited", "001-2345-6789", "Model Town Branch");
+    //         // insertBank("Habib Bank Limited", "123-4567-8901", "Gulshan Branch");
+    //         // insertBank("MCB Bank Limited", "456-7890-1234", "Main Boulevard Branch");
+    //         // insertBank("Standard Chartered", "789-0123-4567", "Commercial Area Branch");
             
-        } catch (Exception e) {
-            System.err.println("DEBUG: Error adding sample data: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
+    //         System.out.println("DEBUG: Sample data added successfully");
+            
+    //     } catch (Exception e) {
+    //         System.err.println("DEBUG: Error adding sample data: " + e.getMessage());
+    //         e.printStackTrace();
+    //     }
+    // }
 
 }
+
+

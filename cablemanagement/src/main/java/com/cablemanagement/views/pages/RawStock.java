@@ -668,7 +668,12 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
     private static RawStockPurchaseItem showReturnItemDialog(RawStockPurchaseItem originalItem) {
         Dialog<RawStockPurchaseItem> dialog = new Dialog<>();
         dialog.setTitle("Return Item Details");
-        dialog.setHeaderText("Enter return details for: " + originalItem.getRawStockName());
+        
+        // Get current stock quantity to display to user
+        double currentStock = database.getCurrentRawStockQuantity(originalItem.getRawStockId());
+        
+        dialog.setHeaderText("Enter return details for: " + originalItem.getRawStockName() + 
+                           "\nCurrent Stock Available: " + String.format("%.0f", currentStock));
         
         ButtonType okButtonType = new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(okButtonType, ButtonType.CANCEL);
@@ -679,16 +684,23 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         grid.setPadding(new Insets(20, 150, 10, 10));
         
         TextField quantityField = new TextField();
-        quantityField.setPromptText("Return Quantity (Max: " + originalItem.getQuantity() + ")");
+        double maxReturnQty = Math.min(originalItem.getQuantity(), currentStock);
+        quantityField.setPromptText("Return Quantity (Max: " + String.format("%.0f", maxReturnQty) + ")");
+        
         TextField unitPriceField = new TextField();
         unitPriceField.setText(String.valueOf(originalItem.getUnitPrice()));
         unitPriceField.setEditable(false);
         unitPriceField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
         
+        // Add info label about stock limitation
+        Label infoLabel = new Label("Note: Return quantity limited by current stock availability");
+        infoLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 10px;");
+        
         grid.add(new Label("Return Quantity:"), 0, 0);
         grid.add(quantityField, 1, 0);
         grid.add(new Label("Unit Price:"), 0, 1);
         grid.add(unitPriceField, 1, 1);
+        grid.add(infoLabel, 0, 2, 2, 1);
         
         dialog.getDialogPane().setContent(grid);
         
@@ -698,8 +710,14 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                     double returnQty = Double.parseDouble(quantityField.getText());
                     double unitPrice = Double.parseDouble(unitPriceField.getText());
                     
-                    if (returnQty <= 0 || returnQty > originalItem.getQuantity()) {
-                        showAlert("Invalid Input", "Return quantity must be between 0 and " + originalItem.getQuantity());
+                    if (returnQty <= 0) {
+                        showAlert("Invalid Input", "Return quantity must be greater than 0");
+                        return null;
+                    }
+                    
+                    if (returnQty > maxReturnQty) {
+                        showAlert("Invalid Input", "Return quantity cannot exceed " + String.format("%.0f", maxReturnQty) + 
+                                 "\n(Limited by current stock availability: " + String.format("%.0f", currentStock) + ")");
                         return null;
                     }
                     
@@ -778,12 +796,12 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 returnInvoiceNumber, originalInvoiceId, supplierId, returnDate, totalAmount);
             
             if (returnInvoiceId > 0) {
-                // Insert return invoice items
+                // Insert return invoice items and update stock quantities
                 List<RawStockPurchaseItem> items = new ArrayList<>(selectedItemsTable.getItems());
                 boolean itemsInserted = database.insertRawPurchaseReturnInvoiceItems(returnInvoiceId, items);
                 
                 if (itemsInserted) {
-                    showAlert("Success", "Return invoice created successfully!");
+                    showAlert("Success", "Return invoice created successfully!\nStock quantities have been updated.");
                     
                     // Clear form
                     returnInvoiceNumberField.setText(database.generateReturnInvoiceNumber());
@@ -796,7 +814,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                     // Refresh return invoices table
                     // This would need to be passed as a parameter or accessed differently
                 } else {
-                    showAlert("Error", "Failed to save return invoice items");
+                    showAlert("Error", "Failed to save return invoice items.\nThis could be due to insufficient stock quantities or database error.");
                 }
             } else {
                 showAlert("Error", "Failed to create return invoice");
@@ -821,7 +839,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                         boolean itemsInserted = database.insertRawPurchaseReturnInvoiceItems(returnInvoiceId, items);
                         
                         if (itemsInserted) {
-                            showAlert("Success", "Return invoice created successfully!");
+                            showAlert("Success", "Return invoice created successfully!\nStock quantities have been updated.");
                             
                             // Clear form
                             returnInvoiceNumberField.setText(database.generateReturnInvoiceNumber());
@@ -831,7 +849,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                             selectedItemsTable.getItems().clear();
                             totalReturnAmountField.setText("0.00");
                         } else {
-                            showAlert("Error", "Failed to save return invoice items on retry");
+                            showAlert("Error", "Failed to save return invoice items on retry.\nThis could be due to insufficient stock quantities.");
                         }
                     } else {
                         showAlert("Error", "Failed to create return invoice even after retry");
@@ -2175,3 +2193,5 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         public Double getTotalCost() { return totalCost; }
     }
 }
+
+

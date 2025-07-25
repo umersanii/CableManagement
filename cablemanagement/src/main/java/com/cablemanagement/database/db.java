@@ -205,6 +205,8 @@ public interface db {
     
     boolean insertRawPurchaseReturnInvoiceItems(int returnInvoiceId, List<RawStockPurchaseItem> items);
     
+    double getCurrentRawStockQuantity(int stockId);
+    
     List<Object[]> getAllRawPurchaseReturnInvoices();
 
     // --------------------------
@@ -406,3 +408,4 @@ List<Object[]> getInvoiceItemsByID(Integer invoiceID);
     ResultSet getAttendanceReport(int employeeId, Date fromDate, Date toDate);
 
 }
+
