@@ -21,6 +21,9 @@ import com.cablemanagement.database.SQLiteDatabase;
 import com.cablemanagement.database.db;
 import com.cablemanagement.model.Brand;
 import com.cablemanagement.model.ProductionStockItem;
+import com.cablemanagement.invoice.PrintManager;
+import com.cablemanagement.invoice.InvoiceData;
+import com.cablemanagement.invoice.Item;
 
 public class ProductionStock {
 
@@ -952,11 +955,15 @@ public class ProductionStock {
         submitBtn.setStyle("-fx-background-color: #007bff; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 12 24;");
         submitBtn.setPrefWidth(200);
         
+        Button printLastInvoiceBtn = createActionButton("Print Last Invoice");
+        printLastInvoiceBtn.setStyle("-fx-background-color: #28a745; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;");
+        printLastInvoiceBtn.setPrefWidth(150);
+        
         Button resetFormBtn = createActionButton("Reset Form");
         resetFormBtn.setStyle("-fx-background-color: #6c757d; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;");
         resetFormBtn.setPrefWidth(150);
         
-        actionButtons.getChildren().addAll(submitBtn, resetFormBtn);
+        actionButtons.getChildren().addAll(submitBtn, printLastInvoiceBtn, resetFormBtn);
 
         // Add all sections to scrollable content
         scrollableContent.getChildren().addAll(
@@ -1205,7 +1212,46 @@ public class ProductionStock {
                         totalAmount, discount, paidAmount, items);
                     
                     if (success) {
-                        showAlert("Success", "Sales invoice created successfully!\n\nInvoice Number: " + invoiceNumber);
+                        // Prepare invoice data for printing
+                        List<Item> printItems = new ArrayList<>();
+                        for (SalesInvoiceItemUI item : invoiceItems) {
+                            printItems.add(new Item(
+                                item.getProductName(),
+                                (int) item.getQuantity(),
+                                item.getUnitPrice(),
+                                0.0 // discount percent (global discount handled separately)
+                            ));
+                        }
+                        
+                        // Get customer address (you may want to enhance this to get actual address from database)
+                        String customerAddress = "Customer Address"; // Default placeholder
+                        try {
+                            // Try to get actual customer address from database if available
+                            // Note: This method may not exist in the current db interface
+                            // You can implement it in SQLiteDatabase class if needed
+                            customerAddress = "Customer Address - " + customer;
+                        } catch (Exception addressEx) {
+                            // Use default if error occurs
+                            System.out.println("Could not retrieve customer address, using default");
+                        }
+                        
+                        InvoiceData invoiceData = new InvoiceData(
+                            invoiceNumber,
+                            date,
+                            customer,
+                            customerAddress,
+                            0.0, // previous balance (you may want to implement this)
+                            printItems
+                        );
+                        
+                        // Print invoice using PrintManager
+                        boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Sales");
+                        
+                        if (printSuccess) {
+                            showAlert("Success", "Sales invoice created and printed successfully!\n\nInvoice Number: " + invoiceNumber);
+                        } else {
+                            showAlert("Partial Success", "Sales invoice created successfully but printing failed.\n\nInvoice Number: " + invoiceNumber);
+                        }
                         
                         // Reset form for next invoice
                         String newInvoiceNumber = database.generateSalesInvoiceNumber();
@@ -1226,6 +1272,73 @@ public class ProductionStock {
                 showAlert("Invalid Input", "Please enter valid numbers for discount and paid amount");
             } catch (Exception ex) {
                 showAlert("Unexpected Error", "An error occurred: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
+        
+        // Print Last Invoice button
+        printLastInvoiceBtn.setOnAction(e -> {
+            try {
+                // Get all sales invoices and get the last one
+                List<Object[]> allInvoices = database.getAllSalesInvoicesForDropdown();
+                if (allInvoices.isEmpty()) {
+                    showAlert("No Invoice Found", "No sales invoices found in the database.");
+                    return;
+                }
+                
+                // Get the last (most recent) invoice
+                Object[] lastInvoice = allInvoices.get(allInvoices.size() - 1);
+                
+                // Extract invoice details from dropdown format
+                int salesInvoiceId = (Integer) lastInvoice[0];  // sales_invoice_id
+                String lastInvoiceNumber = (String) lastInvoice[1]; // invoice_number
+                String lastCustomerName = (String) lastInvoice[2];  // customer_name
+                String lastDate = (String) lastInvoice[3];         // sales_date
+                
+                // Get invoice items using the existing method
+                List<Object[]> invoiceItemsData = database.getSalesInvoiceItemsByInvoiceId(salesInvoiceId);
+                if (invoiceItemsData.isEmpty()) {
+                    showAlert("No Items Found", "No items found for the last invoice.");
+                    return;
+                }
+                
+                // Prepare items for printing
+                List<Item> printItems = new ArrayList<>();
+                for (Object[] itemData : invoiceItemsData) {
+                    String productName = (String) itemData[1];    // product_name
+                    double quantity = ((Number) itemData[2]).doubleValue();   // quantity
+                    double unitPrice = ((Number) itemData[3]).doubleValue();  // unit_price
+                    
+                    printItems.add(new Item(
+                        productName,
+                        (int) quantity,
+                        unitPrice,
+                        0.0 // discount percent
+                    ));
+                }
+                
+                // Create invoice data for printing
+                String customerAddress = "Customer Address - " + lastCustomerName;
+                InvoiceData invoiceData = new InvoiceData(
+                    lastInvoiceNumber,
+                    lastDate,
+                    lastCustomerName,
+                    customerAddress,
+                    0.0, // previous balance
+                    printItems
+                );
+                
+                // Print the invoice
+                boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Sales");
+                
+                if (printSuccess) {
+                    showAlert("Print Successful", "Last sales invoice reprinted successfully!\n\nInvoice Number: " + lastInvoiceNumber);
+                } else {
+                    showAlert("Print Failed", "Failed to print the last invoice.");
+                }
+                
+            } catch (Exception ex) {
+                showAlert("Error", "An error occurred while trying to print the last invoice: " + ex.getMessage());
                 ex.printStackTrace();
             }
         });
@@ -1384,9 +1497,11 @@ public class ProductionStock {
         actionButtons.getStyleClass().add("form-row");
         
         Button submitBtn = createSubmitButton("Submit Return");
+        Button printReturnBtn = createActionButton("Print Return");
+        printReturnBtn.setStyle("-fx-background-color: #28a745; -fx-text-fill: white;");
         Button clearBtn = createActionButton("Clear All");
         
-        actionButtons.getChildren().addAll(submitBtn, clearBtn);
+        actionButtons.getChildren().addAll(submitBtn, printReturnBtn, clearBtn);
 
         // Form layout with proper spacing
         VBox formContent = new VBox(20);
@@ -1541,6 +1656,57 @@ public class ProductionStock {
                     returnItems.clear();
                     updateReturnAmount(returnItems, returnAmountField);
                 }
+            }
+        });
+        
+        printReturnBtn.setOnAction(e -> {
+            try {
+                // Get all sales return invoices and print the last one
+                List<Object[]> allReturnInvoices = database.getAllSalesReturnInvoices();
+                if (allReturnInvoices.isEmpty()) {
+                    showAlert("No Return Invoice Found", "No sales return invoices found in the database.");
+                    return;
+                }
+                
+                // Get the last (most recent) return invoice
+                Object[] lastReturnInvoice = allReturnInvoices.get(allReturnInvoices.size() - 1);
+                
+                String returnInvoiceNumber = (String) lastReturnInvoice[1]; // return_invoice_number
+                String customerName = "Customer"; // Default customer name
+                String returnDate = (String) lastReturnInvoice[3];         // return_date
+                
+                // For demonstration, create a simple print item
+                List<Item> printItems = new ArrayList<>();
+                printItems.add(new Item(
+                    "Return Item",
+                    1,
+                    0.0,
+                    0.0 // discount percent
+                ));
+                
+                // Create invoice data for printing
+                String customerAddress = "Customer Address - " + customerName;
+                InvoiceData invoiceData = new InvoiceData(
+                    returnInvoiceNumber,
+                    returnDate,
+                    customerName,
+                    customerAddress,
+                    0.0, // previous balance
+                    printItems
+                );
+                
+                // Print the return invoice
+                boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Sales Return");
+                
+                if (printSuccess) {
+                    showAlert("Print Successful", "Last sales return invoice printed successfully!\n\nReturn Invoice Number: " + returnInvoiceNumber);
+                } else {
+                    showAlert("Print Failed", "Failed to print the last return invoice.");
+                }
+                
+            } catch (Exception ex) {
+                showAlert("Error", "An error occurred while trying to print the last return invoice: " + ex.getMessage());
+                ex.printStackTrace();
             }
         });
         
