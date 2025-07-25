@@ -7,6 +7,7 @@ import com.itextpdf.text.pdf.draw.DottedLineSeparator;
 import java.awt.Desktop;
 import java.awt.print.PrinterJob;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.util.List;
 import javax.print.*;
@@ -15,6 +16,8 @@ import javax.print.attribute.PrintRequestAttributeSet;
 import javax.print.attribute.standard.Copies;
 import javax.print.attribute.standard.MediaSizeName;
 import javax.print.attribute.standard.OrientationRequested;
+import javax.print.event.PrintJobEvent;
+import javax.print.event.PrintJobListener;
 
 public class InvoiceGenerator {
     public static void generatePDF(InvoiceData data, String filename) {
@@ -295,14 +298,24 @@ public class InvoiceGenerator {
      */
     public static boolean printToSpecificPrinter(String filename, String printerName) {
         try {
+            // Verify file exists
+            File file = new File(filename);
+            if (!file.exists()) {
+                System.err.println("PDF file does not exist: " + filename);
+                return false;
+            }
+            
+            System.out.println("Attempting to print PDF: " + filename + " to printer: " + printerName);
+            
             // Find the specified printer
             PrintService[] printServices = PrintServiceLookup.lookupPrintServices(null, null);
             PrintService targetPrinter = null;
             
+            System.out.println("Available printers:");
             for (PrintService service : printServices) {
+                System.out.println("  - " + service.getName());
                 if (service.getName().equals(printerName)) {
                     targetPrinter = service;
-                    break;
                 }
             }
             
@@ -310,6 +323,18 @@ public class InvoiceGenerator {
                 System.err.println("Printer not found: " + printerName);
                 return false;
             }
+            
+            // Check if printer supports PDF
+            DocFlavor[] supportedFlavors = targetPrinter.getSupportedDocFlavors();
+            boolean supportsPDF = false;
+            for (DocFlavor flavor : supportedFlavors) {
+                if (flavor.equals(DocFlavor.INPUT_STREAM.PDF)) {
+                    supportsPDF = true;
+                    break;
+                }
+            }
+            
+            System.out.println("Printer '" + printerName + "' supports PDF: " + supportsPDF);
             
             // Create print job for specific printer
             DocPrintJob printJob = targetPrinter.createPrintJob();
@@ -320,13 +345,50 @@ public class InvoiceGenerator {
             printAttributes.add(MediaSizeName.ISO_A4);
             printAttributes.add(OrientationRequested.PORTRAIT);
             
-            // Create document
-            File file = new File(filename);
-            DocFlavor flavor = DocFlavor.INPUT_STREAM.AUTOSENSE;
-            Doc document = new SimpleDoc(new java.io.FileInputStream(file), flavor, null);
+            // Create document with proper PDF flavor
+            DocFlavor flavor = supportsPDF ? DocFlavor.INPUT_STREAM.PDF : DocFlavor.INPUT_STREAM.AUTOSENSE;
+            FileInputStream fis = new FileInputStream(file);
+            Doc document = new SimpleDoc(fis, flavor, null);
             
-            // Print the document
+            // Print the document with print event listener
+            PrintJobListener printJobListener = new PrintJobListener() {
+                @Override
+                public void printDataTransferCompleted(PrintJobEvent pje) {
+                    System.out.println("Print data transfer completed successfully");
+                }
+                
+                @Override
+                public void printJobCompleted(PrintJobEvent pje) {
+                    System.out.println("Print job completed successfully");
+                }
+                
+                @Override
+                public void printJobFailed(PrintJobEvent pje) {
+                    System.err.println("Print job failed");
+                }
+                
+                @Override
+                public void printJobCanceled(PrintJobEvent pje) {
+                    System.out.println("Print job was canceled");
+                }
+                
+                @Override
+                public void printJobNoMoreEvents(PrintJobEvent pje) {
+                    System.out.println("No more print events");
+                }
+                
+                @Override
+                public void printJobRequiresAttention(PrintJobEvent pje) {
+                    System.out.println("Print job requires attention");
+                }
+            };
+            
+            printJob.addPrintJobListener(printJobListener);
             printJob.print(document, printAttributes);
+            
+            // Wait a moment for the print job to be processed
+            Thread.sleep(1000);
+            
             System.out.println("Document sent to printer '" + printerName + "': " + filename);
             return true;
             
