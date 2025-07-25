@@ -2,4 +2,6 @@ cablemanagement/target
 *.class
 *.pdf
 *.db
+*.db-shm
+*.db-wal
 .fuse_hidden00028ce2000000a8
