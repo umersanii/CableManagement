@@ -21,6 +21,9 @@ import com.cablemanagement.database.SQLiteDatabase;
 import com.cablemanagement.database.db;
 import com.cablemanagement.model.Brand;
 import com.cablemanagement.model.ProductionStockItem;
+import com.cablemanagement.invoice.InvoiceData;
+import com.cablemanagement.invoice.Item;
+import com.cablemanagement.invoice.PrintManager;
 
 public class ProductionStock {
 
@@ -94,213 +97,59 @@ public class ProductionStock {
     }
 
     private static VBox createProductionStockForm() {
-        VBox mainContainer = new VBox(20);
-        mainContainer.setPadding(new Insets(20));
-        mainContainer.getStyleClass().add("form-container");
+        VBox form = new VBox(15);
+        form.setPadding(new Insets(20));
+        form.getStyleClass().add("form-container");
 
         Label heading = createHeading("Register Production Stock");
 
-        // === TWO-COLUMN LAYOUT CONTAINER ===
-        HBox twoColumnLayout = new HBox(30);
-        twoColumnLayout.setAlignment(Pos.TOP_LEFT);
-        twoColumnLayout.setFillHeight(true);
-
-        // === LEFT COLUMN - INPUT FORM ===
-        VBox leftColumn = new VBox(20);
-        leftColumn.setPrefWidth(400);
-        leftColumn.setMinWidth(350);
-        leftColumn.setMaxWidth(450);
-        leftColumn.setStyle("-fx-border-color: #e0e0e0; -fx-border-width: 1; -fx-border-radius: 8; -fx-padding: 20; -fx-background-color: #fafafa;");
-
-        Label formTitle = createSubheading("Product Registration");
-        formTitle.setStyle("-fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-font-size: 16px;");
-
-        // Input fields in a clean grid layout
-        GridPane inputGrid = new GridPane();
-        inputGrid.setHgap(15);
-        inputGrid.setVgap(20);
-        inputGrid.setAlignment(Pos.TOP_LEFT);
-
-        // Product Name Field
-        TextField nameField = createTextField("Enter Product Name");
-        nameField.setPrefWidth(300);
-        nameField.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
-
+        // Input fields matching ProductionStock table structure
+        TextField nameField = createTextField("Product Name");
+        TextField quantityField = createTextField("Quantity");
+        TextField unitCostField = createTextField("Unit Cost");
+        
         // Brand ComboBox 
         ComboBox<String> brandCombo = new ComboBox<>();
-        brandCombo.setPromptText("-- Select Brand --");
-        brandCombo.setEditable(false);
-        brandCombo.setPrefWidth(300);
-        brandCombo.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
-        
-        try {
-            List<Brand> brands = database.getAllBrands();
-            ObservableList<String> brandNames = FXCollections.observableArrayList();
-            for (Brand brand : brands) {
-                brandNames.add(brand.nameProperty().get());
-            }
-            brandCombo.setItems(brandNames);
-        } catch (Exception e) {
-            showAlert("Database Error", "Failed to load brands: " + e.getMessage());
+        brandCombo.setPromptText("Select Brand");
+        for (Brand b : database.getAllBrands()) {
+            brandCombo.getItems().add(b.nameProperty().get());
         }
+        brandCombo.setPrefWidth(200);
 
-        // Quantity Field
-        TextField quantityField = createTextField("Enter Quantity");
-        quantityField.setPrefWidth(300);
-        quantityField.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
+        Button submitBtn = createSubmitButton("Submit Production Stock");
 
-        // Unit Cost Field
-        TextField unitCostField = createTextField("Enter Unit Cost");
-        unitCostField.setPrefWidth(300);
-        unitCostField.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
-
-        // Sale Price Field (manual entry)
-        TextField salePriceField = createTextField("Enter Sale Price");
-        salePriceField.setPrefWidth(300);
-        salePriceField.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
-
-        // Add fields to grid with labels
-        inputGrid.add(createFormRow("Product Name:", nameField), 0, 0);
-        inputGrid.add(createFormRow("Brand:", brandCombo), 0, 1);
-        inputGrid.add(createFormRow("Quantity:", quantityField), 0, 2);
-        inputGrid.add(createFormRow("Unit Cost:", unitCostField), 0, 3);
-        inputGrid.add(createFormRow("Sale Price:", salePriceField), 0, 4);
-
-        // Action buttons for the form
-        HBox buttonBox = new HBox(15);
-        buttonBox.setAlignment(Pos.CENTER_LEFT);
-        buttonBox.setPadding(new Insets(20, 0, 0, 0));
-
-        Button submitBtn = createSubmitButton("Register Product");
-        submitBtn.setStyle("-fx-background-color: #28a745; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 10 20;");
-        submitBtn.setPrefWidth(150);
-
-        Button clearBtn = createActionButton("Clear Form");
-        clearBtn.setStyle("-fx-background-color: #6c757d; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;");
-        clearBtn.setPrefWidth(120);
-
-        buttonBox.getChildren().addAll(submitBtn, clearBtn);
-
-        // Add components to left column
-        leftColumn.getChildren().addAll(formTitle, inputGrid, buttonBox);
-
-        // === RIGHT COLUMN - PRODUCTION STOCK TABLE ===
-        VBox rightColumn = new VBox(15);
-        rightColumn.setMinWidth(600);
-        rightColumn.setStyle("-fx-border-color: #e0e0e0; -fx-border-width: 1; -fx-border-radius: 8; -fx-padding: 20; -fx-background-color: #ffffff;");
-
-        Label tableTitle = createSubheading("Registered Production Stock");
-        tableTitle.setStyle("-fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-font-size: 16px;");
-
-        // Search and filter controls
-        HBox searchBox = new HBox(15);
-        searchBox.setAlignment(Pos.CENTER_LEFT);
-        searchBox.setPadding(new Insets(0, 0, 15, 0));
-
-        TextField searchField = createTextField("Search products...");
-        searchField.setPrefWidth(250);
-        searchField.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
-
-        ComboBox<String> filterCombo = new ComboBox<>();
-        filterCombo.setPromptText("Filter by Brand");
-        filterCombo.setPrefWidth(150);
-        filterCombo.getItems().add("All Brands");
-        
-        // Load brands for filter
-        try {
-            List<Brand> brands = database.getAllBrands();
-            for (Brand brand : brands) {
-                filterCombo.getItems().add(brand.nameProperty().get());
-            }
-            filterCombo.getSelectionModel().selectFirst(); // Select "All Brands"
-        } catch (Exception e) {
-            System.err.println("Failed to load brands for filter: " + e.getMessage());
-        }
-
-        Button refreshBtn = createActionButton("Refresh");
-        refreshBtn.setStyle("-fx-background-color: #007bff; -fx-text-fill: white; -fx-padding: 8 15;");
-
-        searchBox.getChildren().addAll(searchField, filterCombo, refreshBtn);
-
-        // Production Stock Table with enhanced styling
+        // Production Stock Table
+        Label tableHeading = createSubheading("Registered Production Stock:");
         TableView<ProductionStockRecord> stockTable = createProductionStockTable();
-        stockTable.setPrefHeight(400);
-        stockTable.setStyle("-fx-background-color: white; -fx-border-color: #ddd; -fx-border-width: 1;");
+        refreshProductionStockTable(stockTable);
 
-        // Stock summary labels
-        HBox summaryBox = new HBox(30);
-        summaryBox.setAlignment(Pos.CENTER_LEFT);
-        summaryBox.setPadding(new Insets(15, 0, 0, 0));
-        summaryBox.setStyle("-fx-background-color: #f8f9fa; -fx-padding: 15; -fx-border-radius: 5;");
-
-        Label totalItemsLabel = new Label("Total Items: 0");
-        totalItemsLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #495057;");
-
-        Label totalValueLabel = new Label("Total Value: $0.00");
-        totalValueLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #28a745;");
-
-        Label lowStockLabel = new Label("Low Stock Items: 0");
-        lowStockLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #dc3545;");
-
-        summaryBox.getChildren().addAll(totalItemsLabel, totalValueLabel, lowStockLabel);
-
-        // Add components to right column
-        rightColumn.getChildren().addAll(tableTitle, searchBox, stockTable, summaryBox);
-
-        // Add columns to the two-column layout
-        twoColumnLayout.getChildren().addAll(leftColumn, rightColumn);
-
-        // === MAIN CONTAINER WITH SCROLLING ===
-        ScrollPane mainScrollPane = new ScrollPane(twoColumnLayout);
-        mainScrollPane.setFitToWidth(true);
-        mainScrollPane.setFitToHeight(false);
-        mainScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        mainScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        mainScrollPane.setPrefViewportHeight(600);
-        mainScrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
-
-        // Add heading and scrollable content to main container
-        mainContainer.getChildren().addAll(heading, mainScrollPane);
-
-        // === EVENT HANDLERS ===
-
-        // Clear form button
-        clearBtn.setOnAction(e -> {
-            nameField.clear();
-            brandCombo.setValue(null);
-            quantityField.clear();
-            unitCostField.clear();
-            salePriceField.clear();
-            nameField.requestFocus();
-        });
-
-        // Submit button
         submitBtn.setOnAction(e -> handleProductionStockSubmit(
-            nameField, brandCombo, quantityField, unitCostField, salePriceField, stockTable,
-            totalItemsLabel, totalValueLabel, lowStockLabel
+            nameField, brandCombo, quantityField, unitCostField, stockTable
         ));
 
-        // Refresh button
-        refreshBtn.setOnAction(e -> {
-            refreshProductionStockTable(stockTable);
-            updateStockSummary(stockTable, totalItemsLabel, totalValueLabel, lowStockLabel);
-        });
+        // Create form content in a compact layout
+        VBox formContent = new VBox(15);
+        formContent.getChildren().addAll(
+            heading, 
+            createFormRow("Product Name:", nameField),
+            createFormRow("Brand:", brandCombo),
+            createFormRow("Quantity:", quantityField),
+            createFormRow("Unit Cost:", unitCostField),
+            submitBtn, tableHeading, stockTable
+        );
 
-        // Search functionality
-        searchField.textProperty().addListener((obs, oldVal, newVal) -> {
-            filterProductionStockTable(stockTable, newVal, filterCombo.getValue());
-        });
+        // Wrap form in ScrollPane for responsiveness
+        ScrollPane scrollPane = new ScrollPane(formContent);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(false);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setPrefViewportHeight(600);
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
 
-        // Filter functionality
-        filterCombo.setOnAction(e -> {
-            filterProductionStockTable(stockTable, searchField.getText(), filterCombo.getValue());
-        });
-
-        // Load initial data
-        refreshProductionStockTable(stockTable);
-        updateStockSummary(stockTable, totalItemsLabel, totalValueLabel, lowStockLabel);
-
-        return mainContainer;
+        form.getChildren().add(scrollPane);
+        
+        return form;
     }
 
     private static VBox createProductionInvoiceForm() {
@@ -647,32 +496,16 @@ public class ProductionStock {
     }
 
     private static VBox createSalesInvoiceForm() {
-        VBox form = new VBox(20);
+        VBox form = new VBox(15);
         form.setPadding(new Insets(20));
         form.getStyleClass().add("form-container");
 
         Label heading = createHeading("Create Sales Invoice");
-        
-        // Create a VBox for scrollable content
-        VBox scrollableContent = new VBox(20);
-        scrollableContent.setPadding(new Insets(0, 20, 20, 20));
 
-        // === INVOICE HEADER SECTION ===
-        VBox headerSection = new VBox(15);
-        headerSection.setStyle("-fx-border-color: #ddd; -fx-border-width: 1; -fx-border-radius: 5; -fx-padding: 15;");
-        
-        Label headerTitle = createSubheading("Invoice Information");
-        headerTitle.setStyle("-fx-font-weight: bold; -fx-text-fill: #2c3e50;");
-        
-        // Invoice header fields in a grid layout
-        GridPane headerGrid = new GridPane();
-        headerGrid.setHgap(20);
-        headerGrid.setVgap(15);
-        headerGrid.setAlignment(Pos.TOP_LEFT);
-        
+        // Invoice header fields
         TextField invoiceNumberField = createTextField("Auto-generated");
         invoiceNumberField.setEditable(false);
-        invoiceNumberField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
+        invoiceNumberField.setStyle("-fx-background-color: #f0f0f0;");
         
         // Auto-generate invoice number
         String autoInvoiceNumber = database.generateSalesInvoiceNumber();
@@ -680,475 +513,206 @@ public class ProductionStock {
         
         DatePicker salesDatePicker = new DatePicker();
         salesDatePicker.setValue(LocalDate.now());
-        salesDatePicker.setPrefWidth(200);
         
-        // Customer dropdown with improved styling
+        // Customer dropdown
         ComboBox<String> customerComboBox = new ComboBox<>();
-        customerComboBox.setPromptText("-- Select Customer --");
+        customerComboBox.setPromptText("Select Customer");
         customerComboBox.setEditable(false);
-        customerComboBox.setPrefWidth(250);
+        customerComboBox.setMaxWidth(Double.MAX_VALUE);
         
-        // Load customers with error handling
-        try {
-            List<Object[]> customers = database.getAllCustomersForDropdown();
-            ObservableList<String> customerNames = FXCollections.observableArrayList();
-            for (Object[] customer : customers) {
-                customerNames.add((String) customer[1]); // customer_name
-            }
-            customerComboBox.setItems(customerNames);
-        } catch (Exception e) {
-            showAlert("Database Error", "Failed to load customers: " + e.getMessage());
+        // Load customers
+        List<Object[]> customers = database.getAllCustomersForDropdown();
+        ObservableList<String> customerNames = FXCollections.observableArrayList();
+        for (Object[] customer : customers) {
+            customerNames.add((String) customer[1]); // customer_name
         }
+        customerComboBox.setItems(customerNames);
         
-        // Add fields to grid
-        headerGrid.add(createFormRow("Invoice Number:", invoiceNumberField), 0, 0);
-        headerGrid.add(createFormRow("Sales Date:", salesDatePicker), 1, 0);  
-        headerGrid.add(createFormRow("Customer:", customerComboBox), 0, 1, 2, 1);
+        TextField discountField = createTextField("0", "Discount");
+        TextField paidAmountField = createTextField("0", "Paid Amount");
         
-        headerSection.getChildren().addAll(headerTitle, headerGrid);
-
-        // === PRODUCT SELECTION SECTION ===
-        VBox productSection = new VBox(15);
-        productSection.setStyle("-fx-border-color: #ddd; -fx-border-width: 1; -fx-border-radius: 5; -fx-padding: 15;");
-        
-        Label productTitle = createSubheading("Add Products to Invoice");
-        productTitle.setStyle("-fx-font-weight: bold; -fx-text-fill: #2c3e50;");
-        
-        // Product selection grid
-        GridPane productGrid = new GridPane();
-        productGrid.setHgap(15);
-        productGrid.setVgap(15);
-        productGrid.setAlignment(Pos.TOP_LEFT);
-        
-        // Product dropdown with better styling
-        ComboBox<String> productComboBox = new ComboBox<>();
-        productComboBox.setPromptText("-- Select Product --");
-        productComboBox.setEditable(false);
-        productComboBox.setPrefWidth(250);
-        
-        // Load production stock items with error handling
-        final List<Object[]> products = new ArrayList<>();
-        try {
-            products.addAll(database.getAllProductionStocksWithPriceForDropdown());
-            ObservableList<String> productNames = FXCollections.observableArrayList();
-            for (Object[] product : products) {
-                String displayName = String.format("%s (Stock: %d)", 
-                    product[1], // product_name
-                    ((Number) product[3]).intValue() // quantity available
-                );
-                productNames.add(displayName);
-            }
-            productComboBox.setItems(productNames);
-        } catch (Exception e) {
-            showAlert("Database Error", "Failed to load products: " + e.getMessage());
-        }
-        
-        TextField quantityField = createTextField("1");
-        quantityField.setPromptText("Enter Quantity");
-        quantityField.setPrefWidth(120);
-        
-        TextField priceField = createTextField("0.00");
-        priceField.setPromptText("Unit Price");
-        priceField.setPrefWidth(120);
-        priceField.setEditable(false);
-        priceField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
-        
-        TextField stockAvailableField = createTextField("0");
-        stockAvailableField.setPromptText("Available Stock");
-        stockAvailableField.setPrefWidth(120);
-        stockAvailableField.setEditable(false);
-        stockAvailableField.setStyle("-fx-background-color: #e8f5e8; -fx-border-color: #28a745;");
-        
-        // Auto-fill price and stock when product is selected
-        productComboBox.setOnAction(e -> {
-            String selectedDisplay = productComboBox.getValue();
-            if (selectedDisplay != null) {
-                // Extract product name from display (remove stock info)
-                String productName = selectedDisplay.split(" \\(Stock:")[0];
-                
-                for (Object[] product : products) {
-                    if (productName.equals(product[1])) {
-                        double salePrice = ((Number) product[2]).doubleValue();
-                        int availableStock = ((Number) product[3]).intValue();
-                        
-                        priceField.setText(String.format("%.2f", salePrice));
-                        stockAvailableField.setText(String.valueOf(availableStock));
-                        
-                        // Update stock field color based on availability
-                        if (availableStock > 10) {
-                            stockAvailableField.setStyle("-fx-background-color: #e8f5e8; -fx-border-color: #28a745;");
-                        } else if (availableStock > 0) {
-                            stockAvailableField.setStyle("-fx-background-color: #fff3cd; -fx-border-color: #ffc107;");
-                        } else {
-                            stockAvailableField.setStyle("-fx-background-color: #f8d7da; -fx-border-color: #dc3545;");
-                        }
-                        break;
-                    }
-                }
-            } else {
-                priceField.clear();
-                stockAvailableField.clear();
-                stockAvailableField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
-            }
-        });
-        
-        // Action buttons for adding items
-        Button addItemBtn = createActionButton("Add to Invoice");
-        addItemBtn.setStyle("-fx-background-color: #28a745; -fx-text-fill: white; -fx-font-weight: bold;");
-        
-        Button clearSelectionBtn = createActionButton("Clear Selection");
-        clearSelectionBtn.setStyle("-fx-background-color: #6c757d; -fx-text-fill: white;");
-        
-        HBox itemActionButtons = new HBox(10);
-        itemActionButtons.getChildren().addAll(addItemBtn, clearSelectionBtn);
-        
-        // Add to product grid
-        productGrid.add(createFormRow("Product:", productComboBox), 0, 0);
-        productGrid.add(createFormRow("Quantity:", quantityField), 1, 0);
-        productGrid.add(createFormRow("Unit Price:", priceField), 0, 1);
-        productGrid.add(createFormRow("Available Stock:", stockAvailableField), 1, 1);
-        productGrid.add(itemActionButtons, 0, 2, 2, 1);
-        
-        productSection.getChildren().addAll(productTitle, productGrid);
-
-        // === INVOICE ITEMS TABLE SECTION ===
-        VBox tableSection = new VBox(15);
-        tableSection.setStyle("-fx-border-color: #ddd; -fx-border-width: 1; -fx-border-radius: 5; -fx-padding: 15;");
-        
-        Label tableTitle = createSubheading("Invoice Items");
-        tableTitle.setStyle("-fx-font-weight: bold; -fx-text-fill: #2c3e50;");
-        
-        // Invoice items table with improved columns
+        // Invoice items table
         TableView<SalesInvoiceItemUI> itemsTable = new TableView<>();
         itemsTable.setPrefHeight(250);
-        itemsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        itemsTable.setMaxHeight(250);
+        itemsTable.getStyleClass().add("table-view");
         
         TableColumn<SalesInvoiceItemUI, String> productCol = new TableColumn<>("Product Name");
         productCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
-        productCol.setPrefWidth(250);
+        productCol.setPrefWidth(200);
         
         TableColumn<SalesInvoiceItemUI, Double> quantityCol = new TableColumn<>("Quantity");
         quantityCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
         quantityCol.setPrefWidth(100);
-        quantityCol.setCellFactory(col -> new TableCell<SalesInvoiceItemUI, Double>() {
-            @Override
-            protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(String.format("%.1f", item));
-                }
-            }
-        });
         
         TableColumn<SalesInvoiceItemUI, Double> priceCol = new TableColumn<>("Unit Price");
         priceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
         priceCol.setPrefWidth(120);
-        priceCol.setCellFactory(col -> new TableCell<SalesInvoiceItemUI, Double>() {
-            @Override
-            protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(String.format("$%.2f", item));
-                }
-            }
-        });
         
-        TableColumn<SalesInvoiceItemUI, Double> totalCol = new TableColumn<>("Line Total");
+        TableColumn<SalesInvoiceItemUI, Double> totalCol = new TableColumn<>("Total Amount");
         totalCol.setCellValueFactory(new PropertyValueFactory<>("totalPrice"));
         totalCol.setPrefWidth(120);
-        totalCol.setCellFactory(col -> new TableCell<SalesInvoiceItemUI, Double>() {
-            @Override
-            protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(String.format("$%.2f", item));
-                    setStyle("-fx-font-weight: bold; -fx-text-fill: #28a745;");
-                }
-            }
-        });
         
         itemsTable.getColumns().addAll(productCol, quantityCol, priceCol, totalCol);
         
         ObservableList<SalesInvoiceItemUI> invoiceItems = FXCollections.observableArrayList();
         itemsTable.setItems(invoiceItems);
         
-        // Table action buttons
-        Button removeItemBtn = createActionButton("Remove Selected Item");
-        removeItemBtn.setStyle("-fx-background-color: #dc3545; -fx-text-fill: white;");
+        // Add item controls
+        HBox addItemBox = new HBox(10);
+        addItemBox.setAlignment(Pos.CENTER_LEFT);
         
-        Button clearAllItemsBtn = createActionButton("Clear All Items");
-        clearAllItemsBtn.setStyle("-fx-background-color: #6c757d; -fx-text-fill: white;");
+        // Product dropdown
+        ComboBox<String> productComboBox = new ComboBox<>();
+        productComboBox.setPromptText("Select Product");
+        productComboBox.setEditable(false);
+        productComboBox.setPrefWidth(200);
         
-        HBox tableActionButtons = new HBox(10);
-        tableActionButtons.getChildren().addAll(removeItemBtn, clearAllItemsBtn);
+        // Load production stock items
+        List<Object[]> products = database.getAllProductionStocksWithPriceForDropdown();
+        ObservableList<String> productNames = FXCollections.observableArrayList();
+        for (Object[] product : products) {
+            productNames.add((String) product[1]); // production_stock_name
+        }
+        productComboBox.setItems(productNames);
         
-        tableSection.getChildren().addAll(tableTitle, itemsTable, tableActionButtons);
-
-        // === PAYMENT SECTION ===
-        VBox paymentSection = new VBox(15);
-        paymentSection.setStyle("-fx-border-color: #ddd; -fx-border-width: 1; -fx-border-radius: 5; -fx-padding: 15;");
+        TextField quantityField = createTextField("Quantity");
+        quantityField.setPrefWidth(100);
         
-        Label paymentTitle = createSubheading("Payment Information");
-        paymentTitle.setStyle("-fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        TextField priceField = createTextField("Price");
+        priceField.setPrefWidth(100);
+        priceField.setEditable(false);
+        priceField.setStyle("-fx-background-color: #f0f0f0;");
         
-        GridPane paymentGrid = new GridPane();
-        paymentGrid.setHgap(20);
-        paymentGrid.setVgap(15);
-        paymentGrid.setAlignment(Pos.TOP_LEFT);
-        
-        TextField discountField = createTextField("0.00");
-        discountField.setPromptText("Discount Amount");
-        discountField.setPrefWidth(150);
-        
-        TextField paidAmountField = createTextField("0.00");
-        paidAmountField.setPromptText("Amount Paid");
-        paidAmountField.setPrefWidth(150);
-        
-        // Summary labels
-        Label subtotalLabel = new Label("Subtotal: $0.00");
-        subtotalLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
-        
-        Label discountLabel = new Label("Discount: $0.00");
-        discountLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #dc3545;");
-        
-        Label totalAmountLabel = new Label("Total Amount: $0.00");
-        totalAmountLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #28a745;");
-        
-        Label balanceLabel = new Label("Balance Due: $0.00");
-        balanceLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #dc3545;");
-        
-        // Update balance when discount or paid amount changes
-        discountField.textProperty().addListener((obs, oldVal, newVal) -> {
-            updatePaymentSummary(invoiceItems, discountField, paidAmountField, 
-                subtotalLabel, discountLabel, totalAmountLabel, balanceLabel);
+        // Auto-fill price when product is selected
+        productComboBox.setOnAction(e -> {
+            String selectedProduct = productComboBox.getValue();
+            if (selectedProduct != null) {
+                for (Object[] product : products) {
+                    if (selectedProduct.equals(product[1])) {
+                        double salePrice = (Double) product[2];
+                        priceField.setText(String.valueOf(salePrice));
+                        break;
+                    }
+                }
+            }
         });
         
-        paidAmountField.textProperty().addListener((obs, oldVal, newVal) -> {
-            updatePaymentSummary(invoiceItems, discountField, paidAmountField, 
-                subtotalLabel, discountLabel, totalAmountLabel, balanceLabel);
-        });
-        
-        paymentGrid.add(createFormRow("Discount:", discountField), 0, 0);
-        paymentGrid.add(createFormRow("Paid Amount:", paidAmountField), 1, 0);
-        paymentGrid.add(subtotalLabel, 0, 1);
-        paymentGrid.add(discountLabel, 1, 1);
-        paymentGrid.add(totalAmountLabel, 0, 2, 2, 1);
-        paymentGrid.add(balanceLabel, 0, 3, 2, 1);
-        
-        paymentSection.getChildren().addAll(paymentTitle, paymentGrid);
-
-        // === ACTION BUTTONS ===
-        HBox actionButtons = new HBox(15);
-        actionButtons.setAlignment(Pos.CENTER);
-        actionButtons.setPadding(new Insets(20, 0, 0, 0));
-        
-        Button submitBtn = createSubmitButton("Create Sales Invoice");
-        submitBtn.setStyle("-fx-background-color: #007bff; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 12 24;");
-        submitBtn.setPrefWidth(200);
-        
-        Button resetFormBtn = createActionButton("Reset Form");
-        resetFormBtn.setStyle("-fx-background-color: #6c757d; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;");
-        resetFormBtn.setPrefWidth(150);
-        
-        actionButtons.getChildren().addAll(submitBtn, resetFormBtn);
-
-        // Add all sections to scrollable content
-        scrollableContent.getChildren().addAll(
-            headerSection,
-            productSection,  
-            tableSection,
-            paymentSection,
-            actionButtons
+        Button addItemBtn = createActionButton("Add Item");
+        Button removeItemBtn = createActionButton("Remove Item");
+        addItemBox.getChildren().addAll(
+            new Label("Product:"), productComboBox,
+            new Label("Qty:"), quantityField,
+            new Label("Price:"), priceField,
+            addItemBtn, removeItemBtn
         );
         
-        // Create ScrollPane for the form content
-        ScrollPane scrollPane = new ScrollPane(scrollableContent);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setFitToHeight(false);
-        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        scrollPane.setPrefViewportHeight(600);
-        scrollPane.setMaxHeight(600);
-        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        // Total amount label
+        Label totalAmountLabel = new Label("Total Amount: $0.00");
+        totalAmountLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
         
-        // Add heading and scrollable content to main form
-        form.getChildren().addAll(heading, scrollPane);
+        // Action buttons
+        HBox actionButtons = new HBox(10);
+        Button submitBtn = createSubmitButton("Submit Invoice");
+        Button clearBtn = createActionButton("Clear All");
+        Button printBtn = createActionButton("Print Invoice");
+        printBtn.getStyleClass().add("action-button");
+        actionButtons.getChildren().addAll(submitBtn, clearBtn, printBtn);
 
-        // === EVENT HANDLERS ===
-        
-        // Clear selection button
-        clearSelectionBtn.setOnAction(e -> {
-            productComboBox.setValue(null);
-            quantityField.setText("1");
-            priceField.clear();
-            stockAvailableField.clear();
-            stockAvailableField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
-        });
-        
-        // Add item to invoice button
+        form.getChildren().addAll(
+            heading,
+            createFormRow("Invoice Number:", invoiceNumberField),
+            createFormRow("Sales Date:", salesDatePicker),
+            createFormRow("Customer:", customerComboBox),
+            createFormRow("Discount:", discountField),
+            createFormRow("Paid Amount:", paidAmountField),
+            createSubheading("Invoice Items:"),
+            addItemBox,
+            itemsTable,
+            totalAmountLabel,
+            actionButtons
+        );
+
+        // Event handlers
         addItemBtn.setOnAction(e -> {
-            String selectedDisplay = productComboBox.getValue();
-            String quantityText = quantityField.getText().trim();
-            String priceText = priceField.getText().trim();
-            String stockText = stockAvailableField.getText().trim();
+            String selectedProduct = productComboBox.getValue();
+            String quantity = quantityField.getText().trim();
+            String price = priceField.getText().trim();
             
-            // Validation
-            if (selectedDisplay == null) {
-                showAlert("Missing Information", "Please select a product");
-                return;
-            }
-            
-            if (quantityText.isEmpty()) {
-                showAlert("Missing Information", "Please enter quantity");
-                return;
-            }
-            
-            if (priceText.isEmpty()) {
-                showAlert("Missing Information", "Price not loaded. Please select product again");
+            if (selectedProduct == null || quantity.isEmpty() || price.isEmpty()) {
+                showAlert("Missing Information", "Please select a product and enter quantity");
                 return;
             }
             
             try {
-                double qty = Double.parseDouble(quantityText);
-                double price = Double.parseDouble(priceText);
-                int availableStock = stockText.isEmpty() ? 0 : Integer.parseInt(stockText);
+                double qty = Double.parseDouble(quantity);
+                double prc = Double.parseDouble(price);
                 
-                if (qty <= 0) {
-                    showAlert("Invalid Input", "Quantity must be greater than 0");
+                if (qty <= 0 || prc <= 0) {
+                    showAlert("Invalid Input", "Quantity and price must be positive numbers");
                     return;
                 }
-                
-                if (price <= 0) {
-                    showAlert("Invalid Input", "Price must be greater than 0");
-                    return;
-                }
-                
-                if (qty > availableStock) {
-                    showAlert("Insufficient Stock", 
-                        String.format("Requested quantity (%.1f) exceeds available stock (%d)", qty, availableStock));
-                    return;
-                }
-                
-                // Extract product name from display
-                String productName = selectedDisplay.split(" \\(Stock:")[0];
                 
                 // Check if product already exists in table
                 boolean productExists = false;
                 for (SalesInvoiceItemUI item : invoiceItems) {
-                    if (item.getProductName().equals(productName)) {
-                        double newQty = item.getQuantity() + qty;
-                        if (newQty > availableStock) {
-                            showAlert("Insufficient Stock", 
-                                String.format("Total quantity (%.1f) would exceed available stock (%d)", newQty, availableStock));
-                            return;
-                        }
-                        item.setQuantity(newQty);
+                    if (item.getProductName().equals(selectedProduct)) {
+                        item.setQuantity(item.getQuantity() + qty);
                         productExists = true;
                         break;
                     }
                 }
                 
                 if (!productExists) {
-                    SalesInvoiceItemUI newItem = new SalesInvoiceItemUI(productName, qty, price);
+                    SalesInvoiceItemUI newItem = new SalesInvoiceItemUI(selectedProduct, qty, prc);
                     invoiceItems.add(newItem);
                 }
                 
                 itemsTable.refresh();
-                updatePaymentSummary(invoiceItems, discountField, paidAmountField, 
-                    subtotalLabel, discountLabel, totalAmountLabel, balanceLabel);
+                updateTotalAmount(invoiceItems, totalAmountLabel);
                 
-                // Clear selection after adding
                 productComboBox.setValue(null);
-                quantityField.setText("1");
+                quantityField.clear();
                 priceField.clear();
-                stockAvailableField.clear();
-                stockAvailableField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
                 
             } catch (NumberFormatException ex) {
-                showAlert("Invalid Input", "Please enter valid numbers for quantity and price");
+                showAlert("Invalid Input", "Please enter valid numbers for quantity");
             }
         });
         
-        // Remove selected item button
         removeItemBtn.setOnAction(e -> {
             SalesInvoiceItemUI selectedItem = itemsTable.getSelectionModel().getSelectedItem();
             if (selectedItem != null) {
                 invoiceItems.remove(selectedItem);
-                updatePaymentSummary(invoiceItems, discountField, paidAmountField, 
-                    subtotalLabel, discountLabel, totalAmountLabel, balanceLabel);
+                updateTotalAmount(invoiceItems, totalAmountLabel);
             } else {
-                showAlert("No Selection", "Please select an item to remove from the table");
+                showAlert("No Selection", "Please select an item to remove");
             }
         });
         
-        // Clear all items button
-        clearAllItemsBtn.setOnAction(e -> {
+        clearBtn.setOnAction(e -> {
             if (!invoiceItems.isEmpty()) {
                 Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
                 alert.setTitle("Confirm Clear");
                 alert.setHeaderText("Clear all invoice items?");
-                alert.setContentText("This will remove all products from the invoice.");
                 
                 if (alert.showAndWait().get() == ButtonType.OK) {
                     invoiceItems.clear();
-                    updatePaymentSummary(invoiceItems, discountField, paidAmountField, 
-                        subtotalLabel, discountLabel, totalAmountLabel, balanceLabel);
+                    updateTotalAmount(invoiceItems, totalAmountLabel);
                 }
             }
         });
         
-        // Reset form button
-        resetFormBtn.setOnAction(e -> {
-            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-            alert.setTitle("Confirm Reset");
-            alert.setHeaderText("Reset entire form?");
-            alert.setContentText("This will clear all data and generate a new invoice number.");
-            
-            if (alert.showAndWait().get() == ButtonType.OK) {
-                // Generate new invoice number
-                String newInvoiceNumber = database.generateSalesInvoiceNumber();
-                invoiceNumberField.setText(newInvoiceNumber);
-                
-                // Reset all fields
-                salesDatePicker.setValue(LocalDate.now());
-                customerComboBox.setValue(null);
-                productComboBox.setValue(null);
-                quantityField.setText("1");
-                priceField.clear();
-                stockAvailableField.clear();
-                stockAvailableField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
-                discountField.setText("0.00");
-                paidAmountField.setText("0.00");
-                
-                // Clear items
-                invoiceItems.clear();
-                updatePaymentSummary(invoiceItems, discountField, paidAmountField, 
-                    subtotalLabel, discountLabel, totalAmountLabel, balanceLabel);
-            }
-        });
-        
-        // Submit invoice button
-        submitBtn.setOnAction(e -> {
+        // Print button event handler
+        printBtn.setOnAction(e -> {
             String invoiceNumber = invoiceNumberField.getText().trim();
             String customer = customerComboBox.getValue();
             String date = salesDatePicker.getValue().format(DATE_FORMATTER);
             String discountText = discountField.getText().trim();
             String paidAmountText = paidAmountField.getText().trim();
             
-            // Validation
-            if (customer == null || customer.isEmpty()) {
-                showAlert("Missing Information", "Please select a customer");
-                return;
-            }
-            
-            if (invoiceItems.isEmpty()) {
-                showAlert("Missing Information", "Please add at least one item to the invoice");
+            if (customer == null || invoiceItems.isEmpty()) {
+                showAlert("Missing Information", "Please select a customer and add at least one item to print invoice");
                 return;
             }
             
@@ -1156,26 +720,43 @@ public class ProductionStock {
                 double discount = discountText.isEmpty() ? 0.0 : Double.parseDouble(discountText);
                 double paidAmount = paidAmountText.isEmpty() ? 0.0 : Double.parseDouble(paidAmountText);
                 
-                if (discount < 0 || paidAmount < 0) {
-                    showAlert("Invalid Input", "Discount and paid amount cannot be negative");
-                    return;
-                }
+                // Calculate total amount
+                double totalAmount = invoiceItems.stream()
+                    .mapToDouble(SalesInvoiceItemUI::getTotalPrice)
+                    .sum() - discount;
+                
+                // Create invoice data for printing
+                printSalesInvoice(invoiceNumber, customer, date, invoiceItems, totalAmount, discount, paidAmount);
+                
+            } catch (NumberFormatException ex) {
+                showAlert("Invalid Input", "Please enter valid numbers for discount and paid amount");
+            }
+        });
+        
+        submitBtn.setOnAction(e -> {
+            String invoiceNumber = invoiceNumberField.getText().trim();
+            String customer = customerComboBox.getValue();
+            String date = salesDatePicker.getValue().format(DATE_FORMATTER);
+            String discountText = discountField.getText().trim();
+            String paidAmountText = paidAmountField.getText().trim();
+            
+            if (customer == null || invoiceItems.isEmpty()) {
+                showAlert("Missing Information", "Please select a customer and add at least one item");
+                return;
+            }
+            
+            try {
+                double discount = discountText.isEmpty() ? 0.0 : Double.parseDouble(discountText);
+                double paidAmount = paidAmountText.isEmpty() ? 0.0 : Double.parseDouble(paidAmountText);
                 
                 // Calculate total amount
-                double subtotal = invoiceItems.stream()
+                double totalAmount = invoiceItems.stream()
                     .mapToDouble(SalesInvoiceItemUI::getTotalPrice)
-                    .sum();
-                double totalAmount = subtotal - discount;
+                    .sum() - discount;
                 
-                if (totalAmount < 0) {
-                    showAlert("Invalid Input", "Discount cannot exceed subtotal");
-                    return;
-                }
-                
-                // Get customer ID
                 int customerId = database.getCustomerIdByName(customer);
                 if (customerId == -1) {
-                    showAlert("Database Error", "Customer not found in database");
+                    showAlert("Error", "Customer not found in database");
                     return;
                 }
                 
@@ -1183,50 +764,33 @@ public class ProductionStock {
                 List<Object[]> items = new ArrayList<>();
                 for (SalesInvoiceItemUI item : invoiceItems) {
                     int productId = database.getProductionStockIdByName(item.getProductName());
-                    if (productId == -1) {
-                        showAlert("Database Error", "Product '" + item.getProductName() + "' not found in database");
-                        return;
+                    if (productId != -1) {
+                        items.add(new Object[]{productId, item.getQuantity(), item.getUnitPrice()});
                     }
-                    items.add(new Object[]{productId, item.getQuantity(), item.getUnitPrice()});
                 }
                 
-                // Show confirmation with invoice summary
-                Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
-                confirmAlert.setTitle("Confirm Invoice Creation");
-                confirmAlert.setHeaderText("Create Sales Invoice?");
-                confirmAlert.setContentText(String.format(
-                    "Invoice: %s\nCustomer: %s\nSubtotal: $%.2f\nDiscount: $%.2f\nTotal: $%.2f\nPaid: $%.2f\nBalance: $%.2f",
-                    invoiceNumber, customer, subtotal, discount, totalAmount, paidAmount, totalAmount - paidAmount
-                ));
+                // Save to database
+                boolean success = database.insertSalesInvoice(invoiceNumber, customerId, date, 
+                    totalAmount, discount, paidAmount, items);
                 
-                if (confirmAlert.showAndWait().get() == ButtonType.OK) {
-                    // Save to database
-                    boolean success = database.insertSalesInvoice(invoiceNumber, customerId, date, 
-                        totalAmount, discount, paidAmount, items);
+                if (success) {
+                    showAlert("Success", "Sales invoice created successfully!");
                     
-                    if (success) {
-                        showAlert("Success", "Sales invoice created successfully!\n\nInvoice Number: " + invoiceNumber);
-                        
-                        // Reset form for next invoice
-                        String newInvoiceNumber = database.generateSalesInvoiceNumber();
-                        invoiceNumberField.setText(newInvoiceNumber);
-                        salesDatePicker.setValue(LocalDate.now());
-                        customerComboBox.setValue(null);
-                        discountField.setText("0.00");
-                        paidAmountField.setText("0.00");
-                        invoiceItems.clear();
-                        updatePaymentSummary(invoiceItems, discountField, paidAmountField, 
-                            subtotalLabel, discountLabel, totalAmountLabel, balanceLabel);
-                    } else {
-                        showAlert("Database Error", "Failed to create sales invoice. Please check the database connection and try again.");
-                    }
+                    // Clear form and generate new invoice number
+                    String newInvoiceNumber = database.generateSalesInvoiceNumber();
+                    invoiceNumberField.setText(newInvoiceNumber);
+                    salesDatePicker.setValue(LocalDate.now());
+                    customerComboBox.setValue(null);
+                    discountField.setText("0");
+                    paidAmountField.setText("0");
+                    invoiceItems.clear();
+                    updateTotalAmount(invoiceItems, totalAmountLabel);
+                } else {
+                    showAlert("Error", "Failed to create sales invoice. Please try again.");
                 }
                 
             } catch (NumberFormatException ex) {
                 showAlert("Invalid Input", "Please enter valid numbers for discount and paid amount");
-            } catch (Exception ex) {
-                showAlert("Unexpected Error", "An error occurred: " + ex.getMessage());
-                ex.printStackTrace();
             }
         });
 
@@ -1720,131 +1284,47 @@ public class ProductionStock {
     // Production Stock specific methods
     private static void handleProductionStockSubmit(
             TextField nameField, ComboBox<String> brandCombo, 
-            TextField quantityField, TextField unitCostField, TextField salePriceField,
-            TableView<ProductionStockRecord> stockTable,
-            Label totalItemsLabel, Label totalValueLabel, Label lowStockLabel) {
+            TextField quantityField, TextField unitCostField, 
+            TableView<ProductionStockRecord> stockTable) {
         
         String name = nameField.getText().trim();
         String brand = brandCombo.getSelectionModel().getSelectedItem();
         String quantityText = quantityField.getText().trim();
         String unitCostText = unitCostField.getText().trim();
-        String salePriceText = salePriceField.getText().trim();
         
         // Validation
-        if (name.isEmpty()) {
-            showAlert("Missing Information", "Please enter a product name.");
-            nameField.requestFocus();
-            return;
-        }
-        
-        if (brand == null || brand.isEmpty()) {
-            showAlert("Missing Information", "Please select a brand.");
-            brandCombo.requestFocus();
-            return;
-        }
-        
-        if (quantityText.isEmpty()) {
-            showAlert("Missing Information", "Please enter quantity.");
-            quantityField.requestFocus();
-            return;
-        }
-        
-        if (unitCostText.isEmpty()) {
-            showAlert("Missing Information", "Please enter unit cost.");
-            unitCostField.requestFocus();
-            return;
-        }
-        
-        if (salePriceText.isEmpty()) {
-            showAlert("Missing Information", "Please enter sale price.");
-            salePriceField.requestFocus();
+        if (name.isEmpty() || brand == null || quantityText.isEmpty() || unitCostText.isEmpty()) {
+            showAlert("Error", "Please fill in all fields.");
             return;
         }
         
         try {
             int quantity = Integer.parseInt(quantityText);
             double unitCost = Double.parseDouble(unitCostText);
-            double salePrice = Double.parseDouble(salePriceText);
             
-            if (quantity <= 0) {
-                showAlert("Invalid Input", "Quantity must be greater than 0.");
-                quantityField.requestFocus();
+            if (quantity < 0 || unitCost < 0) {
+                showAlert("Error", "Quantity and Unit Cost must be non-negative.");
                 return;
             }
             
-            if (unitCost <= 0) {
-                showAlert("Invalid Input", "Unit cost must be greater than 0.");
-                unitCostField.requestFocus();
-                return;
-            }
+            // Insert into database - using quantity as openingQty and unitCost as salePrice
+            boolean success = database.insertProductionStock(name, "", brand, "", quantity, unitCost, 0.0);
             
-            if (salePrice <= 0) {
-                showAlert("Invalid Input", "Sale price must be greater than 0.");
-                salePriceField.requestFocus();
-                return;
-            }
-            
-            if (salePrice <= unitCost) {
-                Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-                alert.setTitle("Price Warning");
-                alert.setHeaderText("Sale price is less than or equal to unit cost");
-                alert.setContentText(String.format("Sale Price: $%.2f\nUnit Cost: $%.2f\n\nThis will result in no profit or a loss. Do you want to continue?", salePrice, unitCost));
-                
-                if (alert.showAndWait().get() != ButtonType.OK) {
-                    salePriceField.requestFocus();
-                    return;
-                }
-            }
-            
-            // Check if product with same name and brand already exists
-            if (database.productionStockExists(name, brand)) {
-                Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-                alert.setTitle("Product Exists");
-                alert.setHeaderText("Product already exists");
-                alert.setContentText("A product with the name '" + name + "' and brand '" + brand + "' already exists.\n\nDo you want to add this quantity to existing stock?");
-                
-                if (alert.showAndWait().get() == ButtonType.OK) {
-                    // Add to existing stock
-                    boolean success = database.addToProductionStock(name, brand, quantity, unitCost, salePrice);
-                    if (success) {
-                        showAlert("Success", "Quantity added to existing production stock successfully!");
-                    } else {
-                        showAlert("Error", "Failed to add quantity to existing stock.");
-                        return;
-                    }
-                } else {
-                    return; // User cancelled
-                }
+            if (success) {
+                showAlert("Success", "Production Stock registered successfully!");
+                // Clear form
+                nameField.clear();
+                brandCombo.getSelectionModel().clearSelection();
+                quantityField.clear();
+                unitCostField.clear();
+                // Refresh table
+                refreshProductionStockTable(stockTable);
             } else {
-                // Insert new production stock - using the new overloaded method
-                boolean success = database.insertProductionStock(name, "", brand, "", quantity, unitCost, salePrice, 0.0);
-                
-                if (!success) {
-                    showAlert("Error", "Failed to register production stock. Please check database connection.");
-                    return;
-                }
-                
-                showAlert("Success", String.format("Production Stock registered successfully!\n\nProduct: %s\nBrand: %s\nQuantity: %d\nUnit Cost: $%.2f\nSale Price: $%.2f\nProfit Margin: %.1f%%", 
-                    name, brand, quantity, unitCost, salePrice, ((salePrice - unitCost) / unitCost) * 100));
+                showAlert("Error", "Failed to register production stock.");
             }
-            
-            // Clear form after successful submission
-            nameField.clear();
-            brandCombo.getSelectionModel().clearSelection();
-            quantityField.clear();
-            unitCostField.clear();
-            salePriceField.clear();
-            nameField.requestFocus();
-            
-            // Refresh table and summary
-            refreshProductionStockTable(stockTable);
-            updateStockSummary(stockTable, totalItemsLabel, totalValueLabel, lowStockLabel);
             
         } catch (NumberFormatException ex) {
-            showAlert("Invalid Input", "Please enter valid numbers for Quantity, Unit Cost, and Sale Price.\n\nQuantity should be a whole number.\nUnit Cost and Sale Price should be decimal numbers.");
-        } catch (Exception ex) {
-            showAlert("Unexpected Error", "An error occurred while registering the product: " + ex.getMessage());
-            ex.printStackTrace();
+            showAlert("Error", "Please enter valid numbers for Quantity and Unit Cost.");
         }
     }
 
@@ -1856,7 +1336,7 @@ public class ProductionStock {
         
         TableColumn<ProductionStockRecord, String> nameCol = new TableColumn<>("Product Name");
         nameCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getName()));
-        nameCol.setPrefWidth(150);
+        nameCol.setPrefWidth(180);
         
         TableColumn<ProductionStockRecord, String> brandCol = new TableColumn<>("Brand");
         brandCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getBrand()));
@@ -1867,39 +1347,30 @@ public class ProductionStock {
         quantityCol.setPrefWidth(100);
         
         TableColumn<ProductionStockRecord, String> unitCostCol = new TableColumn<>("Unit Cost");
-        unitCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("%.2f", data.getValue().getUnitCost())));
-        unitCostCol.setPrefWidth(100);
+        unitCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("$%.2f", data.getValue().getUnitCost())));
+        unitCostCol.setPrefWidth(120);
         
         TableColumn<ProductionStockRecord, String> totalCostCol = new TableColumn<>("Total Cost");
-        totalCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("%.2f", data.getValue().getTotalCost())));
-        totalCostCol.setPrefWidth(100);
+        totalCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("$%.2f", data.getValue().getTotalCost())));
+        totalCostCol.setPrefWidth(120);
         
         table.getColumns().addAll(nameCol, brandCol, quantityCol, unitCostCol, totalCostCol);
+        
         return table;
     }
 
     private static void refreshProductionStockTable(TableView<ProductionStockRecord> table) {
         ObservableList<ProductionStockRecord> data = FXCollections.observableArrayList();
         
-        try {
-            // Get all production stocks from database
-            List<Object[]> stockList = database.getAllProductionStocks();
-            for (Object[] stock : stockList) {
-                data.add(new ProductionStockRecord(
-                    (Integer) stock[0],   // production_id
-                    (String) stock[1],    // product_name
-                    (String) stock[2],    // product_description
-                    (String) stock[3],    // brand_name
-                    (String) stock[4],    // brand_description
-                    (Integer) stock[5],   // quantity
-                    (Double) stock[6],    // unit_cost
-                    (Double) stock[7]     // sale_price
-                ));
-            }
-        } catch (Exception e) {
-            System.err.println("ERROR: Failed to refresh production stock table: " + e.getMessage());
-            e.printStackTrace();
-            showAlert("Database Error", "Failed to load production stock data: " + e.getMessage());
+        // Get all production stocks from database
+        for (Object[] stock : database.getAllProductionStocks()) {
+            data.add(new ProductionStockRecord(
+                (String) stock[1], // product_name
+                (String) stock[3], // brand_name
+                (Integer) stock[5], // quantity
+                (Double) stock[6], // unit_cost
+                (Double) stock[8]  // total_cost
+            ));
         }
         
         table.setItems(data);
@@ -1907,52 +1378,25 @@ public class ProductionStock {
 
     // Simple record class for table display
     private static class ProductionStockRecord {
-        private final int productionId;
         private final String name;
-        private final String description;
         private final String brand;
-        private final String brandDescription;
         private final int quantity;
         private final double unitCost;
-        private final double salePrice;
+        private final double totalCost;
         
-        // Original constructor for backward compatibility
         public ProductionStockRecord(String name, String brand, int quantity, double unitCost, double totalCost) {
-            this.productionId = 0;
             this.name = name;
-            this.description = "";
             this.brand = brand;
-            this.brandDescription = "";
             this.quantity = quantity;
             this.unitCost = unitCost;
-            this.salePrice = totalCost; // Use totalCost as salePrice for backward compatibility
+            this.totalCost = totalCost;
         }
         
-        // New comprehensive constructor
-        public ProductionStockRecord(int productionId, String name, String description, String brand, 
-                                   String brandDescription, int quantity, double unitCost, double salePrice) {
-            this.productionId = productionId;
-            this.name = name;
-            this.description = description;
-            this.brand = brand;
-            this.brandDescription = brandDescription;
-            this.quantity = quantity;
-            this.unitCost = unitCost;
-            this.salePrice = salePrice;
-        }
-        
-        // Getters
-        public int getProductionId() { return productionId; }
         public String getName() { return name; }
-        public String getDescription() { return description; }
         public String getBrand() { return brand; }
-        public String getBrandDescription() { return brandDescription; }
         public int getQuantity() { return quantity; }
         public double getUnitCost() { return unitCost; }
-        public double getSalePrice() { return salePrice; }
-        
-        // Backward compatibility methods
-        public double getTotalCost() { return quantity * unitCost; }
+        public double getTotalCost() { return totalCost; }
     }
 
     private static Label createHeading(String text) {
@@ -2370,59 +1814,6 @@ public class ProductionStock {
     }
 
     // Helper methods for sales invoice functionality
-    private static void updatePaymentSummary(ObservableList<SalesInvoiceItemUI> items, 
-                                           TextField discountField, TextField paidAmountField,
-                                           Label subtotalLabel, Label discountLabel, 
-                                           Label totalAmountLabel, Label balanceLabel) {
-        try {
-            // Calculate subtotal
-            double subtotal = items.stream().mapToDouble(SalesInvoiceItemUI::getTotalPrice).sum();
-            
-            // Get discount and paid amounts
-            double discount = 0.0;
-            double paidAmount = 0.0;
-            
-            try {
-                String discountText = discountField.getText().trim();
-                discount = discountText.isEmpty() ? 0.0 : Double.parseDouble(discountText);
-            } catch (NumberFormatException e) {
-                discount = 0.0;
-            }
-            
-            try {
-                String paidText = paidAmountField.getText().trim();
-                paidAmount = paidText.isEmpty() ? 0.0 : Double.parseDouble(paidText);
-            } catch (NumberFormatException e) {
-                paidAmount = 0.0;
-            }
-            
-            // Calculate total and balance
-            double totalAmount = subtotal - discount;
-            double balance = totalAmount - paidAmount;
-            
-            // Update labels
-            subtotalLabel.setText(String.format("Subtotal: $%.2f", subtotal));
-            discountLabel.setText(String.format("Discount: $%.2f", discount));
-            totalAmountLabel.setText(String.format("Total Amount: $%.2f", totalAmount));
-            
-            // Set balance color based on amount
-            if (balance <= 0) {
-                balanceLabel.setText("Balance Due: $0.00 (PAID)");
-                balanceLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #28a745;");
-            } else {
-                balanceLabel.setText(String.format("Balance Due: $%.2f", balance));
-                balanceLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #dc3545;");
-            }
-            
-        } catch (Exception e) {
-            // Fallback in case of any errors
-            subtotalLabel.setText("Subtotal: $0.00");
-            discountLabel.setText("Discount: $0.00");
-            totalAmountLabel.setText("Total Amount: $0.00");
-            balanceLabel.setText("Balance Due: $0.00");
-        }
-    }
-    
     private static void updateTotalAmount(ObservableList<SalesInvoiceItemUI> items, Label totalLabel) {
         double total = items.stream().mapToDouble(SalesInvoiceItemUI::getTotalPrice).sum();
         totalLabel.setText(String.format("Total Amount: $%.2f", total));
@@ -2431,6 +1822,59 @@ public class ProductionStock {
     private static void updateReturnAmount(ObservableList<SalesInvoiceItemUI> items, TextField returnAmountField) {
         double total = items.stream().mapToDouble(SalesInvoiceItemUI::getTotalPrice).sum();
         returnAmountField.setText(String.format("%.2f", total));
+    }
+
+    private static void printSalesInvoice(String invoiceNumber, String customer, String date, 
+                                         ObservableList<SalesInvoiceItemUI> invoiceItems, 
+                                         double totalAmount, double discount, double paidAmount) {
+        try {
+            System.out.println("=== PREPARING SALES INVOICE DATA FOR PRINTING ===");
+            
+            // Create invoice items for printing
+            List<Item> printItems = new ArrayList<>();
+            for (SalesInvoiceItemUI item : invoiceItems) {
+                System.out.println("Adding sales item to print: " + item.getProductName() + " x " + item.getQuantity());
+                
+                // Calculate discount percentage if any
+                double discountPercent = 0; // Sales invoices typically don't have item-level discounts
+                
+                Item printItem = new Item(
+                    item.getProductName(),
+                    (int) item.getQuantity(), // Convert to int as Item constructor expects int
+                    item.getUnitPrice(),
+                    discountPercent
+                );
+                printItems.add(printItem);
+            }
+
+            // Create invoice data for printing
+            InvoiceData invoiceData = new InvoiceData(
+                invoiceNumber,
+                date,
+                customer,
+                "Customer Address", // Could be enhanced to fetch actual address
+                paidAmount - totalAmount, // Balance (amount remaining after payment)
+                printItems
+            );
+
+            System.out.println("=== SENDING SALES INVOICE TO PRINTER ===");
+            // Print the invoice
+            boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Sales Invoice");
+            
+            if (printSuccess) {
+                System.out.println("=== SALES INVOICE PRINT SUCCESSFUL ===");
+                showAlert("Success", String.format("Sales Invoice %s printed successfully!\nTotal Amount: $%.2f", 
+                    invoiceNumber, totalAmount));
+            } else {
+                System.out.println("=== SALES INVOICE PRINT FAILED ===");
+                showAlert("Print Information", String.format("Sales Invoice %s data prepared.\nTotal Amount: $%.2f\n\nPrinting was cancelled or failed.", 
+                    invoiceNumber, totalAmount));
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            showAlert("Print Error", "Failed to print sales invoice: " + e.getMessage());
+        }
     }
 
     // UI Model class for Sales Invoice Items
@@ -2488,93 +1932,6 @@ public class ProductionStock {
 
         private void updateTotalPrice() {
             this.totalPrice.set(this.quantity.get() * this.unitPrice.get());
-        }
-    }
-
-    // Helper methods for the new two-column production stock form
-    
-    private static void updateStockSummary(TableView<ProductionStockRecord> stockTable, 
-                                         Label totalItemsLabel, Label totalValueLabel, Label lowStockLabel) {
-        try {
-            ObservableList<ProductionStockRecord> items = stockTable.getItems();
-            int totalItems = items.size();
-            double totalValue = 0.0;
-            int lowStockCount = 0;
-            
-            for (ProductionStockRecord record : items) {
-                // Calculate total value (quantity * sale_price)
-                totalValue += record.getQuantity() * record.getSalePrice();
-                
-                // Count low stock items (less than 10)
-                if (record.getQuantity() < 10) {
-                    lowStockCount++;
-                }
-            }
-            
-            totalItemsLabel.setText("Total Items: " + totalItems);
-            totalValueLabel.setText(String.format("Total Value: $%.2f", totalValue));
-            
-            if (lowStockCount > 0) {
-                lowStockLabel.setText("Low Stock Items: " + lowStockCount);
-                lowStockLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #dc3545;");
-            } else {
-                lowStockLabel.setText("Low Stock Items: 0");
-                lowStockLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #28a745;");
-            }
-            
-        } catch (Exception e) {
-            System.err.println("Error updating stock summary: " + e.getMessage());
-            totalItemsLabel.setText("Total Items: 0");
-            totalValueLabel.setText("Total Value: $0.00");
-            lowStockLabel.setText("Low Stock Items: 0");
-        }
-    }
-    
-    private static void filterProductionStockTable(TableView<ProductionStockRecord> stockTable, 
-                                                 String searchText, String brandFilter) {
-        try {
-            // Get all production stock from database
-            List<Object[]> allStock = database.getAllProductionStocks();
-            ObservableList<ProductionStockRecord> filteredRecords = FXCollections.observableArrayList();
-            
-            for (Object[] stock : allStock) {
-                int productionId = (Integer) stock[0];
-                String productName = (String) stock[1];
-                String productDesc = (String) stock[2];
-                String brandName = (String) stock[3];
-                String brandDesc = (String) stock[4];
-                int quantity = (Integer) stock[5];
-                double unitCost = (Double) stock[6];
-                double salePrice = (Double) stock[7];
-                
-                boolean matchesSearch = true;
-                boolean matchesBrand = true;
-                
-                // Apply search filter
-                if (searchText != null && !searchText.trim().isEmpty()) {
-                    String search = searchText.toLowerCase();
-                    matchesSearch = productName.toLowerCase().contains(search) || 
-                                  brandName.toLowerCase().contains(search);
-                }
-                
-                // Apply brand filter
-                if (brandFilter != null && !brandFilter.equals("All Brands")) {
-                    matchesBrand = brandName.equals(brandFilter);
-                }
-                
-                if (matchesSearch && matchesBrand) {
-                    filteredRecords.add(new ProductionStockRecord(
-                        productionId, productName, productDesc, brandName, brandDesc, 
-                        quantity, unitCost, salePrice
-                    ));
-                }
-            }
-            
-            stockTable.setItems(filteredRecords);
-            
-        } catch (Exception e) {
-            System.err.println("Error filtering production stock table: " + e.getMessage());
-            showAlert("Error", "Failed to filter table: " + e.getMessage());
         }
     }
 }
