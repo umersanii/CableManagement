@@ -3,12 +3,6 @@ package com.cablemanagement.views.pages;
 import com.cablemanagement.config;
 import com.cablemanagement.invoice.*;
 import com.cablemanagement.model.*;
-import com.cablemanagement.views.pages.BooksContent.ProductionRecord;
-import com.cablemanagement.views.pages.BooksContent.ReturnProductionRecord;
-import com.cablemanagement.views.pages.BooksContent.ReturnPurchaseRecord;
-import com.cablemanagement.views.pages.BooksContent.ReturnRawStockRecord;
-import com.cablemanagement.views.pages.BooksContent.ReturnSalesRecord;
-import com.cablemanagement.views.pages.BooksContent.SalesRecord;
 
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -63,22 +57,20 @@ public class BooksContent {
             "Purchase Book",
             "Return Purchase Book",
             "Raw Stock Usage Book",
-            "Return Raw Stock Book",
             "Production Book",
             "Return Production Book",
-            // "Sales Book",
-            // "Return Sales Book"
+            "Sales Book",
+            "Return Sales Book"
         };
 
         Runnable[] actions = {
             () -> formArea.getChildren().setAll(createPurchaseBookForm()),
             () -> formArea.getChildren().setAll(createReturnPurchaseBookForm()),
             () -> formArea.getChildren().setAll(createRawStockUsageBookForm()),
-            () -> formArea.getChildren().setAll(createReturnRawStockBookForm()),
             () -> formArea.getChildren().setAll(createProductionBookForm()),
             () -> formArea.getChildren().setAll(createReturnProductionBookForm()),
-            // () -> formArea.getChildren().setAll(createSalesBookForm()),
-            // () -> formArea.getChildren().setAll(createReturnSalesBookForm())
+            () -> formArea.getChildren().setAll(createSalesBookForm()),
+            () -> formArea.getChildren().setAll(createReturnSalesBookForm())
         };
 
         for (int i = 0; i < buttonLabels.length; i++) {
@@ -165,7 +157,7 @@ public class BooksContent {
 
         generateBtn.setOnAction(e -> loadPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), supplierFilter));
-        printBtn.setOnAction(e -> printReport("PurchaseBook", data));
+        printBtn.setOnAction(e -> printReport("PurchaseBook", table.getItems()));
         exportBtn.setOnAction(e -> exportReport("PurchaseBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
@@ -222,30 +214,6 @@ public class BooksContent {
         return form;
     }
 
-    private static VBox createReturnRawStockBookForm() {
-        VBox form = createSection("Return Raw Stock Book", "View and manage return raw stock records.");
-        ObservableList<ReturnRawStockRecord> data = FXCollections.observableArrayList();
-        TableView<ReturnRawStockRecord> table = createReturnRawStockTable(data);
-
-        ComboBox<String> supplierFilter = createSupplierComboBox();
-        HBox filters = createFilterControls(supplierFilter);
-        Button generateBtn = createSubmitButton("Generate");
-        Button printBtn = createActionButton("Print");
-        Button exportBtn = createActionButton("Export");
-        HBox buttons = new HBox(10, generateBtn, printBtn, exportBtn);
-        buttons.setAlignment(Pos.CENTER_RIGHT);
-
-        generateBtn.setOnAction(e -> loadReturnRawStockData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
-                (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), supplierFilter));
-        printBtn.setOnAction(e -> printReport("ReturnRawStockBook", data));
-        exportBtn.setOnAction(e -> exportReport("ReturnRawStockBook", data));
-
-        form.getChildren().addAll(filters, buttons, table);
-        loadReturnRawStockData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
-                (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), supplierFilter);
-        return form;
-    }
-
     private static VBox createProductionBookForm() {
         VBox form = createSection("Production Book", "View and manage production records.");
         ObservableList<ProductionRecord> data = FXCollections.observableArrayList();
@@ -261,8 +229,8 @@ public class BooksContent {
 
         generateBtn.setOnAction(e -> loadProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), productFilter));
-        printBtn.setOnAction(e -> printReport("ProductionBook", data));
-        exportBtn.setOnAction(e -> exportReport("ProductionBook", data));
+        printBtn.setOnAction(e -> printReport("ProductionBook", table.getItems()));
+        exportBtn.setOnAction(e -> exportReport("ProductionBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -284,8 +252,8 @@ public class BooksContent {
 
         generateBtn.setOnAction(e -> loadReturnProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker")));
-        printBtn.setOnAction(e -> printReport("ReturnProductionBook", data));
-        exportBtn.setOnAction(e -> exportReport("ReturnProductionBook", data));
+        printBtn.setOnAction(e -> printReport("ReturnProductionBook", table.getItems()));
+        exportBtn.setOnAction(e -> exportReport("ReturnProductionBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadReturnProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -308,8 +276,8 @@ public class BooksContent {
 
         generateBtn.setOnAction(e -> loadSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), customerFilter));
-        printBtn.setOnAction(e -> printReport("SalesBook", data));
-        exportBtn.setOnAction(e -> exportReport("SalesBook", data));
+        printBtn.setOnAction(e -> printReport("SalesBook", table.getItems()));
+        exportBtn.setOnAction(e -> exportReport("SalesBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -332,8 +300,8 @@ public class BooksContent {
 
         generateBtn.setOnAction(e -> loadReturnSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), customerFilter));
-        printBtn.setOnAction(e -> printReport("ReturnSalesBook", data));
-        exportBtn.setOnAction(e -> exportReport("ReturnSalesBook", data));
+        printBtn.setOnAction(e -> printReport("ReturnSalesBook", table.getItems()));
+        exportBtn.setOnAction(e -> exportReport("ReturnSalesBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadReturnSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -440,31 +408,6 @@ private static TableView<PurchaseRecord> createPurchaseTable(ObservableList<Purc
     }
 
     @SuppressWarnings("unchecked")
-    private static TableView<ReturnRawStockRecord> createReturnRawStockTable(ObservableList<ReturnRawStockRecord> data) {
-        TableView<ReturnRawStockRecord> table = new TableView<>();
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-
-        TableColumn<ReturnRawStockRecord, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(new PropertyValueFactory<>("date"));
-
-        TableColumn<ReturnRawStockRecord, String> itemCol = new TableColumn<>("Item");
-        itemCol.setCellValueFactory(new PropertyValueFactory<>("item"));
-
-        TableColumn<ReturnRawStockRecord, Double> qtyCol = new TableColumn<>("Quantity");
-        qtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
-
-        TableColumn<ReturnRawStockRecord, Double> priceCol = new TableColumn<>("Unit Price");
-        priceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
-
-        TableColumn<ReturnRawStockRecord, String> supplierCol = new TableColumn<>("Supplier");
-        supplierCol.setCellValueFactory(new PropertyValueFactory<>("supplier"));
-
-        table.getColumns().addAll(dateCol, itemCol, qtyCol, priceCol, supplierCol);
-        table.setItems(data);
-        return table;
-    }
-
-    @SuppressWarnings("unchecked")
     private static TableView<ProductionRecord> createProductionTable(ObservableList<ProductionRecord> data) {
         TableView<ProductionRecord> table = new TableView<>();
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
@@ -511,22 +454,22 @@ private static TableView<PurchaseRecord> createPurchaseTable(ObservableList<Purc
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         TableColumn<SalesRecord, String> invoiceCol = new TableColumn<>("Invoice No");
-        invoiceCol.setCellValueFactory(new PropertyValueFactory<>("invoiceNumber"));
+        invoiceCol.setCellValueFactory(cellData -> cellData.getValue().invoiceNumberProperty());
 
         TableColumn<SalesRecord, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(new PropertyValueFactory<>("date"));
+        dateCol.setCellValueFactory(cellData -> cellData.getValue().dateProperty());
 
         TableColumn<SalesRecord, String> customerCol = new TableColumn<>("Customer");
-        customerCol.setCellValueFactory(new PropertyValueFactory<>("customer"));
+        customerCol.setCellValueFactory(cellData -> cellData.getValue().customerProperty());
 
         TableColumn<SalesRecord, Double> amountCol = new TableColumn<>("Amount");
-        amountCol.setCellValueFactory(new PropertyValueFactory<>("amount"));
+        amountCol.setCellValueFactory(cellData -> cellData.getValue().amountProperty().asObject());
 
         TableColumn<SalesRecord, Double> discountCol = new TableColumn<>("Discount");
-        discountCol.setCellValueFactory(new PropertyValueFactory<>("discount"));
+        discountCol.setCellValueFactory(cellData -> cellData.getValue().discountProperty().asObject());
 
         TableColumn<SalesRecord, Double> paidCol = new TableColumn<>("Paid");
-        paidCol.setCellValueFactory(new PropertyValueFactory<>("paid"));
+        paidCol.setCellValueFactory(cellData -> cellData.getValue().paidProperty().asObject());
 
         table.getColumns().addAll(invoiceCol, dateCol, customerCol, amountCol, discountCol, paidCol);
         table.setItems(data);
@@ -539,18 +482,21 @@ private static TableView<PurchaseRecord> createPurchaseTable(ObservableList<Purc
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         TableColumn<ReturnSalesRecord, String> returnInvoiceCol = new TableColumn<>("Return Invoice");
-        returnInvoiceCol.setCellValueFactory(new PropertyValueFactory<>("returnInvoice"));
+        returnInvoiceCol.setCellValueFactory(cellData -> cellData.getValue().returnInvoiceProperty());
 
         TableColumn<ReturnSalesRecord, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(new PropertyValueFactory<>("date"));
+        dateCol.setCellValueFactory(cellData -> cellData.getValue().dateProperty());
 
         TableColumn<ReturnSalesRecord, String> customerCol = new TableColumn<>("Customer");
-        customerCol.setCellValueFactory(new PropertyValueFactory<>("customer"));
+        customerCol.setCellValueFactory(cellData -> cellData.getValue().customerProperty());
 
         TableColumn<ReturnSalesRecord, Double> amountCol = new TableColumn<>("Amount");
-        amountCol.setCellValueFactory(new PropertyValueFactory<>("amount"));
+        amountCol.setCellValueFactory(cellData -> new javafx.beans.property.ReadOnlyObjectWrapper<>(cellData.getValue().getAmount()));
 
-        table.getColumns().addAll(returnInvoiceCol, dateCol, customerCol, amountCol);
+        TableColumn<ReturnSalesRecord, String> originalInvoiceCol = new TableColumn<>("Original Invoice");
+        originalInvoiceCol.setCellValueFactory(cellData -> cellData.getValue().originalInvoiceProperty());
+
+        table.getColumns().addAll(returnInvoiceCol, dateCol, customerCol, amountCol, originalInvoiceCol);
         table.setItems(data);
         return table;
     }
@@ -717,33 +663,6 @@ private static void loadReturnPurchaseData(TableView<ReturnPurchaseRecord> table
         }
     }
 
-    private static void loadReturnRawStockData(TableView<ReturnRawStockRecord> table, DatePicker fromDate, DatePicker toDate, ComboBox<String> supplierFilter) {
-        if (config.database == null || !config.database.isConnected()) {
-            showAlert("Error", "Database not connected!");
-            return;
-        }
-
-        Map<String, String> filters = new HashMap<>();
-        if (fromDate.getValue() != null) filters.put("return_date", ">= '" + fromDate.getValue().format(DATE_FORMATTER) + "'");
-        if (toDate.getValue() != null) filters.put("return_date", "<= '" + toDate.getValue().format(DATE_FORMATTER) + "'");
-        if (supplierFilter.getValue() != null && !supplierFilter.getValue().equals("All Suppliers")) {
-            filters.put("supplier_name", "= '" + supplierFilter.getValue() + "'");
-        }
-
-        List<Object[]> rows = config.database.getViewData("View_Return_Raw_Stock_Book", filters);
-        ObservableList<ReturnRawStockRecord> data = FXCollections.observableArrayList();
-        for (Object[] row : rows) {
-            data.add(new ReturnRawStockRecord(
-                row[0] != null ? row[0].toString() : "",
-                row[1] != null ? row[1].toString() : "",
-                row[2] != null ? Double.parseDouble(row[2].toString()) : 0.0,
-                row[3] != null ? Double.parseDouble(row[3].toString()) : 0.0,
-                row[4] != null ? row[4].toString() : ""
-            ));
-        }
-        table.setItems(data);
-    }
-
     private static void loadProductionData(TableView<ProductionRecord> table, DatePicker fromDate, DatePicker toDate, ComboBox<String> productFilter) {
         if (config.database == null || !config.database.isConnected()) {
             showAlert("Error", "Database not connected!");
@@ -793,31 +712,104 @@ private static void loadReturnPurchaseData(TableView<ReturnPurchaseRecord> table
     }
 
     private static void loadSalesData(TableView<SalesRecord> table, DatePicker fromDate, DatePicker toDate, ComboBox<String> customerFilter) {
-        if (config.database == null || !config.database.isConnected()) {
-            showAlert("Error", "Database not connected!");
-            return;
-        }
-
-        Map<String, String> filters = new HashMap<>();
-        if (fromDate.getValue() != null) filters.put("sales_date", ">= '" + fromDate.getValue().format(DATE_FORMATTER) + "'");
-        if (toDate.getValue() != null) filters.put("sales_date", "<= '" + toDate.getValue().format(DATE_FORMATTER) + "'");
-        if (customerFilter.getValue() != null && !customerFilter.getValue().equals("All Customers")) {
-            filters.put("customer_name", "= '" + customerFilter.getValue() + "'");
-        }
-
-        List<Object[]> rows = config.database.getViewData("View_Sales_Book", filters);
         ObservableList<SalesRecord> data = FXCollections.observableArrayList();
-        for (Object[] row : rows) {
-            data.add(new SalesRecord(
-                row[0] != null ? row[0].toString() : "",
-                row[1] != null ? row[1].toString() : "",
-                row[2] != null ? row[2].toString() : "",
-                row[3] != null ? Double.parseDouble(row[3].toString()) : 0.0,
-                row[4] != null ? Double.parseDouble(row[4].toString()) : 0.0,
-                row[5] != null ? Double.parseDouble(row[5].toString()) : 0.0
-            ));
+        try {
+            Map<String, String> filters = new HashMap<>();
+            if (fromDate.getValue() != null) {
+                filters.put("fromDate", fromDate.getValue().format(DATE_FORMATTER));
+            }
+            if (toDate.getValue() != null) {
+                filters.put("toDate", toDate.getValue().format(DATE_FORMATTER));
+            }
+            if (customerFilter.getValue() != null && !customerFilter.getValue().isEmpty() && !customerFilter.getValue().equals("All Customers")) {
+                filters.put("customer_name", customerFilter.getValue());
+            }
+
+            // Get all sales invoices directly since View_Sales_Book doesn't exist
+            List<Object[]> result = null;
+            try {
+                result = config.database.getAllSalesInvoices();
+                System.out.println("Direct sales invoice results: " + result.size() + " rows");
+            } catch (Exception e) {
+                System.err.println("Failed to load sales invoices: " + e.getMessage());
+                result = new ArrayList<>();
+            }
+
+            // Filter the results manually based on date and customer filters
+            List<Object[]> filteredResult = new ArrayList<>();
+            for (Object[] row : result) {
+                // getAllSalesInvoices() returns: sales_invoice_number, sales_date, customer_name, total_amount, discount_amount, paid_amount
+                String salesDate = row[1] != null ? row[1].toString() : "";
+                String customerName = row[2] != null ? row[2].toString() : "";
+                
+                // Apply date filtering
+                boolean passesDateFilter = true;
+                if (fromDate != null && toDate != null && !salesDate.isEmpty()) {
+                    try {
+                        LocalDate invoiceDate = LocalDate.parse(salesDate);
+                        LocalDate fromLocalDate = fromDate.getValue();
+                        LocalDate toLocalDate = toDate.getValue();
+                        if (fromLocalDate != null && toLocalDate != null) {
+                            passesDateFilter = !invoiceDate.isBefore(fromLocalDate) && !invoiceDate.isAfter(toLocalDate);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error parsing date: " + salesDate);
+                        passesDateFilter = false;
+                    }
+                }
+                
+                // Apply customer filtering
+                boolean passesCustomerFilter = true;
+                if (customerFilter.getValue() != null && !customerFilter.getValue().isEmpty() && !customerFilter.getValue().equals("All Customers")) {
+                    String filterValue = customerFilter.getValue().toLowerCase();
+                    passesCustomerFilter = customerName.toLowerCase().contains(filterValue);
+                }
+                
+                if (passesDateFilter && passesCustomerFilter) {
+                    filteredResult.add(row);
+                }
+            }
+            
+            System.out.println("Filtered sales invoice results: " + filteredResult.size() + " rows");
+
+            // Use a set to track seen invoice numbers and skip duplicates
+            java.util.HashSet<String> seenInvoiceNumbers = new java.util.HashSet<>();
+            for (Object[] row : filteredResult) {
+                // getAllSalesInvoices() format: sales_invoice_number, sales_date, customer_name, total_amount, discount_amount, paid_amount
+                String invoiceNumber = row[0] != null ? row[0].toString() : "";
+                if (seenInvoiceNumbers.contains(invoiceNumber)) {
+                    continue; // Skip duplicate invoice numbers
+                }
+                seenInvoiceNumbers.add(invoiceNumber);
+
+                String customerName = row[2] != null ? row[2].toString() : "";
+                String salesDate = row[1] != null ? row[1].toString() : "";
+                double totalAmount = row[3] != null ? Double.parseDouble(row[3].toString()) : 0.0;
+                double discountAmount = row[4] != null ? Double.parseDouble(row[4].toString()) : 0.0;
+                double paidAmount = row[5] != null ? Double.parseDouble(row[5].toString()) : 0.0;
+
+                // Data is already filtered above, so just add to the results
+                data.add(new SalesRecord(
+                    invoiceNumber,
+                    salesDate,
+                    customerName,
+                    totalAmount,
+                    discountAmount,
+                    paidAmount
+                ));
+            }
+        } catch (Exception e) {
+            showAlert("Database Error", "Failed to load sales data: " + e.getMessage());
+            e.printStackTrace();
         }
+
         table.setItems(data);
+
+        // Debug output
+        System.out.println("Sales Table items count: " + table.getItems().size());
+        if (!table.getItems().isEmpty()) {
+            System.out.println("First sales record: " + table.getItems().get(0).getInvoiceNumber());
+        }
     }
 
     private static void loadReturnSalesData(TableView<ReturnSalesRecord> table, DatePicker fromDate, DatePicker toDate, ComboBox<String> customerFilter) {
@@ -826,24 +818,91 @@ private static void loadReturnPurchaseData(TableView<ReturnPurchaseRecord> table
             return;
         }
 
-        Map<String, String> filters = new HashMap<>();
-        if (fromDate.getValue() != null) filters.put("return_date", ">= '" + fromDate.getValue().format(DATE_FORMATTER) + "'");
-        if (toDate.getValue() != null) filters.put("return_date", "<= '" + toDate.getValue().format(DATE_FORMATTER) + "'");
-        if (customerFilter.getValue() != null && !customerFilter.getValue().equals("All Customers")) {
-            filters.put("customer_name", "= '" + customerFilter.getValue() + "'");
+        ObservableList<ReturnSalesRecord> data = FXCollections.observableArrayList();
+        try {
+            System.out.println("Loading return sales data...");
+
+            // Get all return sales invoices directly since View_Return_Sales_Book doesn't exist
+            List<Object[]> result = null;
+            try {
+                result = config.database.getAllSalesReturnInvoices();
+                System.out.println("Direct return sales invoice results: " + result.size() + " rows");
+            } catch (Exception e) {
+                System.err.println("Failed to load return sales invoices: " + e.getMessage());
+                result = new ArrayList<>();
+            }
+
+            // Filter the results manually based on date and customer filters
+            List<Object[]> filteredResult = new ArrayList<>();
+            for (Object[] row : result) {
+                // getAllSalesReturnInvoices() returns: return_invoice_number, return_date, customer_name, total_return_amount, sales_invoice_number
+                String returnDate = row[1] != null ? row[1].toString() : "";
+                String customerName = row[2] != null ? row[2].toString() : "";
+                
+                // Apply date filtering
+                boolean passesDateFilter = true;
+                if (fromDate != null && toDate != null && !returnDate.isEmpty()) {
+                    try {
+                        LocalDate invoiceDate = LocalDate.parse(returnDate);
+                        LocalDate fromLocalDate = fromDate.getValue();
+                        LocalDate toLocalDate = toDate.getValue();
+                        if (fromLocalDate != null && toLocalDate != null) {
+                            passesDateFilter = !invoiceDate.isBefore(fromLocalDate) && !invoiceDate.isAfter(toLocalDate);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error parsing date: " + returnDate);
+                        passesDateFilter = false;
+                    }
+                }
+                
+                // Apply customer filtering
+                boolean passesCustomerFilter = true;
+                if (customerFilter.getValue() != null && !customerFilter.getValue().isEmpty() && !customerFilter.getValue().equals("All Customers")) {
+                    String filterValue = customerFilter.getValue().toLowerCase();
+                    passesCustomerFilter = customerName.toLowerCase().contains(filterValue);
+                }
+                
+                if (passesDateFilter && passesCustomerFilter) {
+                    filteredResult.add(row);
+                }
+            }
+            
+            System.out.println("Filtered return sales invoice results: " + filteredResult.size() + " rows");
+
+            // Use a set to track seen return invoice numbers and skip duplicates
+            java.util.HashSet<String> seenReturnInvoiceNumbers = new java.util.HashSet<>();
+            for (Object[] row : filteredResult) {
+                // getAllSalesReturnInvoices() format: return_invoice_number, return_date, customer_name, total_return_amount, sales_invoice_number
+                String returnInvoiceNumber = row[0] != null ? row[0].toString() : "";
+                if (seenReturnInvoiceNumbers.contains(returnInvoiceNumber)) {
+                    continue; // Skip duplicate return invoice numbers
+                }
+                seenReturnInvoiceNumbers.add(returnInvoiceNumber);
+
+                String customerName = row[2] != null ? row[2].toString() : "";
+                String returnDate = row[1] != null ? row[1].toString() : "";
+                double totalReturnAmount = row[3] != null ? Double.parseDouble(row[3].toString()) : 0.0;
+                String originalInvoiceNumber = row[4] != null ? row[4].toString() : "";
+
+                // Data is already filtered above, so just add to the results
+                data.add(new ReturnSalesRecord(
+                    returnInvoiceNumber,
+                    returnDate,
+                    customerName,
+                    totalReturnAmount,
+                    originalInvoiceNumber
+                ));
+            }
+        } catch (Exception e) {
+            showAlert("Database Error", "Failed to load return sales data: " + e.getMessage());
+            e.printStackTrace();
         }
 
-        List<Object[]> rows = config.database.getViewData("View_Return_Sales_Book", filters);
-        ObservableList<ReturnSalesRecord> data = FXCollections.observableArrayList();
-        for (Object[] row : rows) {
-            data.add(new ReturnSalesRecord(
-                row[0] != null ? row[0].toString() : "",
-                row[1] != null ? row[1].toString() : "",
-                row[2] != null ? row[2].toString() : "",
-                row[3] != null ? Double.parseDouble(row[3].toString()) : 0.0
-            ));
-        }
         table.setItems(data);
+        System.out.println("Return Sales Table items count: " + data.size());
+        if (!data.isEmpty()) {
+            System.out.println("First return sales record: " + data.get(0).getReturnInvoice());
+        }
     }
 
     private static ComboBox<String> createSupplierComboBox() {
@@ -951,7 +1010,17 @@ private static void exportReport(String reportName, ObservableList<?> data) {
             System.out.println("Item: " + item.getName() + ", Qty: " + item.getQuantity() + 
                               ", Price: " + item.getUnitPrice() + ", Discount: " + item.getDiscountPercent());
         }
-        InvoiceGenerator.generatePDF(invoiceData, filename);
+        
+        // Use specialized invoice generators for Sales and Return Sales books
+        if (reportName.equals("SalesBook")) {
+            SalesInvoiceGenerator.generateSalesInvoicePDF(invoiceData, filename);
+        } else if (reportName.equals("ReturnSalesBook")) {
+            SalesInvoiceGenerator.generateReturnSalesInvoicePDF(invoiceData, filename);
+        } else {
+            // Use default generator for other reports
+            InvoiceGenerator.generatePDF(invoiceData, filename);
+        }
+        
         showAlert("Success", "Report successfully exported to:\n" + new File(filename).getAbsolutePath());
     } catch (Exception e) {
         showAlert("Error", "Failed to export report: " + e.getMessage());
@@ -967,7 +1036,15 @@ private static void exportReport(String reportName, ObservableList<?> data) {
         String filename = EXPORT_PATH + reportName + "_" + System.currentTimeMillis() + ".pdf";
         InvoiceData invoiceData = createInvoiceData(reportName, data);
         try {
-            InvoiceGenerator.generatePDF(invoiceData, filename);
+            // Use specialized invoice generators for Sales and Return Sales books
+            if (reportName.equals("SalesBook")) {
+                SalesInvoiceGenerator.generateSalesInvoicePDF(invoiceData, filename);
+            } else if (reportName.equals("ReturnSalesBook")) {
+                SalesInvoiceGenerator.generateReturnSalesInvoicePDF(invoiceData, filename);
+            } else {
+                // Use default generator for other reports
+                InvoiceGenerator.generatePDF(invoiceData, filename);
+            }
             
             // Use the new print functionality
             boolean printSuccess = InvoiceGenerator.printPDF(filename);
@@ -1045,21 +1122,6 @@ private static InvoiceData createInvoiceData(String reportName, ObservableList<?
                 }
             }
             break;
-        case "ReturnRawStockBook":
-            for (Object record : data) {
-                ReturnRawStockRecord rrsr = (ReturnRawStockRecord) record;
-                items.add(new Item(
-                    rrsr.getItem() + " (Supplier: " + rrsr.getSupplier() + ")",
-                    (int) rrsr.getQuantity(), 
-                    rrsr.getUnitPrice(), 
-                    0.0
-                ));
-                // ReturnRawStockRecord may not have a direct invoice number; keep generic or use another field
-                if (items.size() == 1) {
-                    invoiceNumber = reportName + "_Report"; // No specific invoice number
-                }
-            }
-            break;
         case "ProductionBook":
             for (Object record : data) {
                 ProductionRecord pr = (ProductionRecord) record;
@@ -1089,11 +1151,18 @@ private static InvoiceData createInvoiceData(String reportName, ObservableList<?
             }
             break;
         case "SalesBook":
+            // For Sales Book, extract customer info from the first record
+            if (!data.isEmpty()) {
+                SalesRecord firstRecord = (SalesRecord) data.get(0);
+                customerName = firstRecord.getCustomer();
+                customerAddress = "Customer Address"; // Could be enhanced to get actual address
+            }
+            
             for (Object record : data) {
                 SalesRecord sr = (SalesRecord) record;
                 double discountPercentage = sr.getAmount() != 0 ? sr.getDiscount() / sr.getAmount() * 100 : 0.0;
                 items.add(new Item(
-                    sr.getCustomer() + " (Invoice: " + sr.getInvoiceNumber() + ")",
+                    "Sales Transaction - Invoice: " + sr.getInvoiceNumber() + " (Customer: " + sr.getCustomer() + ")",
                     1, 
                     sr.getAmount(), 
                     discountPercentage
@@ -1104,10 +1173,19 @@ private static InvoiceData createInvoiceData(String reportName, ObservableList<?
             }
             break;
         case "ReturnSalesBook":
+            // For Return Sales Book, extract customer info from the first record
+            if (!data.isEmpty()) {
+                ReturnSalesRecord firstRecord = (ReturnSalesRecord) data.get(0);
+                customerName = firstRecord.getCustomer();
+                customerAddress = "Customer Address"; // Could be enhanced to get actual address
+            }
+            
             for (Object record : data) {
                 ReturnSalesRecord rsr = (ReturnSalesRecord) record;
                 items.add(new Item(
-                    rsr.getCustomer() + " (Return Invoice: " + rsr.getReturnInvoice() + ")",
+                    "Return Transaction - Return Invoice: " + rsr.getReturnInvoice() + " (Customer: " + rsr.getCustomer() + ")" + 
+                    (rsr.getOriginalInvoice() != null && !rsr.getOriginalInvoice().isEmpty() ? 
+                     " [Original Invoice: " + rsr.getOriginalInvoice() + "]" : ""),
                     1, 
                     rsr.getAmount(), 
                     0.0
@@ -1322,33 +1400,6 @@ static class PurchaseRecord {
         String getReference() { return reference.get(); }
     }
 
-    static class ReturnRawStockRecord {
-        private final StringProperty date = new SimpleStringProperty();
-        private final StringProperty item = new SimpleStringProperty();
-        private final SimpleDoubleProperty quantity = new SimpleDoubleProperty();
-        private final SimpleDoubleProperty unitPrice = new SimpleDoubleProperty();
-        private final StringProperty supplier = new SimpleStringProperty();
-
-        ReturnRawStockRecord(String date, String item, double quantity, double unitPrice, String supplier) {
-            this.date.set(date);
-            this.item.set(item);
-            this.quantity.set(quantity);
-            this.unitPrice.set(unitPrice);
-            this.supplier.set(supplier);
-        }
-
-        StringProperty dateProperty() { return date; }
-        StringProperty itemProperty() { return item; }
-        SimpleDoubleProperty quantityProperty() { return quantity; }
-        SimpleDoubleProperty unitPriceProperty() { return unitPrice; }
-        StringProperty supplierProperty() { return supplier; }
-        String getDate() { return date.get(); }
-        String getItem() { return item.get(); }
-        double getQuantity() { return quantity.get(); }
-        double getUnitPrice() { return unitPrice.get(); }
-        String getSupplier() { return supplier.get(); }
-    }
-
     static class ProductionRecord {
         private final StringProperty date = new SimpleStringProperty();
         private final StringProperty product = new SimpleStringProperty();
@@ -1427,21 +1478,25 @@ static class PurchaseRecord {
         private final StringProperty date = new SimpleStringProperty();
         private final StringProperty customer = new SimpleStringProperty();
         private final SimpleDoubleProperty amount = new SimpleDoubleProperty();
+        private final StringProperty originalInvoice = new SimpleStringProperty();
 
-        ReturnSalesRecord(String returnInvoice, String date, String customer, double amount) {
+        ReturnSalesRecord(String returnInvoice, String date, String customer, double amount, String originalInvoice) {
             this.returnInvoice.set(returnInvoice);
             this.date.set(date);
             this.customer.set(customer);
             this.amount.set(amount);
+            this.originalInvoice.set(originalInvoice);
         }
 
         StringProperty returnInvoiceProperty() { return returnInvoice; }
         StringProperty dateProperty() { return date; }
         StringProperty customerProperty() { return customer; }
         SimpleDoubleProperty amountProperty() { return amount; }
+        StringProperty originalInvoiceProperty() { return originalInvoice; }
         String getReturnInvoice() { return returnInvoice.get(); }
         String getDate() { return date.get(); }
         String getCustomer() { return customer.get(); }
         double getAmount() { return amount.get(); }
+        String getOriginalInvoice() { return originalInvoice.get(); }
     }
 }
