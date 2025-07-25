@@ -49,15 +49,15 @@ public class ReportsContent {
             "Return Sales Report",
             "Bank Transfer Report",
             "Profit Report",
-            "Summary Report",
+            // "Summary Report",
             "Balance Sheet",
             "Customers Report",
             "Suppliers Report",
             "Area-Wise Report",
             "Brand Sales Report",
-            "Brand Profit Report",
-            "Customer Sales Report",
-            "Supplier Sales Report",
+            // "Brand Profit Report",
+            // "Customer Sales Report",
+            // "Supplier Sales Report",
             // "Attendance Report"
         };
 
@@ -68,15 +68,15 @@ public class ReportsContent {
             () -> reportArea.getChildren().setAll(createReturnSalesReport()),
             () -> reportArea.getChildren().setAll(createBankTransferReport()),
             () -> reportArea.getChildren().setAll(createProfitReport()),
-            () -> reportArea.getChildren().setAll(createSummaryReport()),
+            // () -> reportArea.getChildren().setAll(createSummaryReport()),
             () -> reportArea.getChildren().setAll(createBalanceSheet()),
             () -> reportArea.getChildren().setAll(createCustomersReport()),
             () -> reportArea.getChildren().setAll(createSuppliersReport()),
             () -> reportArea.getChildren().setAll(createAreaWiseReport()),
             () -> reportArea.getChildren().setAll(createBrandSalesReport()),
-            () -> reportArea.getChildren().setAll(createBrandProfitReport()),
-            () -> reportArea.getChildren().setAll(createCustomerSalesReport()),
-            () -> reportArea.getChildren().setAll(createSupplierSalesReport()),
+            // () -> reportArea.getChildren().setAll(createBrandProfitReport()),
+            // () -> reportArea.getChildren().setAll(createCustomerSalesReport()),
+            // () -> reportArea.getChildren().setAll(createSupplierSalesReport()),
             // () -> reportArea.getChildren().setAll(createAttendanceReport())
         };
 
