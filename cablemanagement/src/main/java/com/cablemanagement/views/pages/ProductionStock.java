@@ -1589,7 +1589,7 @@ public class ProductionStock {
                     customerId, date, totalReturnAmount, items);
                 
                 if (success) {
-                    showAlert("Success", "Sales return invoice created successfully!");
+                    showAlert("Success", "Sales return invoice created successfully!\nProduction stock quantities have been updated.");
                     
                     // Clear form and generate new return invoice number
                     String newReturnInvoiceNumber = database.generateSalesReturnInvoiceNumber();
@@ -1601,7 +1601,7 @@ public class ProductionStock {
                     availableItems.clear();
                     returnItems.clear();
                 } else {
-                    showAlert("Error", "Failed to create sales return invoice. Please try again.");
+                    showAlert("Error", "Failed to create sales return invoice.\nThis could be due to database error or stock update failure. Please try again.");
                 }
                 
             } catch (NumberFormatException ex) {

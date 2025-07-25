@@ -3734,26 +3734,45 @@ public class SQLiteDatabase implements db {
 
     @Override
     public boolean insertSalesReturnInvoiceItems(int salesReturnInvoiceId, List<Object[]> items) {
-        String query = "INSERT INTO Sales_Return_Invoice_Item (sales_return_invoice_id, production_stock_id, quantity, unit_price, total_price) " +
-                      "VALUES (?, ?, ?, ?, ?)";
+        String insertQuery = "INSERT INTO Sales_Return_Invoice_Item (sales_return_invoice_id, production_stock_id, quantity, unit_price, total_price) " +
+                           "VALUES (?, ?, ?, ?, ?)";
         
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            for (Object[] item : items) {
-                pstmt.setInt(1, salesReturnInvoiceId);
-                pstmt.setInt(2, (Integer) item[0]); // production_stock_id
-                pstmt.setDouble(3, (Double) item[1]); // quantity
-                pstmt.setDouble(4, (Double) item[2]); // unit_price
-                pstmt.setDouble(5, (Double) item[1] * (Double) item[2]); // total_price = quantity * unit_price
-                pstmt.addBatch();
-            }
-            
-            int[] results = pstmt.executeBatch();
-            for (int result : results) {
-                if (result <= 0) {
-                    return false;
+        try {
+            // Insert sales return invoice items
+            try (PreparedStatement pstmt = connection.prepareStatement(insertQuery)) {
+                for (Object[] item : items) {
+                    pstmt.setInt(1, salesReturnInvoiceId);
+                    pstmt.setInt(2, (Integer) item[0]); // production_stock_id
+                    pstmt.setDouble(3, (Double) item[1]); // quantity
+                    pstmt.setDouble(4, (Double) item[2]); // unit_price
+                    pstmt.setDouble(5, (Double) item[1] * (Double) item[2]); // total_price = quantity * unit_price
+                    pstmt.addBatch();
+                }
+                
+                int[] insertResults = pstmt.executeBatch();
+                
+                // Check if all items were inserted successfully
+                for (int result : insertResults) {
+                    if (result <= 0) {
+                        return false;
+                    }
                 }
             }
+            
+            // Update production stock quantities (increase stock as items are being returned)
+            String updateStockQuery = "UPDATE ProductionStock SET quantity = quantity + ? " +
+                                    "WHERE production_id = ?";
+            try (PreparedStatement updatePstmt = connection.prepareStatement(updateStockQuery)) {
+                for (Object[] item : items) {
+                    updatePstmt.setDouble(1, (Double) item[1]); // quantity (add to stock)
+                    updatePstmt.setInt(2, (Integer) item[0]); // production_stock_id
+                    updatePstmt.addBatch();
+                }
+                updatePstmt.executeBatch();
+            }
+            
             return true;
+            
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
