@@ -205,6 +205,8 @@ public interface db {
     
     boolean insertRawPurchaseReturnInvoiceItems(int returnInvoiceId, List<RawStockPurchaseItem> items);
     
+    double getCurrentRawStockQuantity(int stockId);
+    
     List<Object[]> getAllRawPurchaseReturnInvoices();
 
     // --------------------------

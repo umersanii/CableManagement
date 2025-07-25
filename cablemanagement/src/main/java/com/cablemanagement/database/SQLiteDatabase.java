@@ -2133,7 +2133,35 @@ public class SQLiteDatabase implements db {
     }
     
     /**
-     * Insert raw purchase return invoice items
+     * Get current stock quantity for a raw stock item
+     */
+    private double getCurrentStockQuantity(int stockId) throws SQLException {
+        String query = "SELECT quantity FROM Raw_Stock WHERE stock_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, stockId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("quantity");
+                }
+            }
+        }
+        return 0.0;
+    }
+
+    /**
+     * Get current stock quantity for a raw stock item (public method)
+     */
+    public double getCurrentRawStockQuantity(int stockId) {
+        try {
+            return getCurrentStockQuantity(stockId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0.0;
+        }
+    }
+
+    /**
+     * Insert raw purchase return invoice items and update stock quantities
      */
     public boolean insertRawPurchaseReturnInvoiceItems(int returnInvoiceId, 
                                                       List<com.cablemanagement.model.RawStockPurchaseItem> items) {
@@ -2141,18 +2169,70 @@ public class SQLiteDatabase implements db {
                            "(raw_purchase_return_invoice_id, raw_stock_id, quantity, unit_price) " +
                            "VALUES (?, ?, ?, ?)";
         
-        try (PreparedStatement pstmt = connection.prepareStatement(insertQuery)) {
+        try {
+            // Start transaction
+            connection.setAutoCommit(false);
+            
+            // First validate that we have enough stock for all items
             for (com.cablemanagement.model.RawStockPurchaseItem item : items) {
-                pstmt.setInt(1, returnInvoiceId);
-                pstmt.setInt(2, item.getRawStockId());
-                pstmt.setDouble(3, item.getQuantity());
-                pstmt.setDouble(4, item.getUnitPrice());
-                pstmt.addBatch();
+                double currentStock = getCurrentStockQuantity(item.getRawStockId());
+                if (currentStock < item.getQuantity()) {
+                    System.err.println("Insufficient stock for item ID " + item.getRawStockId() + 
+                                     ": Current=" + currentStock + ", Requested=" + item.getQuantity());
+                    connection.rollback();
+                    connection.setAutoCommit(true);
+                    return false;
+                }
             }
             
-            int[] result = pstmt.executeBatch();
-            return result.length == items.size();
+            // Insert return invoice items
+            try (PreparedStatement pstmt = connection.prepareStatement(insertQuery)) {
+                for (com.cablemanagement.model.RawStockPurchaseItem item : items) {
+                    pstmt.setInt(1, returnInvoiceId);
+                    pstmt.setInt(2, item.getRawStockId());
+                    pstmt.setDouble(3, item.getQuantity());
+                    pstmt.setDouble(4, item.getUnitPrice());
+                    pstmt.addBatch();
+                }
+                
+                int[] insertResults = pstmt.executeBatch();
+                
+                // Check if all items were inserted successfully
+                for (int result : insertResults) {
+                    if (result <= 0) {
+                        connection.rollback();
+                        connection.setAutoCommit(true);
+                        return false;
+                    }
+                }
+            }
+            
+            // Update raw stock quantities (reduce stock as items are being returned to supplier)
+            String updateStockQuery = "UPDATE Raw_Stock SET quantity = quantity - ?, total_cost = total_cost - ? " +
+                                    "WHERE stock_id = ?";
+            try (PreparedStatement updatePstmt = connection.prepareStatement(updateStockQuery)) {
+                for (com.cablemanagement.model.RawStockPurchaseItem item : items) {
+                    double totalCostReduction = item.getQuantity() * item.getUnitPrice();
+                    updatePstmt.setDouble(1, item.getQuantity()); // reduce quantity
+                    updatePstmt.setDouble(2, totalCostReduction); // reduce total cost
+                    updatePstmt.setInt(3, item.getRawStockId());
+                    updatePstmt.addBatch();
+                }
+                updatePstmt.executeBatch();
+            }
+            
+            // Commit transaction
+            connection.commit();
+            connection.setAutoCommit(true);
+            return true;
+            
         } catch (SQLException e) {
+            try {
+                connection.rollback();
+                connection.setAutoCommit(true);
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
             e.printStackTrace();
             return false;
         }
