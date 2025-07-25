@@ -2166,13 +2166,21 @@ public class ProductionStock {
                     int productionStockId = getProductionStockIdByName(productName);
                     if (productionStockId != -1) {
                         productionItems.add(new Object[]{productionStockId, quantity});
+                    } else {
+                        showAlert("Error", "Production stock not found for product: " + productName);
+                        return;
                     }
                 }
             }
             
-            // Insert production invoice items
+            if (productionItems.isEmpty()) {
+                showAlert("Error", "No valid production items found");
+                return;
+            }
+            
+            // Insert production invoice items and update stock quantities
             if (!database.insertProductionInvoiceItems(invoiceId, productionItems)) {
-                showAlert("Error", "Failed to save production items");
+                showAlert("Error", "Failed to save production items and update stock quantities");
                 return;
             }
             
@@ -2200,7 +2208,7 @@ public class ProductionStock {
                 }
             }
             
-            showAlert("Success", "Production invoice created successfully!");
+            showAlert("Success", "Production invoice created successfully!\nProduction stock quantities have been updated.");
             
             // Clear form
             invoiceNumberField.setText(sqliteDatabase.generateProductionInvoiceNumber());

@@ -240,6 +240,8 @@ public interface db {
     
     boolean insertProductionInvoiceItems(int productionInvoiceId, List<Object[]> productionItems);
     
+    double getCurrentProductionStockQuantity(int productionId);
+    
     boolean insertProductionStockRawUsage(int productionInvoiceId, List<Object[]> rawMaterialsUsed);
 
     // --------------------------
