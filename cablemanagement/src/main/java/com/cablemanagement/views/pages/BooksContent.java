@@ -968,8 +968,16 @@ private static void exportReport(String reportName, ObservableList<?> data) {
         InvoiceData invoiceData = createInvoiceData(reportName, data);
         try {
             InvoiceGenerator.generatePDF(invoiceData, filename);
-            //InvoiceGenerator.printPDF(filename);
-            showAlert("Success", "Report sent to printer!");
+            
+            // Use the new print functionality
+            boolean printSuccess = InvoiceGenerator.printPDF(filename);
+            
+            if (printSuccess) {
+                showAlert("Success", "Report sent to printer successfully!");
+            } else {
+                showAlert("Warning", "Report was generated but printing failed. Check your printer connection.\n" +
+                         "Report saved to: " + filename);
+            }
         } catch (Exception e) {
             showAlert("Error", "Failed to print report: " + e.getMessage());
         }

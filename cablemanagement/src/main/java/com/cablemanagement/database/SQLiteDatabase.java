@@ -5698,6 +5698,12 @@ public class SQLiteDatabase implements db {
             insertSupplier("Wire Masters", "03661234567", "Islamabad");
             insertSupplier("Industrial Supplies Co", "03771234567", "Multan");
             
+            // Insert sample banks
+            insertBank("Allied Bank Limited", "001-2345-6789", "Model Town Branch");
+            insertBank("Habib Bank Limited", "123-4567-8901", "Gulshan Branch");
+            insertBank("MCB Bank Limited", "456-7890-1234", "Main Boulevard Branch");
+            insertBank("Standard Chartered", "789-0123-4567", "Commercial Area Branch");
+            
             System.out.println("DEBUG: Sample data added successfully");
             
         } catch (Exception e) {

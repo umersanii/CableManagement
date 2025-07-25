@@ -4,8 +4,17 @@ import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.*;
 import com.itextpdf.text.pdf.draw.DottedLineSeparator;
 
+import java.awt.Desktop;
+import java.awt.print.PrinterJob;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.util.List;
+import javax.print.*;
+import javax.print.attribute.HashPrintRequestAttributeSet;
+import javax.print.attribute.PrintRequestAttributeSet;
+import javax.print.attribute.standard.Copies;
+import javax.print.attribute.standard.MediaSizeName;
+import javax.print.attribute.standard.OrientationRequested;
 
 public class InvoiceGenerator {
     public static void generatePDF(InvoiceData data, String filename) {
@@ -167,6 +176,164 @@ public class InvoiceGenerator {
             System.out.println("Invoice generated: " + filename);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Print a PDF file to the default printer
+     * @param filename The path to the PDF file to print
+     * @return true if printing was successful, false otherwise
+     */
+    public static boolean printPDF(String filename) {
+        try {
+            File file = new File(filename);
+            if (!file.exists()) {
+                System.err.println("File not found: " + filename);
+                return false;
+            }
+            
+            // Try to use system default printer
+            if (Desktop.isDesktopSupported()) {
+                Desktop desktop = Desktop.getDesktop();
+                if (desktop.isSupported(Desktop.Action.PRINT)) {
+                    desktop.print(file);
+                    System.out.println("Document sent to printer: " + filename);
+                    return true;
+                }
+            }
+            
+            // Alternative approach using javax.print
+            return printWithJavaxPrint(filename);
+            
+        } catch (Exception e) {
+            System.err.println("Failed to print PDF: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * Print using javax.print API as fallback
+     * @param filename The path to the PDF file to print
+     * @return true if printing was successful, false otherwise
+     */
+    private static boolean printWithJavaxPrint(String filename) {
+        try {
+            // Get the default print service
+            PrintService defaultPrintService = PrintServiceLookup.lookupDefaultPrintService();
+            if (defaultPrintService == null) {
+                System.err.println("No default printer found");
+                return false;
+            }
+            
+            // Create print job
+            DocPrintJob printJob = defaultPrintService.createPrintJob();
+            
+            // Create print request attributes
+            PrintRequestAttributeSet printAttributes = new HashPrintRequestAttributeSet();
+            printAttributes.add(new Copies(1));
+            printAttributes.add(MediaSizeName.ISO_A4);
+            printAttributes.add(OrientationRequested.PORTRAIT);
+            
+            // Create document
+            File file = new File(filename);
+            DocFlavor flavor = DocFlavor.INPUT_STREAM.AUTOSENSE;
+            Doc document = new SimpleDoc(new java.io.FileInputStream(file), flavor, null);
+            
+            // Print the document
+            printJob.print(document, printAttributes);
+            System.out.println("Document sent to printer using javax.print: " + filename);
+            return true;
+            
+        } catch (Exception e) {
+            System.err.println("Failed to print using javax.print: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * Generate and immediately print an invoice
+     * @param data The invoice data
+     * @param filename The temporary filename for the PDF
+     * @return true if generation and printing were successful
+     */
+    public static boolean generateAndPrint(InvoiceData data, String filename) {
+        try {
+            generatePDF(data, filename);
+            return printPDF(filename);
+        } catch (Exception e) {
+            System.err.println("Failed to generate and print invoice: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * Show available printers to the user
+     * @return Array of available printer names
+     */
+    public static String[] getAvailablePrinters() {
+        try {
+            PrintService[] printServices = PrintServiceLookup.lookupPrintServices(null, null);
+            String[] printerNames = new String[printServices.length];
+            for (int i = 0; i < printServices.length; i++) {
+                printerNames[i] = printServices[i].getName();
+            }
+            return printerNames;
+        } catch (Exception e) {
+            System.err.println("Failed to get available printers: " + e.getMessage());
+            return new String[0];
+        }
+    }
+    
+    /**
+     * Print to a specific printer
+     * @param filename The path to the PDF file to print
+     * @param printerName The name of the printer to use
+     * @return true if printing was successful
+     */
+    public static boolean printToSpecificPrinter(String filename, String printerName) {
+        try {
+            // Find the specified printer
+            PrintService[] printServices = PrintServiceLookup.lookupPrintServices(null, null);
+            PrintService targetPrinter = null;
+            
+            for (PrintService service : printServices) {
+                if (service.getName().equals(printerName)) {
+                    targetPrinter = service;
+                    break;
+                }
+            }
+            
+            if (targetPrinter == null) {
+                System.err.println("Printer not found: " + printerName);
+                return false;
+            }
+            
+            // Create print job for specific printer
+            DocPrintJob printJob = targetPrinter.createPrintJob();
+            
+            // Create print request attributes
+            PrintRequestAttributeSet printAttributes = new HashPrintRequestAttributeSet();
+            printAttributes.add(new Copies(1));
+            printAttributes.add(MediaSizeName.ISO_A4);
+            printAttributes.add(OrientationRequested.PORTRAIT);
+            
+            // Create document
+            File file = new File(filename);
+            DocFlavor flavor = DocFlavor.INPUT_STREAM.AUTOSENSE;
+            Doc document = new SimpleDoc(new java.io.FileInputStream(file), flavor, null);
+            
+            // Print the document
+            printJob.print(document, printAttributes);
+            System.out.println("Document sent to printer '" + printerName + "': " + filename);
+            return true;
+            
+        } catch (Exception e) {
+            System.err.println("Failed to print to specific printer: " + e.getMessage());
+            e.printStackTrace();
+            return false;
         }
     }
 }
