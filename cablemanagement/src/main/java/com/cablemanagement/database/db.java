@@ -25,6 +25,10 @@ public interface db {
     
 
 
+    // Sales Return Invoice methods
+    List<Object[]> getAllSalesReturnInvoicesForDropdown();
+    List<Object[]> getSalesReturnInvoiceItemsByInvoiceId(int returnInvoiceId);
+
     // Add this method to support category deletion
     public boolean deleteCategory(String categoryName);
     public boolean deleteManufacturer(String name);

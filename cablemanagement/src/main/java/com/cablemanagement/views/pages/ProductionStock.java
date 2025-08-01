@@ -398,8 +398,9 @@ public class ProductionStock {
         // Add sections to layout
         itemsMaterialsSection.getChildren().addAll(itemsSection, materialsSection);
         
-        // Submit Button
-        Button submitBtn = createSubmitButton("Submit Production Invoice");
+        // Submit & Print Button
+        Button submitBtn = createSubmitButton("Submit & Print Production Invoice");
+        submitBtn.setStyle("-fx-background-color: #007bff; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;");
         submitBtn.setMaxWidth(Double.MAX_VALUE);
 
         // Add all components to main form
@@ -523,10 +524,14 @@ public class ProductionStock {
         
         // Action buttons
         HBox actionButtons = new HBox(10);
-        Button submitBtn = createSubmitButton("Submit Return Invoice");
+        Button submitBtn = createSubmitButton("Submit & Print Return Invoice");
         Button clearBtn = createActionButton("Clear All");
+        
+        submitBtn.setStyle("-fx-background-color: #007bff; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
+        clearBtn.setStyle("-fx-background-color: #6c757d; -fx-text-fill: white;");
+        
         actionButtons.getChildren().addAll(submitBtn, clearBtn);
-
+        
         form.getChildren().addAll(
             heading,
             createFormRow("Return Invoice Number:", returnInvoiceNumberField),
@@ -630,21 +635,76 @@ public class ProductionStock {
             }
         });
         
-        submitBtn.setOnAction(e -> handleSubmitReturnProductionInvoice(
-            returnInvoiceNumberField.getText(),
-            returnDatePicker.getValue(),
-            productionInvoiceCombo.getValue(),
-            returnItemsList.getItems(),
-            totalReturnQuantityField.getText(),
-            returnInvoiceNumberField,
-            returnDatePicker,
-            productionInvoiceCombo,
-            availableItemsList,
-            returnItemsList,
-            itemCombo,
-            returnQuantityField,
-            totalReturnQuantityField
-        ));
+        submitBtn.setOnAction(e -> {
+            // Call submit handler first
+            handleSubmitReturnProductionInvoice(
+                returnInvoiceNumberField.getText(),
+                returnDatePicker.getValue(),
+                productionInvoiceCombo.getValue(),
+                returnItemsList.getItems(),
+                totalReturnQuantityField.getText(),
+                returnInvoiceNumberField,
+                returnDatePicker,
+                productionInvoiceCombo,
+                availableItemsList,
+                returnItemsList,
+                itemCombo,
+                returnQuantityField,
+                totalReturnQuantityField
+            );
+            
+            // After successful submission, get the latest invoice and print it
+            try {
+                // Get the latest return production invoice and its items
+                List<Object[]> lastInvoiceData = sqliteDatabase.getLastProductionReturnInvoice();
+                if (!lastInvoiceData.isEmpty()) {
+                    Object[] lastInvoice = lastInvoiceData.get(0);
+                    String returnInvoiceNumber = (String) lastInvoice[0];
+                    String returnDate = (String) lastInvoice[1];
+                    String notes = (String) lastInvoice[2];
+                    
+                    // Get the items for the invoice
+                    List<Object[]> returnItemsData = sqliteDatabase.getProductionReturnInvoiceItems(returnInvoiceNumber);
+                    
+                    // Prepare items for printing
+                    List<Item> printItems = new ArrayList<>();
+                    for (Object[] itemData : returnItemsData) {
+                        String productName = (String) itemData[0];
+                        double quantity = ((Number) itemData[1]).doubleValue();
+                        double unitCost = ((Number) itemData[2]).doubleValue();
+                        
+                        printItems.add(new Item(
+                            productName,
+                            (int) quantity,
+                            unitCost,
+                            0.0 // no discount for returns
+                        ));
+                    }
+                    
+                    // Create invoice data for printing
+                    String title = "Production Return Invoice";
+                    String address = notes != null && !notes.isEmpty() ? notes : "Return Production Items";
+                    InvoiceData invoiceData = new InvoiceData(
+                        returnInvoiceNumber,
+                        returnDate,
+                        title,
+                        address,
+                        0.0, // no previous balance for returns
+                        printItems
+                    );
+                    
+                    // Try to open for preview first
+                    boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Production Return");
+                    if (!previewSuccess) {
+                        // If preview fails, try printer selection
+                        PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Production Return");
+                    }
+                }
+            } catch (Exception ex) {
+                showAlert("Print Error", "Failed to print return invoice: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
 
         return form;
     }
@@ -951,19 +1011,15 @@ public class ProductionStock {
         actionButtons.setAlignment(Pos.CENTER);
         actionButtons.setPadding(new Insets(20, 0, 0, 0));
         
-        Button submitBtn = createSubmitButton("Create Sales Invoice");
+        Button submitBtn = createSubmitButton("Submit & Print Invoice");
         submitBtn.setStyle("-fx-background-color: #007bff; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 12 24;");
         submitBtn.setPrefWidth(200);
-        
-        Button printLastInvoiceBtn = createActionButton("Print Last Invoice");
-        printLastInvoiceBtn.setStyle("-fx-background-color: #28a745; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;");
-        printLastInvoiceBtn.setPrefWidth(150);
         
         Button resetFormBtn = createActionButton("Reset Form");
         resetFormBtn.setStyle("-fx-background-color: #6c757d; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;");
         resetFormBtn.setPrefWidth(150);
         
-        actionButtons.getChildren().addAll(submitBtn, printLastInvoiceBtn, resetFormBtn);
+        actionButtons.getChildren().addAll(submitBtn, resetFormBtn);
 
         // Add all sections to scrollable content
         scrollableContent.getChildren().addAll(
@@ -1283,71 +1339,7 @@ public class ProductionStock {
         });
         
         // Print Last Invoice button
-        printLastInvoiceBtn.setOnAction(e -> {
-            try {
-                // Get all sales invoices and get the last one
-                List<Object[]> allInvoices = database.getAllSalesInvoicesForDropdown();
-                if (allInvoices.isEmpty()) {
-                    showAlert("No Invoice Found", "No sales invoices found in the database.");
-                    return;
-                }
-                
-                // Get the last (most recent) invoice
-                Object[] lastInvoice = allInvoices.get(allInvoices.size() - 1);
-                
-                // Extract invoice details from dropdown format
-                int salesInvoiceId = (Integer) lastInvoice[0];  // sales_invoice_id
-                String lastInvoiceNumber = (String) lastInvoice[1]; // invoice_number
-                String lastCustomerName = (String) lastInvoice[2];  // customer_name
-                String lastDate = (String) lastInvoice[3];         // sales_date
-                
-                // Get invoice items using the existing method
-                List<Object[]> invoiceItemsData = database.getSalesInvoiceItemsByInvoiceId(salesInvoiceId);
-                if (invoiceItemsData.isEmpty()) {
-                    showAlert("No Items Found", "No items found for the last invoice.");
-                    return;
-                }
-                
-                // Prepare items for printing
-                List<Item> printItems = new ArrayList<>();
-                for (Object[] itemData : invoiceItemsData) {
-                    String productName = (String) itemData[1];    // product_name
-                    double quantity = ((Number) itemData[2]).doubleValue();   // quantity
-                    double unitPrice = ((Number) itemData[3]).doubleValue();  // unit_price
-                    
-                    printItems.add(new Item(
-                        productName,
-                        (int) quantity,
-                        unitPrice,
-                        0.0 // discount percent
-                    ));
-                }
-                
-                // Create invoice data for printing
-                String customerAddress = "Customer Address - " + lastCustomerName;
-                InvoiceData invoiceData = new InvoiceData(
-                    lastInvoiceNumber,
-                    lastDate,
-                    lastCustomerName,
-                    customerAddress,
-                    0.0, // previous balance
-                    printItems
-                );
-                
-                // Print the invoice
-                boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Sales");
-                
-                if (printSuccess) {
-                    showAlert("Print Successful", "Last sales invoice reprinted successfully!\n\nInvoice Number: " + lastInvoiceNumber);
-                } else {
-                    showAlert("Print Failed", "Failed to print the last invoice.");
-                }
-                
-            } catch (Exception ex) {
-                showAlert("Error", "An error occurred while trying to print the last invoice: " + ex.getMessage());
-                ex.printStackTrace();
-            }
-        });
+        // Print Last Invoice button removed
 
         return form;
     }
@@ -1502,12 +1494,13 @@ public class ProductionStock {
         actionButtons.setPadding(new Insets(20, 0, 10, 0));
         actionButtons.getStyleClass().add("form-row");
         
-        Button submitBtn = createSubmitButton("Submit Return");
-        Button printReturnBtn = createActionButton("Print Return");
-        printReturnBtn.setStyle("-fx-background-color: #28a745; -fx-text-fill: white;");
-        Button clearBtn = createActionButton("Clear All");
+        Button submitBtn = createSubmitButton("Submit & Print Return");
+        submitBtn.setStyle("-fx-background-color: #007bff; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;");
         
-        actionButtons.getChildren().addAll(submitBtn, printReturnBtn, clearBtn);
+        Button clearBtn = createActionButton("Clear All");
+        clearBtn.setStyle("-fx-background-color: #6c757d; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;");
+        
+        actionButtons.getChildren().addAll(submitBtn, clearBtn);
 
         // Form layout with proper spacing
         VBox formContent = new VBox(20);
@@ -1665,56 +1658,7 @@ public class ProductionStock {
             }
         });
         
-        printReturnBtn.setOnAction(e -> {
-            try {
-                // Get all sales return invoices and print the last one
-                List<Object[]> allReturnInvoices = database.getAllSalesReturnInvoices();
-                if (allReturnInvoices.isEmpty()) {
-                    showAlert("No Return Invoice Found", "No sales return invoices found in the database.");
-                    return;
-                }
-                
-                // Get the last (most recent) return invoice
-                Object[] lastReturnInvoice = allReturnInvoices.get(allReturnInvoices.size() - 1);
-                
-                String returnInvoiceNumber = (String) lastReturnInvoice[1]; // return_invoice_number
-                String customerName = "Customer"; // Default customer name
-                String returnDate = (String) lastReturnInvoice[3];         // return_date
-                
-                // For demonstration, create a simple print item
-                List<Item> printItems = new ArrayList<>();
-                printItems.add(new Item(
-                    "Return Item",
-                    1,
-                    0.0,
-                    0.0 // discount percent
-                ));
-                
-                // Create invoice data for printing
-                String customerAddress = "Customer Address - " + customerName;
-                InvoiceData invoiceData = new InvoiceData(
-                    returnInvoiceNumber,
-                    returnDate,
-                    customerName,
-                    customerAddress,
-                    0.0, // previous balance
-                    printItems
-                );
-                
-                // Print the return invoice
-                boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Sales Return");
-                
-                if (printSuccess) {
-                    showAlert("Print Successful", "Last sales return invoice printed successfully!\n\nReturn Invoice Number: " + returnInvoiceNumber);
-                } else {
-                    showAlert("Print Failed", "Failed to print the last return invoice.");
-                }
-                
-            } catch (Exception ex) {
-                showAlert("Error", "An error occurred while trying to print the last return invoice: " + ex.getMessage());
-                ex.printStackTrace();
-            }
-        });
+        // Print Return button removed
         
         submitBtn.setOnAction(e -> {
             String returnInvoiceNumber = returnInvoiceNumberField.getText().trim();
@@ -1761,7 +1705,43 @@ public class ProductionStock {
                     customerId, date, totalReturnAmount, items);
                 
                 if (success) {
-                    showAlert("Success", "Sales return invoice created successfully!\nProduction stock quantities have been updated.");
+                    // Prepare invoice data for printing
+                    List<Item> printItems = new ArrayList<>();
+                    for (SalesInvoiceItemUI item : returnItems) {
+                        printItems.add(new Item(
+                            item.getProductName(),
+                            (int) item.getQuantity(),
+                            item.getUnitPrice(),
+                            0.0 // discount percent for returns is 0
+                        ));
+                    }
+                    
+                    // Create invoice data for printing
+                    String customerAddress = "Customer Address - " + customer; // You may enhance this to get actual address
+                    InvoiceData invoiceData = new InvoiceData(
+                        returnInvoiceNumber,
+                        date,
+                        customer,
+                        customerAddress,
+                        0.0, // previous balance
+                        printItems
+                    );
+                    
+                    // Open invoice for print preview
+                    boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Sales Return");
+                    
+                    if (previewSuccess) {
+                        showAlert("Success", "Sales return invoice created successfully!\n\nReturn Invoice Number: " + returnInvoiceNumber + 
+                                "\n\nThe return invoice has been opened for preview and printing.");
+                    } else {
+                        // Fallback to printer selection if preview fails
+                        boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Sales Return");
+                        if (printSuccess) {
+                            showAlert("Success", "Sales return invoice created and printed successfully!\n\nReturn Invoice Number: " + returnInvoiceNumber);
+                        } else {
+                            showAlert("Partial Success", "Sales return invoice created successfully but printing failed.\n\nReturn Invoice Number: " + returnInvoiceNumber);
+                        }
+                    }
                     
                     // Clear form and generate new return invoice number
                     String newReturnInvoiceNumber = database.generateSalesReturnInvoiceNumber();
@@ -2354,6 +2334,50 @@ public class ProductionStock {
             if (!database.insertProductionInvoiceItems(invoiceId, productionItems)) {
                 showAlert("Error", "Failed to save production items and update stock quantities");
                 return;
+            }
+
+            // Prepare items for printing
+            List<Item> printItems = new ArrayList<>();
+            for (String item : itemsList.getItems()) {
+                String[] parts = item.split(" - Quantity: ");
+                if (parts.length == 2) {
+                    String productName = parts[0];
+                    double quantity = Double.parseDouble(parts[1]);
+                    printItems.add(new Item(
+                        productName,
+                        (int) quantity,
+                        0.0, // unit price not applicable for production
+                        0.0  // discount not applicable for production
+                    ));
+                }
+            }
+
+            // Create invoice data for printing
+            InvoiceData invoiceData = new InvoiceData(
+                invoiceNumberField.getText(),
+                productionDate,
+                "Production Invoice",
+                "Notes: " + notes,
+                0.0, // not applicable for production
+                printItems
+            );
+            
+            // Open invoice for print preview
+            boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Production");
+            
+            if (previewSuccess) {
+                showAlert("Success", "Production invoice created and opened for preview!\n\nInvoice Number: " + 
+                    invoiceNumberField.getText() + "\n\nProceeed with printing from the preview window.");
+            } else {
+                // Fallback to printer selection if preview fails
+                boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Production");
+                if (printSuccess) {
+                    showAlert("Success", "Production invoice created and printed successfully!\n\nInvoice Number: " + 
+                        invoiceNumberField.getText());
+                } else {
+                    showAlert("Partial Success", "Production invoice created but printing failed.\n\nInvoice Number: " + 
+                        invoiceNumberField.getText() + "\n\nYou can print it later if needed.");
+                }
             }
             
             // Prepare raw materials data (if any)

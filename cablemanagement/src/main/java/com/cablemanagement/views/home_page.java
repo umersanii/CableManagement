@@ -1,5 +1,6 @@
 package com.cablemanagement.views;
 
+import java.net.URL;
 import com.cablemanagement.views.pages.HomeContent;
 import com.cablemanagement.views.pages.SettingsContent;
 import com.cablemanagement.views.pages.ProfileContent;
@@ -130,7 +131,8 @@ public class home_page {
         });
 
         Scene scene = new Scene(mainLayout, 800, 500);
-        scene.getStylesheets().add(home_page.class.getResource("/com/cablemanagement/style.css").toExternalForm());
+        String cssPath = home_page.class.getResource("/com/cablemanagement/style.css").toExternalForm();
+        scene.getStylesheets().add(cssPath);
         return scene;
     }
 

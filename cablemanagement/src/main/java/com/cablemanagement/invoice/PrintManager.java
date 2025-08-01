@@ -1,5 +1,6 @@
 package com.cablemanagement.invoice;
 
+import javafx.application.Platform;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceDialog;
@@ -234,7 +235,7 @@ public class PrintManager {
      * @return true if PDF was successfully opened for preview
      */
     public static boolean openInvoiceForPrintPreview(InvoiceData invoiceData, String invoiceType) {
-        File pdfFile = null;
+        final File[] pdfFile = new File[1];
         try {
             // Generate temporary filename for preview
             String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMAT);
@@ -252,18 +253,18 @@ public class PrintManager {
             }
             
             // Verify the PDF file was created and is not empty
-            pdfFile = new File(filename);
-            if (!pdfFile.exists()) {
+            pdfFile[0] = new File(filename);
+            if (!pdfFile[0].exists()) {
                 showErrorAlert("PDF Generation Failed", "The PDF file could not be created.\nFile: " + filename);
                 return false;
             }
             
-            if (pdfFile.length() == 0) {
+            if (pdfFile[0].length() == 0) {
                 showErrorAlert("PDF Generation Failed", "The PDF file is empty or corrupted.\nFile: " + filename);
                 return false;
             }
             
-            System.out.println("PDF generated successfully: " + pdfFile.length() + " bytes");
+            System.out.println("PDF generated successfully: " + pdfFile[0].length() + " bytes");
             
             // Add a small delay to ensure file is completely written and closed
             Thread.sleep(1000);
@@ -273,19 +274,40 @@ public class PrintManager {
                 Desktop desktop = Desktop.getDesktop();
                 if (desktop.isSupported(Desktop.Action.OPEN)) {
                     System.out.println("Opening PDF in default viewer...");
-                    desktop.open(pdfFile);
                     
-                    // Show information dialog
+                    // Show information dialog before opening PDF
                     Alert infoAlert = new Alert(Alert.AlertType.INFORMATION);
-                    infoAlert.setTitle("Print Preview Opened");
+                    infoAlert.setTitle("Print Preview Ready");
                     infoAlert.setHeaderText(invoiceType + " Invoice #" + invoiceData.getInvoiceNumber());
-                    infoAlert.setContentText("The invoice has been opened in your default PDF viewer.\n\n" +
-                                           "You can now:\n" +
+                    infoAlert.setContentText("The invoice PDF has been generated and will open in your default PDF viewer.\n\n" +
+                                           "You can then:\n" +
                                            "• Review the invoice\n" +
                                            "• Press Ctrl+P to open the print dialog\n" +
                                            "• Choose your printer and print settings\n\n" +
-                                           "File saved at: " + filename);
+                                           "File saved at: " + filename + "\n\n" +
+                                           "Click OK to open the PDF viewer.");
                     infoAlert.showAndWait();
+                    
+                    // Open PDF in a new thread to prevent blocking
+                    new Thread(() -> {
+                        try {
+                            String os = System.getProperty("os.name").toLowerCase();
+                            if (os.contains("linux")) {
+                                // Use xdg-open on Linux for better compatibility
+                                Runtime.getRuntime().exec(new String[]{"xdg-open", pdfFile[0].getAbsolutePath()});
+                            } else {
+                                desktop.open(pdfFile[0]);
+                            }
+                        } catch (Exception e) {
+                            Platform.runLater(() -> {
+                                showErrorAlert("Preview Error", 
+                                    "Could not open PDF viewer automatically.\n\n" +
+                                    "The PDF has been saved at:\n" + filename + "\n\n" +
+                                    "You can manually open this file with any PDF viewer.\n\n" +
+                                    "Error: " + e.getMessage());
+                            });
+                        }
+                    }, "PDFPreviewThread").start();
                     
                     return true;
                 } else {
@@ -300,7 +322,7 @@ public class PrintManager {
         } catch (Exception e) {
             e.printStackTrace();
             showErrorAlert("Preview Error", "An error occurred while opening the invoice for preview:\n\n" + e.getMessage() + 
-                          (pdfFile != null ? "\n\nFile location: " + pdfFile.getAbsolutePath() : ""));
+                          (pdfFile[0] != null ? "\n\nFile location: " + pdfFile[0].getAbsolutePath() : ""));
             return false;
         }
     }

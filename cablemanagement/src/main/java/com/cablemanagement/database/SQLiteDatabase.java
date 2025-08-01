@@ -28,10 +28,140 @@ import com.cablemanagement.model.Supplier;
 
 public class SQLiteDatabase implements db {
     
+    public List<Object[]> getLastProductionReturnInvoice() {
+        List<Object[]> result = new ArrayList<>();
+        String query = "SELECT return_invoice_number, return_date, notes FROM Production_Return_Invoice " +
+                      "ORDER BY production_return_invoice_id DESC LIMIT 1";
+                      
+        Connection connection = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        
+        try {
+            String jdbcUrl = "jdbc:sqlite:cable_management.db";
+            connection = DriverManager.getConnection(jdbcUrl);
+            stmt = connection.prepareStatement(query);
+            rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("return_invoice_number"),
+                    rs.getString("return_date"),
+                    rs.getString("notes")
+                };
+                result.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (stmt != null) stmt.close();
+                if (connection != null) connection.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+        return result;
+    }
+    
+    public List<Object[]> getProductionReturnInvoiceItems(String returnInvoiceNumber) {
+        List<Object[]> items = new ArrayList<>();
+        String query = "SELECT ps.product_name, pri.quantity_returned, pri.unit_cost " +
+                      "FROM Production_Return_Invoice_Item pri " +
+                      "JOIN Production_Return_Invoice priv ON pri.production_return_invoice_id = priv.production_return_invoice_id " +
+                      "JOIN ProductionStock ps ON pri.production_id = ps.production_id " +
+                      "WHERE priv.return_invoice_number = ?";
+                      
+        Connection connection = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+        
+        try {
+            String jdbcUrl = "jdbc:sqlite:cable_management.db";
+            connection = DriverManager.getConnection(jdbcUrl);
+            stmt = connection.prepareStatement(query);
+            stmt.setString(1, returnInvoiceNumber);
+            rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] item = {
+                    rs.getString("product_name"),
+                    rs.getDouble("quantity_returned"),
+                    rs.getDouble("unit_cost")
+                };
+                items.add(item);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (stmt != null) stmt.close();
+                if (connection != null) connection.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+        return items;
+    }
+    
     private Connection connection;
     private String databasePath;
     
     // Implement missing methods from db interface
+
+    @Override
+    public List<Object[]> getAllSalesReturnInvoicesForDropdown() {
+        List<Object[]> returnInvoices = new ArrayList<>();
+        String query = "SELECT sr.sales_return_invoice_id, sr.return_invoice_number, c.customer_name, sr.return_date " +
+                      "FROM SalesReturnInvoice sr " +
+                      "INNER JOIN Customer c ON sr.customer_id = c.customer_id " +
+                      "ORDER BY sr.sales_return_invoice_id DESC";
+                      
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                Object[] invoiceData = {
+                    rs.getInt("sales_return_invoice_id"),
+                    rs.getString("return_invoice_number"),
+                    rs.getString("customer_name"),
+                    rs.getString("return_date")
+                };
+                returnInvoices.add(invoiceData);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return returnInvoices;
+    }
+
+    @Override
+    public List<Object[]> getSalesReturnInvoiceItemsByInvoiceId(int returnInvoiceId) {
+        List<Object[]> items = new ArrayList<>();
+        String query = "SELECT sri.*, ps.product_name " +
+                      "FROM SalesReturnInvoiceItem sri " +
+                      "INNER JOIN ProductionStock ps ON sri.production_stock_id = ps.production_stock_id " +
+                      "WHERE sri.sales_return_invoice_id = ?";
+                      
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, returnInvoiceId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Object[] itemData = {
+                        rs.getInt("sales_return_invoice_item_id"),
+                        rs.getString("product_name"),
+                        rs.getDouble("quantity"),
+                        rs.getDouble("unit_price")
+                    };
+                    items.add(itemData);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return items;
+    }
 
     @Override
     public boolean updateBankBalance(double newBalance) {

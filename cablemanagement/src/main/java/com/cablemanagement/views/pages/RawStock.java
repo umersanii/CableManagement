@@ -20,6 +20,9 @@ import com.cablemanagement.database.db;
 import com.cablemanagement.model.Brand;
 import com.cablemanagement.model.RawStockPurchaseItem;
 import com.cablemanagement.model.RawStockUseItem;
+import com.cablemanagement.invoice.Item;
+import com.cablemanagement.invoice.InvoiceData;
+import com.cablemanagement.invoice.PrintManager;
 
 public class RawStock {
 
@@ -801,7 +804,42 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 boolean itemsInserted = database.insertRawPurchaseReturnInvoiceItems(returnInvoiceId, items);
                 
                 if (itemsInserted) {
-                    showAlert("Success", "Return invoice created successfully!\nStock quantities have been updated.");
+                    // Prepare invoice data for printing
+                    List<Item> printItems = new ArrayList<>();
+                    for (RawStockPurchaseItem item : selectedItemsTable.getItems()) {
+                        printItems.add(new Item(
+                            item.getRawStockName(),
+                            (int)Math.floor(item.getQuantity()),
+                            item.getUnitPrice(),
+                            0.0  // No discount for return items
+                        ));
+                    }
+
+                    String supplierName = supplierComboBox.getValue();
+                    String supplierAddress = "Supplier Address - " + supplierName;
+                    InvoiceData invoiceData = new InvoiceData(
+                        returnInvoiceNumber,
+                        returnDate,
+                        supplierName,
+                        supplierAddress,
+                        0.0, // No previous balance for returns
+                        printItems
+                    );
+
+                    // Try to open invoice for print preview first
+                    boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Purchase Return");
+
+                    if (previewSuccess) {
+                        showAlert("Success", "Return invoice created successfully and opened for preview!\n\nReturn Invoice Number: " + returnInvoiceNumber);
+                    } else {
+                        // Fallback to printer selection if preview fails
+                        boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Purchase Return");
+                        if (printSuccess) {
+                            showAlert("Success", "Return invoice created and printed successfully!\n\nReturn Invoice Number: " + returnInvoiceNumber);
+                        } else {
+                            showAlert("Partial Success", "Return invoice created successfully but printing failed.\n\nReturn Invoice Number: " + returnInvoiceNumber);
+                        }
+                    }
                     
                     // Clear form
                     returnInvoiceNumberField.setText(database.generateReturnInvoiceNumber());

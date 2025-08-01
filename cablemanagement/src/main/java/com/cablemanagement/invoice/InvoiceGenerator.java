@@ -33,15 +33,35 @@ public class InvoiceGenerator {
 
             // Logo (Optional - only add if logo file exists)
             try {
-                String logoPath = "src/main/resources/LOGO.jpg";
-                File logoFile = new File(logoPath);
-                if (logoFile.exists()) {
-                    Image logo = Image.getInstance(logoPath);
-                    logo.scaleToFit(100, 100);
-                    logo.setAlignment(Element.ALIGN_CENTER);
-                    document.add(logo);
-                } else {
-                    System.out.println("Logo file not found at: " + logoPath + " - proceeding without logo");
+                // Try multiple possible logo locations
+                String[] logoPaths = {
+                    "src/main/resources/LOGO.jpg",
+                    "CableManagement/cablemanagement/src/main/resources/LOGO.jpg",
+                    "CableManagement/cablemanagement/LOGO.jpg",
+                    InvoiceGenerator.class.getResource("/LOGO.jpg").getPath()
+                };
+                
+                boolean logoFound = false;
+                for (String logoPath : logoPaths) {
+                    try {
+                        File logoFile = new File(logoPath);
+                        if (logoFile.exists() && logoFile.length() > 0) {
+                            Image logo = Image.getInstance(logoPath);
+                            logo.scaleToFit(100, 100);
+                            logo.setAlignment(Element.ALIGN_CENTER);
+                            document.add(logo);
+                            System.out.println("Logo loaded successfully from: " + logoPath);
+                            logoFound = true;
+                            break;
+                        }
+                    } catch (Exception e) {
+                        // Continue to next path if this one fails
+                        continue;
+                    }
+                }
+                
+                if (!logoFound) {
+                    System.out.println("Logo file not found in any of the expected locations - proceeding without logo");
                 }
             } catch (Exception logoEx) {
                 System.out.println("Could not load logo: " + logoEx.getMessage() + " - proceeding without logo");
