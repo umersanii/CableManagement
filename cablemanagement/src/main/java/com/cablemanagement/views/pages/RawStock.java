@@ -198,7 +198,7 @@ public class RawStock {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("$%.2f", item));
+                    setText(String.format("%.2f", item));
                 }
             }
         });
@@ -213,7 +213,7 @@ public class RawStock {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("$%.2f", item));
+                    setText(String.format("%.2f", item));
                 }
             }
         });
@@ -343,7 +343,7 @@ public class RawStock {
         TextField paidAmountField = createTextField("0", "Paid Amount");
         paidAmountField.setPrefWidth(100);
 
-        Label totalLabel = new Label("Total: $0.00");
+        Label totalLabel = new Label("Total: 0.00");
         totalLabel.getStyleClass().add("total-label");
         totalLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 16px;");
 
@@ -590,7 +590,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             if (empty || item == null) {
                 setText(null);
             } else {
-                setText(String.format("$%.2f", item));
+                setText(String.format("%.2f", item));
             }
         }
     });
@@ -637,7 +637,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("$%.2f", item));
+                    setText(String.format("%.2f", item));
                 }
             }
         });
@@ -653,7 +653,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("$%.2f", item));
+                    setText(String.format("%.2f", item));
                 }
             }
         });
@@ -929,7 +929,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         removeItemBtn.getStyleClass().add("form-submit");
 
         // Total amount display
-        Label totalLabel = createSubheading("Total Usage Amount: $0.00");
+        Label totalLabel = createSubheading("Total Usage Amount: 0.00");
         totalLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
 
         // Load available items initially
@@ -1041,11 +1041,11 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 if (summaryStats != null && summaryStats.length > 0) {
                     totalInvoicesLabel.setText("Total Invoices: " + summaryStats[0]);
                     uniqueItemsLabel.setText("Unique Items Used: " + summaryStats[1]);
-                    totalValueLabel.setText("Total Value Used: $" + String.format("%.2f", Double.parseDouble(summaryStats[2].toString())));
+                    totalValueLabel.setText("Total Value Used: " + String.format("%.2f", Double.parseDouble(summaryStats[2].toString())));
                 } else {
                     totalInvoicesLabel.setText("Total Invoices: 0");
                     uniqueItemsLabel.setText("Unique Items Used: 0");
-                    totalValueLabel.setText("Total Value Used: $0.00");
+                    totalValueLabel.setText("Total Value Used: 0.00");
                 }
                 
                 // Generate selected report type
@@ -1106,7 +1106,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             quantityCol.setPrefWidth(120);
             
             TableColumn<Object[], String> valueCol = new TableColumn<>("Total Value");
-            valueCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty("$" + String.format("%.2f", Double.parseDouble(cellData.getValue()[3].toString()))));
+            valueCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", Double.parseDouble(cellData.getValue()[3].toString()))));
             valueCol.setPrefWidth(120);
             
             table.getColumns().addAll(itemCol, brandCol, quantityCol, valueCol);
@@ -1158,11 +1158,11 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             quantityCol.setPrefWidth(80);
             
             TableColumn<Object[], String> unitCostCol = new TableColumn<>("Unit Cost");
-            unitCostCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty("$" + String.format("%.2f", Double.parseDouble(cellData.getValue()[5].toString()))));
+            unitCostCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", Double.parseDouble(cellData.getValue()[5].toString()))));
             unitCostCol.setPrefWidth(100);
             
             TableColumn<Object[], String> totalCol = new TableColumn<>("Total");
-            totalCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty("$" + String.format("%.2f", Double.parseDouble(cellData.getValue()[6].toString()))));
+            totalCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", Double.parseDouble(cellData.getValue()[6].toString()))));
             totalCol.setPrefWidth(100);
             
             table.getColumns().addAll(invoiceCol, dateCol, itemCol, brandCol, quantityCol, unitCostCol, totalCol);
@@ -1202,7 +1202,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 itemLabel.getStyleClass().add("item-name");
                 
                 Label quantityLabel = new Label("Quantity Used: " + item[2]);
-                Label valueLabel = new Label("Total Value: $" + String.format("%.2f", Double.parseDouble(item[3].toString())));
+                Label valueLabel = new Label("Total Value: " + String.format("%.2f", Double.parseDouble(item[3].toString())));
                 
                 itemBox.getChildren().addAll(itemLabel, quantityLabel, valueLabel);
                 reportContent.getChildren().add(itemBox);
@@ -1412,7 +1412,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         }
 
         double total = subtotal - discount;
-        totalLabel.setText(String.format("Total: $%.2f", total));
+        totalLabel.setText(String.format("Total: %.2f", total));
     }
 
     private static void handleEnhancedPurchaseInvoiceSubmit(
@@ -1464,7 +1464,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
 
             if (success) {
                 showAlert(Alert.AlertType.INFORMATION, "Success", 
-                    String.format("Purchase Invoice %s created successfully!\nTotal Amount: $%.2f", 
+                    String.format("Purchase Invoice %s created successfully!\nTotal Amount: %.2f", 
                     invoiceNumber, totalAmount));
 
                 // Clear form
@@ -1501,7 +1501,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                     
                     if (success) {
                         showAlert(Alert.AlertType.INFORMATION, "Success", 
-                            String.format("Purchase Invoice %s created successfully!\nTotal Amount: $%.2f", 
+                            String.format("Purchase Invoice %s created successfully!\nTotal Amount: %.2f", 
                             retryInvoiceNumber, totalAmount));
                         clearPurchaseInvoiceForm(invoiceNumberField, supplierCombo, itemsTable, 
                                                discountField, paidAmountField, totalLabel);
@@ -1733,7 +1733,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("$%.2f", item));
+                    setText(String.format("%.2f", item));
                 }
             }
         });
@@ -1794,7 +1794,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("$%.2f", item));
+                    setText(String.format("%.2f", item));
                 }
             }
         });
@@ -1806,7 +1806,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("$%.2f", item));
+                    setText(String.format("%.2f", item));
                 }
             }
         });
@@ -1863,12 +1863,12 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         
         Label itemLabel = new Label("Item: " + item.getRawStockName() + " (" + item.getBrandName() + ")");
         Label availableLabel = new Label("Available Quantity: " + item.getAvailableQuantity() + " " + item.getUnitName());
-        Label costLabel = new Label("Unit Cost: $" + String.format("%.2f", item.getUnitCost()));
+        Label costLabel = new Label("Unit Cost: " + String.format("%.2f", item.getUnitCost()));
         
         TextField quantityField = new TextField();
         quantityField.setPromptText("Enter quantity to use");
         
-        Label totalCostLabel = new Label("Total Cost: $0.00");
+        Label totalCostLabel = new Label("Total Cost: 0.00");
         totalCostLabel.setStyle("-fx-font-weight: bold;");
         
         // Update total cost as user types
@@ -1877,9 +1877,9 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 if (!newVal.isEmpty()) {
                     double qty = Double.parseDouble(newVal);
                     double total = qty * item.getUnitCost();
-                    totalCostLabel.setText("Total Cost: $" + String.format("%.2f", total));
+                    totalCostLabel.setText("Total Cost: " + String.format("%.2f", total));
                 } else {
-                    totalCostLabel.setText("Total Cost: $0.00");
+                    totalCostLabel.setText("Total Cost: 0.00");
                 }
             } catch (NumberFormatException e) {
                 totalCostLabel.setText("Total Cost: Invalid");
@@ -1965,7 +1965,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         double total = selectedTable.getItems().stream()
                 .mapToDouble(item -> item.getQuantityUsed() * item.getUnitCost())
                 .sum();
-        totalLabel.setText("Total Usage Amount: $" + String.format("%.2f", total));
+        totalLabel.setText("Total Usage Amount: " + String.format("%.2f", total));
     }
     
     /**
@@ -2125,7 +2125,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         selectedItemsTable.getItems().clear();
         
         // Reset total
-        totalLabel.setText("Total Usage Amount: $0.00");
+        totalLabel.setText("Total Usage Amount: 0.00");
     }
 
     private static void handleUsageInvoiceSubmit(

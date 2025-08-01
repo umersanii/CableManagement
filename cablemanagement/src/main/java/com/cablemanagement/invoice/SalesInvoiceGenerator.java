@@ -130,9 +130,9 @@ public class SalesInvoiceGenerator {
                 table.addCell(new Phrase(String.valueOf(i + 1), regularFont));
                 table.addCell(new Phrase(itemName, regularFont));
                 table.addCell(new Phrase(String.valueOf(item.getQuantity()), regularFont));
-                table.addCell(new Phrase(String.format("$%.2f", item.getUnitPrice()), regularFont));
-                table.addCell(new Phrase(String.format("$%.2f", discount), regularFont));
-                table.addCell(new Phrase(String.format("$%.2f", net), regularFont));
+                table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice()), regularFont));
+                table.addCell(new Phrase(String.format("%.2f", discount), regularFont));
+                table.addCell(new Phrase(String.format("%.2f", net), regularFont));
             }
 
             document.add(table);
@@ -147,13 +147,13 @@ public class SalesInvoiceGenerator {
             double grandTotal = total + data.getPreviousBalance();
 
             // Summary rows
-            addSummaryRow(summaryTable, "Subtotal:", String.format("$%.2f", subtotal), regularFont, boldFont);
-            addSummaryRow(summaryTable, "Total Discount:", String.format("$%.2f", totalDiscount), regularFont, boldFont);
-            addSummaryRow(summaryTable, "Net Amount:", String.format("$%.2f", total), regularFont, boldFont);
+            addSummaryRow(summaryTable, "Subtotal:", String.format("%.2f", subtotal), regularFont, boldFont);
+            addSummaryRow(summaryTable, "Total Discount:", String.format("%.2f", totalDiscount), regularFont, boldFont);
+            addSummaryRow(summaryTable, "Net Amount:", String.format("%.2f", total), regularFont, boldFont);
             
             if (data.getPreviousBalance() != 0) {
-                addSummaryRow(summaryTable, "Previous Balance:", String.format("$%.2f", data.getPreviousBalance()), regularFont, boldFont);
-                addSummaryRow(summaryTable, "Grand Total:", String.format("$%.2f", grandTotal), boldFont, boldFont);
+                addSummaryRow(summaryTable, "Previous Balance:", String.format("%.2f", data.getPreviousBalance()), regularFont, boldFont);
+                addSummaryRow(summaryTable, "Grand Total:", String.format("%.2f", grandTotal), boldFont, boldFont);
             }
 
             document.add(summaryTable);
@@ -319,8 +319,8 @@ public class SalesInvoiceGenerator {
                 table.addCell(new Phrase(String.valueOf(i + 1), regularFont));
                 table.addCell(new Phrase(itemName, regularFont));
                 table.addCell(new Phrase(String.valueOf(item.getQuantity()), regularFont));
-                table.addCell(new Phrase(String.format("$%.2f", item.getUnitPrice()), regularFont));
-                table.addCell(new Phrase(String.format("$%.2f", returnAmount), regularFont));
+                table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice()), regularFont));
+                table.addCell(new Phrase(String.format("%.2f", returnAmount), regularFont));
             }
 
             document.add(table);
@@ -331,10 +331,10 @@ public class SalesInvoiceGenerator {
             summaryTable.setWidthPercentage(50);
             summaryTable.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
-            addSummaryRow(summaryTable, "Total Return Amount:", String.format("$%.2f", totalReturnAmount), boldFont, boldFont);
+            addSummaryRow(summaryTable, "Total Return Amount:", String.format("%.2f", totalReturnAmount), boldFont, boldFont);
             addSummaryRow(summaryTable, "Refund Method:", "Store Credit", regularFont, boldFont);
-            addSummaryRow(summaryTable, "Processing Fee:", "$0.00", regularFont, boldFont);
-            addSummaryRow(summaryTable, "Net Refund:", String.format("$%.2f", totalReturnAmount), boldFont, boldFont);
+            addSummaryRow(summaryTable, "Processing Fee:", "0.00", regularFont, boldFont);
+            addSummaryRow(summaryTable, "Net Refund:", String.format("%.2f", totalReturnAmount), boldFont, boldFont);
 
             document.add(summaryTable);
             document.add(Chunk.NEWLINE);

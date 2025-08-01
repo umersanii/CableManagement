@@ -239,7 +239,7 @@ public class ProductionStock {
         Label totalItemsLabel = new Label("Total Items: 0");
         totalItemsLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #495057;");
 
-        Label totalValueLabel = new Label("Total Value: $0.00");
+        Label totalValueLabel = new Label("Total Value: 0.00");
         totalValueLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #28a745;");
 
         Label lowStockLabel = new Label("Low Stock Items: 0");
@@ -855,7 +855,7 @@ public class ProductionStock {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("$%.2f", item));
+                    setText(String.format("%.2f", item));
                 }
             }
         });
@@ -870,7 +870,7 @@ public class ProductionStock {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("$%.2f", item));
+                    setText(String.format("%.2f", item));
                     setStyle("-fx-font-weight: bold; -fx-text-fill: #28a745;");
                 }
             }
@@ -914,16 +914,16 @@ public class ProductionStock {
         paidAmountField.setPrefWidth(150);
         
         // Summary labels
-        Label subtotalLabel = new Label("Subtotal: $0.00");
+        Label subtotalLabel = new Label("Subtotal: 0.00");
         subtotalLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
         
-        Label discountLabel = new Label("Discount: $0.00");
+        Label discountLabel = new Label("Discount: 0.00");
         discountLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #dc3545;");
         
-        Label totalAmountLabel = new Label("Total Amount: $0.00");
+        Label totalAmountLabel = new Label("Total Amount: 0.00");
         totalAmountLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #28a745;");
         
-        Label balanceLabel = new Label("Balance Due: $0.00");
+        Label balanceLabel = new Label("Balance Due: 0.00");
         balanceLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #dc3545;");
         
         // Update balance when discount or paid amount changes
@@ -1202,7 +1202,7 @@ public class ProductionStock {
                 confirmAlert.setTitle("Confirm Invoice Creation");
                 confirmAlert.setHeaderText("Create Sales Invoice?");
                 confirmAlert.setContentText(String.format(
-                    "Invoice: %s\nCustomer: %s\nSubtotal: $%.2f\nDiscount: $%.2f\nTotal: $%.2f\nPaid: $%.2f\nBalance: $%.2f",
+                    "Invoice: %s\nCustomer: %s\nSubtotal: %.2f\nDiscount: %.2f\nTotal: %.2f\nPaid: %.2f\nBalance: %.2f",
                     invoiceNumber, customer, subtotal, discount, totalAmount, paidAmount, totalAmount - paidAmount
                 ));
                 
@@ -1960,7 +1960,7 @@ public class ProductionStock {
                 Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
                 alert.setTitle("Price Warning");
                 alert.setHeaderText("Sale price is less than or equal to unit cost");
-                alert.setContentText(String.format("Sale Price: $%.2f\nUnit Cost: $%.2f\n\nThis will result in no profit or a loss. Do you want to continue?", salePrice, unitCost));
+                alert.setContentText(String.format("Sale Price: %.2f\nUnit Cost: %.2f\n\nThis will result in no profit or a loss. Do you want to continue?", salePrice, unitCost));
                 
                 if (alert.showAndWait().get() != ButtonType.OK) {
                     salePriceField.requestFocus();
@@ -1996,7 +1996,7 @@ public class ProductionStock {
                     return;
                 }
                 
-                showAlert("Success", String.format("Production Stock registered successfully!\n\nProduct: %s\nBrand: %s\nQuantity: %d\nUnit Cost: $%.2f\nSale Price: $%.2f\nProfit Margin: %.1f%%", 
+                showAlert("Success", String.format("Production Stock registered successfully!\n\nProduct: %s\nBrand: %s\nQuantity: %d\nUnit Cost: %.2f\nSale Price: %.2f\nProfit Margin: %.1f%%", 
                     name, brand, quantity, unitCost, salePrice, ((salePrice - unitCost) / unitCost) * 100));
             }
             
@@ -2581,31 +2581,31 @@ public class ProductionStock {
             double balance = totalAmount - paidAmount;
             
             // Update labels
-            subtotalLabel.setText(String.format("Subtotal: $%.2f", subtotal));
-            discountLabel.setText(String.format("Discount: $%.2f", discount));
-            totalAmountLabel.setText(String.format("Total Amount: $%.2f", totalAmount));
+            subtotalLabel.setText(String.format("Subtotal: %.2f", subtotal));
+            discountLabel.setText(String.format("Discount: %.2f", discount));
+            totalAmountLabel.setText(String.format("Total Amount: %.2f", totalAmount));
             
             // Set balance color based on amount
             if (balance <= 0) {
-                balanceLabel.setText("Balance Due: $0.00 (PAID)");
+                balanceLabel.setText("Balance Due: 0.00 (PAID)");
                 balanceLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #28a745;");
             } else {
-                balanceLabel.setText(String.format("Balance Due: $%.2f", balance));
+                balanceLabel.setText(String.format("Balance Due: %.2f", balance));
                 balanceLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #dc3545;");
             }
             
         } catch (Exception e) {
             // Fallback in case of any errors
-            subtotalLabel.setText("Subtotal: $0.00");
-            discountLabel.setText("Discount: $0.00");
-            totalAmountLabel.setText("Total Amount: $0.00");
-            balanceLabel.setText("Balance Due: $0.00");
+            subtotalLabel.setText("Subtotal: 0.00");
+            discountLabel.setText("Discount: 0.00");
+            totalAmountLabel.setText("Total Amount: 0.00");
+            balanceLabel.setText("Balance Due: 0.00");
         }
     }
     
     private static void updateTotalAmount(ObservableList<SalesInvoiceItemUI> items, Label totalLabel) {
         double total = items.stream().mapToDouble(SalesInvoiceItemUI::getTotalPrice).sum();
-        totalLabel.setText(String.format("Total Amount: $%.2f", total));
+        totalLabel.setText(String.format("Total Amount: %.2f", total));
     }
 
     private static void updateReturnAmount(ObservableList<SalesInvoiceItemUI> items, TextField returnAmountField) {
@@ -2692,7 +2692,7 @@ public class ProductionStock {
             }
             
             totalItemsLabel.setText("Total Items: " + totalItems);
-            totalValueLabel.setText(String.format("Total Value: $%.2f", totalValue));
+            totalValueLabel.setText(String.format("Total Value: %.2f", totalValue));
             
             if (lowStockCount > 0) {
                 lowStockLabel.setText("Low Stock Items: " + lowStockCount);
@@ -2705,7 +2705,7 @@ public class ProductionStock {
         } catch (Exception e) {
             System.err.println("Error updating stock summary: " + e.getMessage());
             totalItemsLabel.setText("Total Items: 0");
-            totalValueLabel.setText("Total Value: $0.00");
+            totalValueLabel.setText("Total Value: 0.00");
             lowStockLabel.setText("Low Stock Items: 0");
         }
     }
