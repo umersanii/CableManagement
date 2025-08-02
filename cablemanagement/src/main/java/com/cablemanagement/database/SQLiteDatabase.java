@@ -4458,6 +4458,25 @@ public class SQLiteDatabase implements db {
 
     // Delete Methods
     @Override
+    public String getSupplierAddress(String supplierName) {
+        String query = "SELECT s.contact_number || ' - ' || t.tehsil_name as address " +
+                      "FROM Supplier s " +
+                      "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                      "WHERE s.supplier_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, supplierName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("address");
+            }
+            return supplierName; // Return supplier name if no address found
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "";
+        }
+    }
+
+    @Override
     public boolean deleteCategory(String categoryName) {
         String query = "DELETE FROM Category WHERE category_name = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {

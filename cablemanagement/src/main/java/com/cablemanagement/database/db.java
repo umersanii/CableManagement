@@ -46,6 +46,9 @@ public interface db {
     
 
 
+    // Supplier address method
+    String getSupplierAddress(String supplierName);
+
     // Add this method to support category deletion
     public boolean deleteCategory(String categoryName);
     public boolean deleteManufacturer(String name);

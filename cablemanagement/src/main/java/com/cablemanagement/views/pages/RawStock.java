@@ -359,7 +359,7 @@ public class RawStock {
         // Action buttons
         HBox actionButtons = new HBox(10);
         actionButtons.setAlignment(Pos.CENTER);
-        Button submitBtn = createSubmitButton("Submit Purchase Invoice");
+        Button submitBtn = createSubmitButton("Print Purchase Invoice");
         Button clearAllBtn = createActionButton("Clear All");
         actionButtons.getChildren().addAll(submitBtn, clearAllBtn);
 
@@ -398,10 +398,52 @@ public class RawStock {
             }
         });
 
-        submitBtn.setOnAction(e -> handleEnhancedPurchaseInvoiceSubmit(
-            invoiceNumberField, supplierCombo, invoiceDatePicker,
-            itemsTable, discountField, paidAmountField, totalLabel
-        ));
+        submitBtn.setOnAction(e -> {
+            if (handleEnhancedPurchaseInvoiceSubmit(
+                invoiceNumberField, supplierCombo, invoiceDatePicker,
+                itemsTable, discountField, paidAmountField, totalLabel)) {
+                    
+                // Prepare invoice data for printing
+                List<Item> printItems = new ArrayList<>();
+                for (RawStockPurchaseItem item : itemsTable.getItems()) {
+                    printItems.add(new Item(
+                        item.getRawStockName(),
+                        item.getQuantity().intValue(),
+                        item.getUnitPrice(),
+                        0.0  // No item-level discount in purchase invoice
+                    ));
+                }
+
+                // Get supplier details
+                String supplierName = supplierCombo.getValue();
+                String supplierAddress = database.getSupplierAddress(supplierName);
+
+                // Create invoice data object
+                InvoiceData invoiceData = new InvoiceData(
+                    invoiceNumberField.getText(),
+                    invoiceDatePicker.getValue().format(DATE_FORMATTER),
+                    supplierName,
+                    supplierAddress,
+                    Double.parseDouble(discountField.getText()),
+                    printItems
+                );
+
+                // Try to open invoice for print preview first
+                boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Purchase");
+
+                if (previewSuccess) {
+                    showAlert("Success", "Invoice created and opened for print preview.");
+                } else {
+                    // If preview fails, try direct printing
+                    boolean printSuccess = PrintManager.printInvoice(invoiceData, "Purchase");
+                    if (printSuccess) {
+                        showAlert("Success", "Invoice created and sent to printer.");
+                    } else {
+                        showAlert("Warning", "Invoice created but printing failed. You can print it later from the records.");
+                    }
+                }
+            }
+        });
 
         return form;
     }
@@ -1453,7 +1495,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         totalLabel.setText(String.format("Total: %.2f", total));
     }
 
-    private static void handleEnhancedPurchaseInvoiceSubmit(
+    private static boolean handleEnhancedPurchaseInvoiceSubmit(
         TextField invoiceNumberField, ComboBox<String> supplierCombo, DatePicker invoiceDatePicker,
         TableView<RawStockPurchaseItem> itemsTable, TextField discountField, 
         TextField paidAmountField, Label totalLabel) {
@@ -1467,7 +1509,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
 
         if (selectedSupplier == null || itemsTable.getItems().isEmpty()) {
             showAlert(Alert.AlertType.ERROR, "Error", "Please select a supplier and add at least one item");
-            return;
+            return false;
         }
 
         try {
@@ -1484,12 +1526,12 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
 
             if (discount < 0) {
                 showAlert(Alert.AlertType.ERROR, "Error", "Discount cannot be negative");
-                return;
+                return false;
             }
 
             if (paidAmount < 0) {
                 showAlert(Alert.AlertType.ERROR, "Error", "Paid amount cannot be negative");
-                return;
+                return false;
             }
 
             // Convert table items to list
@@ -1508,8 +1550,10 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 // Clear form
                 clearPurchaseInvoiceForm(invoiceNumberField, supplierCombo, itemsTable, 
                                        discountField, paidAmountField, totalLabel);
+                return true;
             } else {
                 showAlert(Alert.AlertType.ERROR, "Error", "Failed to create purchase invoice");
+                return false;
             }
 
         } catch (NumberFormatException ex) {
@@ -1543,17 +1587,22 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                             retryInvoiceNumber, totalAmount));
                         clearPurchaseInvoiceForm(invoiceNumberField, supplierCombo, itemsTable, 
                                                discountField, paidAmountField, totalLabel);
+                        return true;
                     } else {
                         showAlert(Alert.AlertType.ERROR, "Error", "Failed to create purchase invoice even after retry");
+                        return false;
                     }
                 } catch (Exception retryException) {
                     retryException.printStackTrace();
                     showAlert(Alert.AlertType.ERROR, "Error", "Invoice number conflict occurred. Please try again. Error: " + retryException.getMessage());
+                    return false;
                 }
             } else {
                 showAlert(Alert.AlertType.ERROR, "Database Error", "Error saving to database: " + ex.getMessage());
+                return false;
             }
         }
+        return false;
     }
 
     private static void clearPurchaseInvoiceForm(TextField invoiceNumberField, ComboBox<String> supplierCombo,

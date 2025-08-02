@@ -7,6 +7,9 @@ package com.cablemanagement;
  */
 public class Launcher {
     public static void main(String[] args) {
+        // Suppress Gdk-WARNING about XSetErrorHandler
+        System.setProperty("jdk.gtk.version", "2");
+        
         // Launch the JavaFX application
         App.main(args);
     }
