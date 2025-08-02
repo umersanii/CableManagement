@@ -149,16 +149,14 @@ public class BooksContent {
 
         ComboBox<String> supplierFilter = createSupplierComboBox();
         HBox filters = createFilterControls(supplierFilter);
-        Button generateBtn = createSubmitButton("Generate");
+        Button loadBtn = createSubmitButton("Load");
         Button printBtn = createActionButton("Print");
-        Button exportBtn = createActionButton("Export");
-        HBox buttons = new HBox(10, generateBtn, printBtn, exportBtn);
+        HBox buttons = new HBox(10, loadBtn, printBtn);
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
-        generateBtn.setOnAction(e -> loadPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
+        loadBtn.setOnAction(e -> loadPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), supplierFilter));
         printBtn.setOnAction(e -> printReport("PurchaseBook", table.getItems()));
-        exportBtn.setOnAction(e -> exportReport("PurchaseBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -173,16 +171,14 @@ public class BooksContent {
 
         ComboBox<String> supplierFilter = createSupplierComboBox();
         HBox filters = createFilterControls(supplierFilter);
-        Button generateBtn = createSubmitButton("Generate");
+        Button loadBtn = createSubmitButton("Load");
         Button printBtn = createActionButton("Print");
-        Button exportBtn = createActionButton("Export");
-        HBox buttons = new HBox(10, generateBtn, printBtn, exportBtn);
+        HBox buttons = new HBox(10, loadBtn, printBtn);
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
-        generateBtn.setOnAction(e -> loadReturnPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
+        loadBtn.setOnAction(e -> loadReturnPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), supplierFilter));
         printBtn.setOnAction(e -> printReport("ReturnPurchaseBook", table.getItems()));
-        exportBtn.setOnAction(e -> exportReport("ReturnPurchaseBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadReturnPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -197,16 +193,14 @@ public class BooksContent {
 
         ComboBox<String> itemFilter = createItemComboBox();
         HBox filters = createFilterControls(itemFilter);
-        Button generateBtn = createSubmitButton("Generate");
+        Button loadBtn = createSubmitButton("Load");
         Button printBtn = createActionButton("Print");
-        Button exportBtn = createActionButton("Export");
-        HBox buttons = new HBox(10, generateBtn, printBtn, exportBtn);
+        HBox buttons = new HBox(10, loadBtn, printBtn);
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
-        generateBtn.setOnAction(e -> loadRawStockData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
+        loadBtn.setOnAction(e -> loadRawStockData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), itemFilter));
         printBtn.setOnAction(e -> printReport("RawStockUsageBook", table.getItems()));
-        exportBtn.setOnAction(e -> exportReport("RawStockUsageBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadRawStockData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -221,16 +215,14 @@ public class BooksContent {
 
         ComboBox<String> productFilter = createProductComboBox();
         HBox filters = createFilterControls(productFilter);
-        Button generateBtn = createSubmitButton("Generate");
+        Button loadBtn = createSubmitButton("Load");
         Button printBtn = createActionButton("Print");
-        Button exportBtn = createActionButton("Export");
-        HBox buttons = new HBox(10, generateBtn, printBtn, exportBtn);
+        HBox buttons = new HBox(10, loadBtn, printBtn);
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
-        generateBtn.setOnAction(e -> loadProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
+        loadBtn.setOnAction(e -> loadProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), productFilter));
         printBtn.setOnAction(e -> printReport("ProductionBook", table.getItems()));
-        exportBtn.setOnAction(e -> exportReport("ProductionBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -244,16 +236,14 @@ public class BooksContent {
         TableView<ReturnProductionRecord> table = createReturnProductionTable(data);
 
         HBox filters = createFilterControls(null);
-        Button generateBtn = createSubmitButton("Generate");
+        Button loadBtn = createSubmitButton("Load");
         Button printBtn = createActionButton("Print");
-        Button exportBtn = createActionButton("Export");
-        HBox buttons = new HBox(10, generateBtn, printBtn, exportBtn);
+        HBox buttons = new HBox(10, loadBtn, printBtn);
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
-        generateBtn.setOnAction(e -> loadReturnProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
+        loadBtn.setOnAction(e -> loadReturnProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker")));
         printBtn.setOnAction(e -> printReport("ReturnProductionBook", table.getItems()));
-        exportBtn.setOnAction(e -> exportReport("ReturnProductionBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadReturnProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -268,16 +258,72 @@ public class BooksContent {
 
         ComboBox<String> customerFilter = createCustomerComboBox();
         HBox filters = createFilterControls(customerFilter);
-        Button generateBtn = createSubmitButton("Generate");
+        Button loadBtn = createSubmitButton("Load");
         Button printBtn = createActionButton("Print");
-        Button exportBtn = createActionButton("Export");
-        HBox buttons = new HBox(10, generateBtn, printBtn, exportBtn);
+        HBox buttons = new HBox(10, loadBtn, printBtn);
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
-        generateBtn.setOnAction(e -> loadSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
+        loadBtn.setOnAction(e -> loadSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), customerFilter));
-        printBtn.setOnAction(e -> printReport("SalesBook", table.getItems()));
-        exportBtn.setOnAction(e -> exportReport("SalesBook", table.getItems()));
+        
+        // Enhanced print functionality
+        printBtn.setOnAction(e -> {
+            SalesRecord selectedRecord = table.getSelectionModel().getSelectedItem();
+            if (selectedRecord == null) {
+                showAlert("No Selection", "Please select an invoice to print");
+                return;
+            }
+
+            try {
+                // Get detailed invoice data from database
+                String invoiceNumber = selectedRecord.getInvoiceNumber();
+                // Get sales invoice ID first
+                int salesInvoiceId = config.database.getSalesInvoiceIdByNumber(invoiceNumber);
+                if (salesInvoiceId == -1) {
+                    showAlert("Error", "Invoice " + invoiceNumber + " not found");
+                    return;
+                }
+                
+                List<Object[]> invoiceItems = config.database.getSalesInvoiceItemsByInvoiceId(salesInvoiceId);
+                if (invoiceItems.isEmpty()) {
+                    showAlert("Error", "No items found for invoice " + invoiceNumber);
+                    return;
+                }
+
+                // Convert to Item objects for printing
+                List<Item> printItems = new ArrayList<>();
+                for (Object[] item : invoiceItems) {
+                    String productName = item[1].toString();
+                    double quantity = Double.parseDouble(item[2].toString());
+                    double unitPrice = Double.parseDouble(item[3].toString());
+                    printItems.add(new Item(productName, (int)quantity, unitPrice, 0.0));
+                }
+
+                // Create invoice data object
+                InvoiceData invoiceData = new InvoiceData(
+                    invoiceNumber,
+                    selectedRecord.getDate(),
+                    selectedRecord.getCustomer(),
+                    "Customer Address - " + selectedRecord.getCustomer(), // You might want to get actual address
+                    0.0, // Previous balance
+                    printItems
+                );
+
+                // Open invoice for print preview
+                boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Sales");
+                
+                if (!previewSuccess) {
+                    // Fallback to printer selection if preview fails
+                    boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Sales");
+                    if (!printSuccess) {
+                        showAlert("Error", "Failed to print invoice " + invoiceNumber);
+                    }
+                }
+            } catch (Exception ex) {
+                showAlert("Error", "Failed to prepare invoice for printing: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
 
         form.getChildren().addAll(filters, buttons, table);
         loadSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -292,16 +338,14 @@ public class BooksContent {
 
         ComboBox<String> customerFilter = createCustomerComboBox();
         HBox filters = createFilterControls(customerFilter);
-        Button generateBtn = createSubmitButton("Generate");
+        Button loadBtn = createSubmitButton("Load");
         Button printBtn = createActionButton("Print");
-        Button exportBtn = createActionButton("Export");
-        HBox buttons = new HBox(10, generateBtn, printBtn, exportBtn);
+        HBox buttons = new HBox(10, loadBtn, printBtn);
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
-        generateBtn.setOnAction(e -> loadReturnSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
+        loadBtn.setOnAction(e -> loadReturnSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), customerFilter));
         printBtn.setOnAction(e -> printReport("ReturnSalesBook", table.getItems()));
-        exportBtn.setOnAction(e -> exportReport("ReturnSalesBook", table.getItems()));
 
         form.getChildren().addAll(filters, buttons, table);
         loadReturnSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),

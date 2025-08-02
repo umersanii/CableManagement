@@ -15,6 +15,13 @@ import com.cablemanagement.model.RawStockUseItem;
 import com.cablemanagement.model.Supplier;
 
 public interface db {
+    
+    /**
+     * Get the sales invoice ID by its invoice number
+     * @param invoiceNumber The invoice number to look up
+     * @return The sales invoice ID, or -1 if not found
+     */
+    int getSalesInvoiceIdByNumber(String invoiceNumber);
 
 
     ///////////////////////////////////////////////////

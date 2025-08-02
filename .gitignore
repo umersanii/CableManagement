@@ -11,3 +11,5 @@ dependency-reduced-pom.xml
 .vscode/
 .idea/
 *.iml
+cablemanagement/pom.xml
+cablemanagement/src/main/java/module-info.java

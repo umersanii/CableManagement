@@ -5978,6 +5978,22 @@ public class SQLiteDatabase implements db {
     //     }
     // }
 
+    @Override
+public int getSalesInvoiceIdByNumber(String invoiceNumber) {
+    String query = "SELECT sales_invoice_id FROM Sales_Invoice WHERE sales_invoice_number = ?";
+    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        pstmt.setString(1, invoiceNumber);
+        ResultSet rs = pstmt.executeQuery();
+        if (rs.next()) {
+            return rs.getInt("sales_invoice_id");
+        }
+    } catch (SQLException e) {
+        System.err.println("Error getting sales invoice ID: " + e.getMessage());
+        e.printStackTrace();
+    }
+    return -1;
+}
+
 }
 
 
