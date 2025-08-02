@@ -137,33 +137,6 @@ public class SQLiteDatabase implements db {
     }
 
     @Override
-    public List<Object[]> getSalesReturnInvoiceItemsByInvoiceId(int returnInvoiceId) {
-        List<Object[]> items = new ArrayList<>();
-        String query = "SELECT sri.*, ps.product_name " +
-                      "FROM SalesReturnInvoiceItem sri " +
-                      "INNER JOIN ProductionStock ps ON sri.production_stock_id = ps.production_stock_id " +
-                      "WHERE sri.sales_return_invoice_id = ?";
-                      
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setInt(1, returnInvoiceId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    Object[] itemData = {
-                        rs.getInt("sales_return_invoice_item_id"),
-                        rs.getString("product_name"),
-                        rs.getDouble("quantity"),
-                        rs.getDouble("unit_price")
-                    };
-                    items.add(itemData);
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return items;
-    }
-
-    @Override
     public boolean updateBankBalance(double newBalance) {
         // Update the balance for all banks (or you may want to specify a bank_id)
         String query = "UPDATE Bank SET balance = ?";
@@ -4485,6 +4458,25 @@ public class SQLiteDatabase implements db {
 
     // Delete Methods
     @Override
+    public String getSupplierAddress(String supplierName) {
+        String query = "SELECT s.contact_number || ' - ' || t.tehsil_name as address " +
+                      "FROM Supplier s " +
+                      "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                      "WHERE s.supplier_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, supplierName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("address");
+            }
+            return supplierName; // Return supplier name if no address found
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "";
+        }
+    }
+
+    @Override
     public boolean deleteCategory(String categoryName) {
         String query = "DELETE FROM Category WHERE category_name = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
@@ -5977,6 +5969,65 @@ public class SQLiteDatabase implements db {
     //         e.printStackTrace();
     //     }
     // }
+
+    @Override
+public int getSalesInvoiceIdByNumber(String invoiceNumber) {
+    String query = "SELECT sales_invoice_id FROM Sales_Invoice WHERE sales_invoice_number = ?";
+    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        pstmt.setString(1, invoiceNumber);
+        ResultSet rs = pstmt.executeQuery();
+        if (rs.next()) {
+            return rs.getInt("sales_invoice_id");
+        }
+    } catch (SQLException e) {
+        System.err.println("Error getting sales invoice ID: " + e.getMessage());
+        e.printStackTrace();
+    }
+    return -1;
+}
+
+@Override
+public int getSalesReturnInvoiceIdByNumber(String returnInvoiceNumber) {
+    String query = "SELECT sales_return_invoice_id FROM Sales_Return_Invoice WHERE return_invoice_number = ?";
+    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        pstmt.setString(1, returnInvoiceNumber);
+        ResultSet rs = pstmt.executeQuery();
+        if (rs.next()) {
+            return rs.getInt("sales_return_invoice_id");
+        }
+    } catch (SQLException e) {
+        System.err.println("Error getting sales return invoice ID: " + e.getMessage());
+        e.printStackTrace();
+    }
+    return -1;
+}
+
+@Override
+public List<Object[]> getSalesReturnInvoiceItemsByInvoiceId(int returnInvoiceId) {
+    List<Object[]> items = new ArrayList<>();
+    String query = "SELECT srii.production_stock_id, ps.product_name, srii.quantity, srii.unit_price " +
+                  "FROM Sales_Return_Invoice_Item srii " +
+                  "JOIN ProductionStock ps ON srii.production_stock_id = ps.production_id " +
+                  "WHERE srii.sales_return_invoice_id = ?";
+    
+    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        pstmt.setInt(1, returnInvoiceId);
+        ResultSet rs = pstmt.executeQuery();
+        while (rs.next()) {
+            Object[] row = {
+                rs.getInt("production_stock_id"),
+                rs.getString("product_name"),
+                rs.getDouble("quantity"),
+                rs.getDouble("unit_price")
+            };
+            items.add(row);
+        }
+    } catch (SQLException e) {
+        System.err.println("Error getting sales return invoice items: " + e.getMessage());
+        e.printStackTrace();
+    }
+    return items;
+}
 
 }
 

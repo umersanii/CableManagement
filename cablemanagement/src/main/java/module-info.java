@@ -1,7 +1,7 @@
 module com.cablemanagement {
     requires javafx.controls;
     requires javafx.fxml;
-    requires java.sql;
+    requires transitive java.sql;
     requires itextpdf;
     requires java.desktop;
 
