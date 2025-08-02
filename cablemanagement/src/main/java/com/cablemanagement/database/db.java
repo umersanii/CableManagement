@@ -22,19 +22,29 @@ public interface db {
      * @return The sales invoice ID, or -1 if not found
      */
     int getSalesInvoiceIdByNumber(String invoiceNumber);
+    
+    /**
+     * Get the sales return invoice ID by its invoice number
+     * @param invoiceNumber The invoice number to look up
+     * @return The sales return invoice ID, or -1 if not found
+     */
+    int getSalesReturnInvoiceIdByNumber(String invoiceNumber);
 
+    /**
+     * Get the items for a specific sales return invoice
+     * @param returnInvoiceId The ID of the return invoice to get items for
+     * @return A list of Object arrays containing the return invoice items
+     */
+    List<Object[]> getSalesReturnInvoiceItemsByInvoiceId(int returnInvoiceId);
 
-    ///////////////////////////////////////////////////
-    /// Uncategorized, Errors fix krne k lye dale hain
-    /// Fazal inko implement krna ha
-    /// /////////////////////////////////////////////////
-    /// 
+    /**
+     * Get all sales return invoices for dropdown selection
+     * @return A list of Object arrays containing invoice data
+     */
+    List<Object[]> getAllSalesReturnInvoicesForDropdown();
+
     
 
-
-    // Sales Return Invoice methods
-    List<Object[]> getAllSalesReturnInvoicesForDropdown();
-    List<Object[]> getSalesReturnInvoiceItemsByInvoiceId(int returnInvoiceId);
 
     // Add this method to support category deletion
     public boolean deleteCategory(String categoryName);

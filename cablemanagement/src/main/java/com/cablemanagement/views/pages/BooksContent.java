@@ -345,7 +345,63 @@ public class BooksContent {
 
         loadBtn.setOnAction(e -> loadReturnSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), customerFilter));
-        printBtn.setOnAction(e -> printReport("ReturnSalesBook", table.getItems()));
+        
+        // Enhanced print functionality for return sales
+        printBtn.setOnAction(e -> {
+            ReturnSalesRecord selectedRecord = table.getSelectionModel().getSelectedItem();
+            if (selectedRecord == null) {
+                showAlert("No Selection", "Please select a return invoice to print");
+                return;
+            }
+
+            try {
+                String returnInvoiceNumber = selectedRecord.getReturnInvoice();
+                int salesReturnInvoiceId = config.database.getSalesReturnInvoiceIdByNumber(returnInvoiceNumber);
+                if (salesReturnInvoiceId == -1) {
+                    showAlert("Error", "Return Invoice " + returnInvoiceNumber + " not found");
+                    return;
+                }
+
+                List<Object[]> returnInvoiceItems = config.database.getSalesReturnInvoiceItemsByInvoiceId(salesReturnInvoiceId);
+                if (returnInvoiceItems.isEmpty()) {
+                    showAlert("Error", "No items found for return invoice " + returnInvoiceNumber);
+                    return;
+                }
+
+                // Convert to Item objects for printing
+                List<Item> printItems = new ArrayList<>();
+                for (Object[] item : returnInvoiceItems) {
+                    String productName = item[1].toString(); // product_name
+                    double quantity = Double.parseDouble(item[2].toString()); // quantity
+                    double unitPrice = Double.parseDouble(item[3].toString()); // unit_price
+                    printItems.add(new Item(productName, (int)quantity, unitPrice, 0.0));
+                }
+
+                // Create invoice data object for return invoice
+                InvoiceData invoiceData = new InvoiceData(
+                    returnInvoiceNumber,
+                    selectedRecord.getDate(),
+                    selectedRecord.getCustomer(),
+                    "Customer Address - " + selectedRecord.getCustomer(), // Could be enhanced to get actual address
+                    0.0, // Previous balance
+                    printItems
+                );
+
+                // Open return invoice for print preview
+                boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Return Sales");
+                
+                if (!previewSuccess) {
+                    // Fallback to printer selection if preview fails
+                    boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Return Sales");
+                    if (!printSuccess) {
+                        showAlert("Error", "Failed to print return invoice " + returnInvoiceNumber);
+                    }
+                }
+            } catch (Exception ex) {
+                showAlert("Error", "Failed to prepare return invoice for printing: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
 
         form.getChildren().addAll(filters, buttons, table);
         loadReturnSalesData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
