@@ -43,10 +43,10 @@ public class BooksContent {
         configureScrollPane(scrollPane);
 
         mainLayout.setTop(scrollPane);
-        mainLayout.setCenter(formArea);
-
-        return mainLayout;
-    }
+            mainLayout.setCenter(formArea);
+    
+            return mainLayout;
+        }
 
     private static HBox createButtonBar(StackPane formArea) {
         HBox buttonBar = new HBox(10);
@@ -1193,14 +1193,41 @@ private static void exportReport(String reportName, ObservableList<?> data) {
 
 private static InvoiceData createInvoiceData(String reportName, ObservableList<?> data) {
     List<Item> items = new ArrayList<>();
-    String customerName = "General Report";
-    String customerAddress = "N/A";
+    String entityName = "General Report";
+    String entityAddress = "N/A";
+    String entityTehsil = "";  // New field for Tehsil
+    String entityContact = "";  // New field for Contact
     String invoiceNumber = reportName + "_Report"; // Generic identifier for the report
     String date = LocalDate.now().format(DATE_FORMATTER);
     double previousBalance = 0.0;
+    String type = InvoiceData.TYPE_SALE; // Default type
 
     switch (reportName) {
         case "PurchaseBook":
+            type = InvoiceData.TYPE_PURCHASE;
+            // First, get supplier details from the first record to use in the invoice header
+            if (!data.isEmpty()) {
+                PurchaseRecord firstRecord = (PurchaseRecord) data.get(0);
+                String supplierName = firstRecord.getSupplierName();
+                entityName = supplierName != null ? supplierName : "Unknown Supplier";
+                
+                // Get more supplier details if available
+                if (config.database != null && config.database.isConnected() && supplierName != null) {
+                    try {
+                        Object[] supplier = config.database.getSupplierDetails(supplierName);
+                        if (supplier != null) {
+                            // Using supplier details array [id, name, address, tehsil, contact, ...]
+                            entityAddress = supplier[2] != null ? supplier[2].toString() : "N/A";
+                            entityTehsil = supplier[3] != null ? supplier[3].toString() : "";
+                            entityContact = supplier[4] != null ? supplier[4].toString() : "";
+                            System.out.println("Found supplier details: " + entityName + ", " + entityAddress + ", " + entityContact);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error retrieving supplier details: " + e.getMessage());
+                    }
+                }
+            }
+            
             for (Object record : data) {
                 PurchaseRecord pr = (PurchaseRecord) record;
                 double discountPercentage = pr.getAmount() != 0 ? pr.getDiscount() / pr.getAmount() * 100 : 0.0;
@@ -1282,11 +1309,17 @@ private static InvoiceData createInvoiceData(String reportName, ObservableList<?
             }
             break;
         case "SalesBook":
+            type = InvoiceData.TYPE_SALE;
             // For Sales Book, extract customer info from the first record
             if (!data.isEmpty()) {
                 SalesRecord firstRecord = (SalesRecord) data.get(0);
-                customerName = firstRecord.getCustomer();
-                customerAddress = "Customer Address"; // Could be enhanced to get actual address
+                entityName = firstRecord.getCustomer();
+                
+                // For now, just use simple address info
+                // This could be enhanced in the future to retrieve more details
+                entityAddress = "Khalil Abad, Amangarh, Nowshera";
+                entityContact = "Customer Contact";
+                System.out.println("Using customer: " + entityName);
             }
             
             for (Object record : data) {
@@ -1304,11 +1337,17 @@ private static InvoiceData createInvoiceData(String reportName, ObservableList<?
             }
             break;
         case "ReturnSalesBook":
+            type = InvoiceData.TYPE_SALE_RETURN;
             // For Return Sales Book, extract customer info from the first record
             if (!data.isEmpty()) {
                 ReturnSalesRecord firstRecord = (ReturnSalesRecord) data.get(0);
-                customerName = firstRecord.getCustomer();
-                customerAddress = "Customer Address"; // Could be enhanced to get actual address
+                entityName = firstRecord.getCustomer();
+                
+                // For now, just use simple address info
+                // This could be enhanced in the future to retrieve more details
+                entityAddress = "Khalil Abad, Amangarh, Nowshera";
+                entityContact = "Customer Contact";
+                System.out.println("Using customer for return: " + entityName);
             }
             
             for (Object record : data) {
@@ -1333,8 +1372,10 @@ private static InvoiceData createInvoiceData(String reportName, ObservableList<?
     System.out.println("Invoice Data:");
     System.out.println("Invoice Number: " + invoiceNumber);
     System.out.println("Date: " + date);
-    System.out.println("Customer Name: " + customerName);
-    System.out.println("Customer Address: " + customerAddress);
+    System.out.println("Entity Name: " + entityName);
+    System.out.println("Entity Address: " + entityAddress);
+    System.out.println("Entity Tehsil: " + entityTehsil);
+    System.out.println("Entity Contact: " + entityContact);
     System.out.println("Previous Balance: " + previousBalance);
     System.out.println("Items:");
     for (Item item : items) {
@@ -1343,7 +1384,14 @@ private static InvoiceData createInvoiceData(String reportName, ObservableList<?
                           ", Unit Price: " + item.getUnitPrice() +
                           ", Discount %: " + item.getDiscountPercent());
     }
-    return new InvoiceData(invoiceNumber, date, customerName, customerAddress, previousBalance, items);
+    
+    // Create an InvoiceData object with the type
+    InvoiceData invoiceData = new InvoiceData(type, invoiceNumber, date, entityName, entityAddress, items, previousBalance);
+    
+    // Set additional metadata if available in the future
+    // This is where we'd set tehsil, contact, etc. if the InvoiceData class supported it
+    
+    return invoiceData;
 }
        
     // Assumed PurchaseRecord class

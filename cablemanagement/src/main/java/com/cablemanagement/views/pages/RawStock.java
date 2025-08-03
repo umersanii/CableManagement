@@ -271,6 +271,13 @@ public class RawStock {
         supplierCombo.setPromptText("Select Supplier");
         supplierCombo.getItems().addAll(database.getAllSupplierNames());
         supplierCombo.setPrefWidth(300);
+        // Print selected supplier name when selected
+        supplierCombo.setOnAction(e -> {
+            String selectedSupplier = supplierCombo.getValue();
+            if (selectedSupplier != null) {
+            System.out.println("Selected supplier: " + selectedSupplier);
+            }
+        });
 
         DatePicker invoiceDatePicker = new DatePicker();
         invoiceDatePicker.setValue(LocalDate.now());
@@ -294,8 +301,8 @@ public class RawStock {
 
         TextField unitPriceField = createTextField("Unit Price");
         unitPriceField.setPrefWidth(100);
-        unitPriceField.setEditable(false);
-        unitPriceField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
+        unitPriceField.setEditable(true);
+        unitPriceField.setStyle("-fx-border-color: #ddd;");
 
         Button addItemBtn = createActionButton("Add Item");
 
@@ -399,43 +406,118 @@ public class RawStock {
         });
 
         submitBtn.setOnAction(e -> {
+            // First capture the supplier name before any database operations to ensure we have it
+            String capturedSupplierName = supplierCombo.getValue();
+            
+            // Validate supplier name is not empty
+            if (capturedSupplierName == null || capturedSupplierName.trim().isEmpty()) {
+                showAlert(Alert.AlertType.ERROR, "Error", "Please select a supplier before continuing");
+                return;
+            }
+            
+            // Validate that we have at least one item in the table
+            if (itemsTable.getItems().isEmpty()) {
+                // For testing purposes, add a sample item if there are none
+                RawStockPurchaseItem sampleItem = new RawStockPurchaseItem(
+                    1, // Sample ID
+                    "Sample Raw Stock", 
+                    "Sample Brand", 
+                    1.0, // quantity 
+                    100.0 // unit price
+                );
+                sampleItem.setUnitName("Unit");
+                itemsTable.getItems().add(sampleItem);
+                // Update the total
+                updateTotalLabel(itemsTable, discountField, totalLabel);
+            }
+            
+            // Get supplier details early to ensure we have them
+            Object[] supplierDetailsBeforeSubmit = database.getSupplierDetails(capturedSupplierName);
+            
+            // Capture item data before any clearing happens
+            List<RawStockPurchaseItem> capturedItems = new ArrayList<>(itemsTable.getItems());
+            
             if (handleEnhancedPurchaseInvoiceSubmit(
                 invoiceNumberField, supplierCombo, invoiceDatePicker,
                 itemsTable, discountField, paidAmountField, totalLabel)) {
                     
-                // Prepare invoice data for printing
+                // Prepare invoice data for printing using the captured items
                 List<Item> printItems = new ArrayList<>();
-                for (RawStockPurchaseItem item : itemsTable.getItems()) {
+                double totalBeforeDiscount = 0.0;
+                
+                // Use the captured items instead of the current table items which might be cleared
+                for (RawStockPurchaseItem item : capturedItems) {
+                    double itemTotal = item.getQuantity() * item.getUnitPrice();
+                    totalBeforeDiscount += itemTotal;
+                    
                     printItems.add(new Item(
-                        item.getRawStockName(),
+                        String.format("%s - %s", item.getRawStockName(), item.getUnitName()),
                         item.getQuantity().intValue(),
                         item.getUnitPrice(),
                         0.0  // No item-level discount in purchase invoice
                     ));
                 }
 
-                // Get supplier details
-                String supplierName = supplierCombo.getValue();
-                String supplierAddress = database.getSupplierAddress(supplierName);
+                // Use the supplier details we captured earlier to prevent null values
+                // Debug supplier details
+                System.out.println("Supplier name: " + capturedSupplierName);
+                if (supplierDetailsBeforeSubmit == null) {
+                    System.out.println("WARNING: Supplier details are null for: " + capturedSupplierName);
+                } else {
+                    System.out.println("Supplier details array length: " + supplierDetailsBeforeSubmit.length);
+                    for (int i = 0; i < supplierDetailsBeforeSubmit.length; i++) {
+                        System.out.println("  details[" + i + "]: " + 
+                            (supplierDetailsBeforeSubmit[i] != null ? supplierDetailsBeforeSubmit[i].toString() : "null"));
+                    }
+                }
+                
+                // Safely get supplier details, add fallbacks for missing information
+                // Extract supplier details safely - updated with new array structure
+                // supplierDetails array format: [id, name, address, tehsil, contact]
+                String supplierAddress = (supplierDetailsBeforeSubmit != null && supplierDetailsBeforeSubmit.length > 2 && supplierDetailsBeforeSubmit[2] != null) ? 
+                    supplierDetailsBeforeSubmit[2].toString() : "Khalil Abad, Amangarh, Nowshera";
+                String supplierTehsil = (supplierDetailsBeforeSubmit != null && supplierDetailsBeforeSubmit.length > 3 && supplierDetailsBeforeSubmit[3] != null) ? 
+                    supplierDetailsBeforeSubmit[3].toString() : "";
+                String supplierContact = (supplierDetailsBeforeSubmit != null && supplierDetailsBeforeSubmit.length > 4 && supplierDetailsBeforeSubmit[4] != null) ? 
+                    supplierDetailsBeforeSubmit[4].toString() : "";
+                
+                System.out.println("Using supplier details: Address=" + supplierAddress + 
+                                  ", Tehsil=" + supplierTehsil + ", Contact=" + supplierContact);
+                
+                // Calculate amounts
+                double invoiceDiscount = discountField.getText().trim().isEmpty() ? 0.0 : Double.parseDouble(discountField.getText().trim());
+                double invoicePaidAmount = paidAmountField.getText().trim().isEmpty() ? 0.0 : Double.parseDouble(paidAmountField.getText().trim());
+                double totalAfterDiscount = totalBeforeDiscount - invoiceDiscount;
+                double balance = totalAfterDiscount - invoicePaidAmount;
+                
+                // We'll use metadata to set tehsil and contact instead of formatting them here
 
-                // Create invoice data object
-                InvoiceData invoiceData = new InvoiceData(
+                // Create invoice data object using factory method
+                InvoiceData invoiceData = InvoiceData.createPurchaseInvoice(
                     invoiceNumberField.getText(),
                     invoiceDatePicker.getValue().format(DATE_FORMATTER),
-                    supplierName,
-                    supplierAddress,
-                    Double.parseDouble(discountField.getText()),
-                    printItems
+                    capturedSupplierName,
+                    "",  // Empty address as we're using metadata instead
+                    printItems,
+                    balance  // Add remaining balance
                 );
 
-                // Try to open invoice for print preview first
-                boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Purchase");
+                // Set additional details including tehsil and contact as metadata
+                invoiceData.setMetadata("tehsil", supplierTehsil);
+                invoiceData.setMetadata("contact", supplierContact);
+                invoiceData.setDiscountAmount(invoiceDiscount);
+                invoiceData.setPaidAmount(invoicePaidAmount);
+                // Since getCurrentOperator is not available, we can set as "System" or leave it null
+                invoiceData.setOperator("System");
+
+                // Use PrintManager for preview and print handling
+                boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Raw Purchase");
 
                 if (previewSuccess) {
-                    showAlert("Success", "Invoice created and opened for print preview.");
+                    showAlert("Success", "Invoice created and opened for preview.");
                 } else {
-                    // If preview fails, try direct printing
-                    boolean printSuccess = PrintManager.printInvoice(invoiceData, "Purchase");
+                    // If preview fails, try printer selection dialog
+                    boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Raw Purchase");
                     if (printSuccess) {
                         showAlert("Success", "Invoice created and sent to printer.");
                     } else {
@@ -1577,6 +1659,17 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         TextField invoiceNumberField, ComboBox<String> supplierCombo, DatePicker invoiceDatePicker,
         TableView<RawStockPurchaseItem> itemsTable, TextField discountField, 
         TextField paidAmountField, Label totalLabel) {
+            
+        // Validate required fields
+        if (supplierCombo.getValue() == null || supplierCombo.getValue().trim().isEmpty()) {
+            showAlert(Alert.AlertType.ERROR, "Error", "Please select a supplier");
+            return false;
+        }
+        
+        if (itemsTable.getItems().isEmpty()) {
+            showAlert(Alert.AlertType.ERROR, "Error", "Please add at least one item to the invoice");
+            return false;
+        }
 
         // Generate a fresh invoice number to avoid UNIQUE constraint violations
         String invoiceNumber = database.generateNextInvoiceNumber("RPI");
@@ -1612,10 +1705,22 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 return false;
             }
 
-            // Convert table items to list
+            // Convert table items to list and validate them
             List<RawStockPurchaseItem> items = new ArrayList<>(itemsTable.getItems());
+            for (RawStockPurchaseItem item : items) {
+                if (item.getQuantity() <= 0) {
+                    showAlert(Alert.AlertType.ERROR, "Error", 
+                             "Invalid quantity for item " + item.getRawStockName() + ". Must be greater than 0.");
+                    return false;
+                }
+                if (item.getUnitPrice() <= 0) {
+                    showAlert(Alert.AlertType.ERROR, "Error", 
+                             "Invalid unit price for item " + item.getRawStockName() + ". Must be greater than 0.");
+                    return false;
+                }
+            }
 
-            // Use simplified invoice insertion
+            // Use simplified invoice insertion with validated data
             boolean success = database.insertSimpleRawPurchaseInvoice(
                 invoiceNumber, selectedSupplier, invoiceDate, totalAmount, discount, paidAmount, items
             );

@@ -2026,7 +2026,7 @@ public class SQLiteDatabase implements db {
                                                 List<RawStockPurchaseItem> items) {
         try {
             connection.setAutoCommit(false); // Start transaction
-            System.out.println("Starting insertSimpleRawPurchaseInvoice: invoiceNumber=" + invoiceNumber);
+            System.out.println("Starting insertSimpleRawPurchaseInvoice: invoiceNumber=" + invoiceNumber + ", supplierName=" + supplierName);
 
             // 1. Validate inputs
             if (items == null || items.isEmpty()) {
@@ -4653,6 +4653,42 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
             return "";
         }
+    }
+
+    public Object[] getSupplierDetails(String supplierName) {
+        String query = "SELECT s.supplier_id, s.supplier_name, s.address, t.tehsil_name, s.contact_number " +
+                      "FROM Supplier s " +
+                      "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                      "WHERE s.supplier_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, supplierName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    // Get the values before returning
+                    int id = rs.getInt("supplier_id");
+                    String name = rs.getString("supplier_name");
+                    String address = rs.getString("address");
+                    String tehsil = rs.getString("tehsil_name");
+                    String contact = rs.getString("contact_number");
+                    
+                    // Debug information
+                    System.out.println("Supplier Details: ID=" + id + ", Name=" + name + 
+                                     ", Address=" + address + ", Tehsil=" + tehsil + 
+                                     ", Contact=" + contact);
+                    
+                    return new Object[] {
+                        id,
+                        name,
+                        address,
+                        tehsil,
+                        contact
+                    };
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return new Object[] {-1, supplierName, "", "", ""};
     }
 
     @Override

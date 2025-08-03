@@ -9,10 +9,11 @@ public class Main {
         Item i3 = new Item("Wase Cabel 7/36", 2, 11374, 9);
 
         InvoiceData data = new InvoiceData(
+            InvoiceData.TYPE_SALE, // This is a sales invoice
             "297",
+            "2025-06-30",
             "MIYA ELECTRICSTORE",
             "AKORA KHATTAK",
-            "2025-06-30",
             Arrays.asList(i1, i2, i3),
             1080310.00 // previous balance
         );

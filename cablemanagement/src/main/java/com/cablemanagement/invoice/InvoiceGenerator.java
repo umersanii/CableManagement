@@ -4,8 +4,6 @@ import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.*;
 import com.itextpdf.text.pdf.draw.DottedLineSeparator;
 
-import java.awt.Desktop;
-import java.awt.print.PrinterJob;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -20,6 +18,31 @@ import javax.print.event.PrintJobEvent;
 import javax.print.event.PrintJobListener;
 
 public class InvoiceGenerator {
+    
+    /**
+     * Get the appropriate invoice title based on the invoice type
+     * @param data The invoice data containing the type
+     * @return The formatted invoice title
+     */
+    private static String getInvoiceTitle(InvoiceData data) {
+        String type = data.getType();
+        if (type == null) {
+            return "Invoice";
+        }
+        
+        switch (type.toLowerCase()) {
+            case "purchase":
+                return "Purchase Invoice";
+            case "purchase_return":
+                return "Purchase Return Invoice";
+            case "sale":
+                return "Sales Invoice";
+            case "sale_return":
+                return "Sales Return Invoice";
+            default:
+                return "Invoice";
+        }
+    }
     public static void generatePDF(InvoiceData data, String filename) {
         try {
             Document document = new Document(PageSize.A4, 50, 50, 50, 50);
@@ -72,7 +95,9 @@ public class InvoiceGenerator {
             header.setAlignment(Element.ALIGN_CENTER);
             document.add(header);
 
-            Paragraph subHeader = new Paragraph("Purchase Return Invoice", headerFont);
+            // Dynamic invoice title based on invoice type
+            String invoiceTitle = getInvoiceTitle(data);
+            Paragraph subHeader = new Paragraph(invoiceTitle, headerFont);
             subHeader.setAlignment(Element.ALIGN_CENTER);
             document.add(subHeader);
 
@@ -82,24 +107,49 @@ public class InvoiceGenerator {
             document.add(new Chunk(new DottedLineSeparator()));
             document.add(Chunk.NEWLINE);
 
-            // Supplier & Invoice Info
+            // Customer/Supplier Info & Invoice Info
             PdfPTable infoTable = new PdfPTable(2);
             infoTable.setWidthPercentage(100);
             infoTable.setWidths(new float[]{6f, 4f});
 
-            PdfPCell supplierCell = new PdfPCell(new Phrase(
-                    "Supplier: RawMetals Pvt Ltd\n" +
-                    "Address: Model Town, Lahore,\nPunjab", regularFont));
-            supplierCell.setBorder(Rectangle.NO_BORDER);
+            // Dynamic entity info based on invoice type with enhanced metadata
+            String entityLabel = data.getType().toLowerCase().contains("purchase") ? "Supplier" : "Customer";
+            StringBuilder entityInfo = new StringBuilder();
+            // Only display entity name without the label for suppliers as requested
+            if (data.getType().toLowerCase().contains("purchase")) {
+                entityInfo.append(data.getEntityName());
+            } else {
+                entityInfo.append(entityLabel).append(": ").append(data.getEntityName());
+            }
+            
+            // Skip adding the address as per client request
+            
+            // Add tehsil if available in metadata
+            if (data.hasMetadata("tehsil") && !data.getMetadata("tehsil").toString().isEmpty()) {
+                entityInfo.append("\nTehsil: ").append(data.getMetadata("tehsil"));
+            }
+            
+            // Add contact if available in metadata
+            if (data.hasMetadata("contact") && !data.getMetadata("contact").toString().isEmpty()) {
+                entityInfo.append("\nContact: ").append(data.getMetadata("contact"));
+            }
+            
+            PdfPCell entityCell = new PdfPCell(new Phrase(entityInfo.toString(), regularFont));
+            entityCell.setBorder(Rectangle.NO_BORDER);
 
-            PdfPCell invoiceCell = new PdfPCell(new Phrase(
-                    "Invoice #: " + data.getInvoiceNumber() + "\n" +
-                    "Date: " + data.getDate() + "\n" +
-                    "Original Invoice #: " + data.getInvoiceNumber() + "\n" +
-                    "Operator: admin", regularFont));
+            // Build invoice cell content based on type
+            StringBuilder invoiceCellContent = new StringBuilder();
+            invoiceCellContent.append("Invoice #: ").append(data.getInvoiceNumber()).append("\n");
+            invoiceCellContent.append("Date: ").append(data.getDate()).append("\n");
+            if (data.getType().toLowerCase().contains("return")) {
+                invoiceCellContent.append("Original Invoice #: ").append(data.getOriginalInvoiceNumber()).append("\n");
+            }
+            invoiceCellContent.append("Operator: ").append(data.getOperator());
+
+            PdfPCell invoiceCell = new PdfPCell(new Phrase(invoiceCellContent.toString(), regularFont));
             invoiceCell.setBorder(Rectangle.NO_BORDER);
 
-            infoTable.addCell(supplierCell);
+            infoTable.addCell(entityCell);
             infoTable.addCell(invoiceCell);
             document.add(infoTable);
             document.add(Chunk.NEWLINE);
@@ -227,17 +277,7 @@ public class InvoiceGenerator {
                 return false;
             }
             
-            // Try to use system default printer
-            if (Desktop.isDesktopSupported()) {
-                Desktop desktop = Desktop.getDesktop();
-                if (desktop.isSupported(Desktop.Action.PRINT)) {
-                    desktop.print(file);
-                    System.out.println("Document sent to printer: " + filename);
-                    return true;
-                }
-            }
-            
-            // Alternative approach using javax.print
+            // Try using javax.print directly instead of Desktop API
             return printWithJavaxPrint(filename);
             
         } catch (Exception e) {
@@ -293,10 +333,72 @@ public class InvoiceGenerator {
      * @param filename The temporary filename for the PDF
      * @return true if generation and printing were successful
      */
-    public static boolean generateAndPrint(InvoiceData data, String filename) {
+    public static String generateAndGetPath(InvoiceData data, String filename) {
         try {
             generatePDF(data, filename);
-            return printPDF(filename);
+            System.out.println("PDF generated successfully: " + new File(filename).length() + " bytes");
+            return filename;
+        } catch (Exception e) {
+            System.err.println("Failed to generate invoice: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Print the invoice without preview
+     * @param data The invoice data
+     * @param filename The file to save and print
+     * @return true if successful
+     */
+    public static boolean generateAndPrint(InvoiceData data, String filename) {
+        try {
+            String pdfPath = generateAndGetPath(data, filename);
+            if (pdfPath == null) {
+                return false;
+            }
+
+            // Print in a separate thread but with proper synchronization
+            final boolean[] printComplete = { false };
+            final boolean[] printSuccess = { false };
+            
+            Thread printThread = new Thread(() -> {
+                try {
+                    boolean result = printWithJavaxPrint(pdfPath);
+                    synchronized (printComplete) {
+                        printSuccess[0] = result;
+                        printComplete[0] = true;
+                        printComplete.notify();
+                    }
+                } catch (Exception e) {
+                    System.err.println("Print thread error: " + e.getMessage());
+                    synchronized (printComplete) {
+                        printComplete[0] = true;
+                        printComplete.notify();
+                    }
+                }
+            });
+            printThread.setDaemon(true);
+            printThread.start();
+
+            // Wait for printing to complete with a timeout
+            synchronized (printComplete) {
+                if (!printComplete[0]) {
+                    try {
+                        printComplete.wait(5000); // 5 second timeout
+                    } catch (InterruptedException e) {
+                        System.err.println("Print wait interrupted");
+                    }
+                }
+            }
+
+            // If printing didn't complete in time, consider it failed but don't block
+            if (!printComplete[0]) {
+                System.err.println("Print operation timed out");
+                return false;
+            }
+
+            return printSuccess[0];
         } catch (Exception e) {
             System.err.println("Failed to generate and print invoice: " + e.getMessage());
             e.printStackTrace();
@@ -320,6 +422,54 @@ public class InvoiceGenerator {
             System.err.println("Failed to get available printers: " + e.getMessage());
             return new String[0];
         }
+    }
+
+    /**
+     * Preview the PDF using system's default PDF viewer
+     * @param pdfPath Path to the PDF file
+     * @return true if the command was launched successfully
+     */
+    public static boolean previewPDF(String pdfPath) {
+        try {
+            String osName = System.getProperty("os.name").toLowerCase();
+            ProcessBuilder pb;
+            
+            if (osName.contains("linux")) {
+                // Try xdg-open first
+                pb = new ProcessBuilder("xdg-open", pdfPath);
+            } else if (osName.contains("windows")) {
+                pb = new ProcessBuilder("cmd", "/c", "start", pdfPath);
+            } else if (osName.contains("mac")) {
+                pb = new ProcessBuilder("open", pdfPath);
+            } else {
+                System.err.println("Unsupported operating system for preview");
+                return false;
+            }
+
+            // Start the process and don't wait for it
+            pb.start();
+            
+            System.out.println("PDF viewer command launched for: " + pdfPath);
+            return true;
+        } catch (Exception e) {
+            System.err.println("Failed to launch PDF viewer: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Generate a PDF and open it for preview
+     * @param data The invoice data
+     * @param filename The file to save
+     * @return true if generation and preview launch were successful
+     */
+    public static boolean generateAndPreview(InvoiceData data, String filename) {
+        String pdfPath = generateAndGetPath(data, filename);
+        if (pdfPath == null) {
+            return false;
+        }
+        return previewPDF(pdfPath);
     }
     
     /**

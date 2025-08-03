@@ -208,6 +208,8 @@ public interface db {
     
     int getRawStockIdByName(String rawStockName);
     
+    Object[] getSupplierDetails(String supplierName);
+    
     // Simplified invoice methods that work with existing tables
     boolean insertSimpleRawPurchaseInvoice(String invoiceNumber, String supplierName, String invoiceDate, 
                                           double totalAmount, double discountAmount, double paidAmount, 
