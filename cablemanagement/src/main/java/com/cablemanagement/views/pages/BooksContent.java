@@ -433,7 +433,52 @@ public class BooksContent {
 
         loadBtn.setOnAction(e -> loadRawStockData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), itemFilter));
-        printBtn.setOnAction(e -> printReport("RawStockUsageBook", table.getItems()));
+        
+        // Enhanced print functionality for raw stock usage
+        printBtn.setOnAction(e -> {
+            RawStockRecord selectedRecord = table.getSelectionModel().getSelectedItem();
+            if (selectedRecord == null) {
+                showAlert("No Selection", "Please select a record to print");
+                return;
+            }
+
+            try {
+                // Get record details
+                String itemName = selectedRecord.getItem();
+                String date = selectedRecord.getDate();
+                double quantity = selectedRecord.getQuantity();
+                String reference = selectedRecord.getReference();
+                
+                // Create items list for invoice
+                List<Item> printItems = new ArrayList<>();
+                printItems.add(new Item(itemName, (int)quantity, 0.0, 0.0)); // Unit price not available in this view
+                
+                // Create invoice data for printing
+                InvoiceData invoiceData = new InvoiceData(
+                    InvoiceData.TYPE_RAW_STOCK,
+                    reference,
+                    date,
+                    "Raw Stock Usage",
+                    "", 
+                    printItems,
+                    0.0
+                );
+                
+                // Open invoice for print preview
+                boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Raw Stock Usage");
+                
+                if (!previewSuccess) {
+                    // Fallback to printer selection if preview fails
+                    boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Raw Stock Usage");
+                    if (!printSuccess) {
+                        showAlert("Error", "Failed to print raw stock usage record");
+                    }
+                }
+            } catch (Exception ex) {
+                showAlert("Error", "Failed to prepare record for printing: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
 
         form.getChildren().addAll(filters, buttons, table);
         loadRawStockData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -455,7 +500,55 @@ public class BooksContent {
 
         loadBtn.setOnAction(e -> loadProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), productFilter));
-        printBtn.setOnAction(e -> printReport("ProductionBook", table.getItems()));
+        
+        // Enhanced print functionality for production book
+        printBtn.setOnAction(e -> {
+            ProductionRecord selectedRecord = table.getSelectionModel().getSelectedItem();
+            if (selectedRecord == null) {
+                showAlert("No Selection", "Please select a production record to print");
+                return;
+            }
+
+            try {
+                // Get record details
+                String productName = selectedRecord.getProduct();
+                String date = selectedRecord.getDate();
+                double quantity = selectedRecord.getQuantity();
+                String notes = selectedRecord.getNotes();
+                
+                // Create items list for invoice
+                List<Item> printItems = new ArrayList<>();
+                printItems.add(new Item(productName, (int)quantity, 0.0, 0.0)); // Unit price not available
+                
+                // Create invoice data for printing
+                InvoiceData invoiceData = new InvoiceData(
+                    InvoiceData.TYPE_PRODUCTION,
+                    "PROD-" + date.replace("-", ""),
+                    date,
+                    "Production Record",
+                    "", 
+                    printItems,
+                    0.0
+                );
+                
+                // Add metadata
+                invoiceData.setMetadata("notes", notes);
+
+                // Open invoice for print preview
+                boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Production");
+                
+                if (!previewSuccess) {
+                    // Fallback to printer selection if preview fails
+                    boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Production");
+                    if (!printSuccess) {
+                        showAlert("Error", "Failed to print production record");
+                    }
+                }
+            } catch (Exception ex) {
+                showAlert("Error", "Failed to prepare production record for printing: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
 
         form.getChildren().addAll(filters, buttons, table);
         loadProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -476,7 +569,51 @@ public class BooksContent {
 
         loadBtn.setOnAction(e -> loadReturnProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker")));
-        printBtn.setOnAction(e -> printReport("ReturnProductionBook", table.getItems()));
+        
+        // Enhanced print functionality for return production book
+        printBtn.setOnAction(e -> {
+            ReturnProductionRecord selectedRecord = table.getSelectionModel().getSelectedItem();
+            if (selectedRecord == null) {
+                showAlert("No Selection", "Please select a return production record to print");
+                return;
+            }
+
+            try {
+                // Get record details
+                String reference = selectedRecord.getReference();
+                String date = selectedRecord.getDate();
+                double quantity = selectedRecord.getQuantity();
+                
+                // Create items list for invoice
+                List<Item> printItems = new ArrayList<>();
+                printItems.add(new Item(reference, (int)quantity, 0.0, 0.0)); // Reference as name since detailed product info not available
+                
+                // Create invoice data for printing with proper type
+                InvoiceData invoiceData = new InvoiceData(
+                    InvoiceData.TYPE_PRODUCTION_RETURN,
+                    "RETPROD-" + date.replace("-", ""),
+                    date,
+                    "Return Production Record",
+                    "", 
+                    printItems,
+                    0.0
+                );
+
+                // Open invoice for print preview
+                boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Return Production");
+                
+                if (!previewSuccess) {
+                    // Fallback to printer selection if preview fails
+                    boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Return Production");
+                    if (!printSuccess) {
+                        showAlert("Error", "Failed to print return production record");
+                    }
+                }
+            } catch (Exception ex) {
+                showAlert("Error", "Failed to prepare return production record for printing: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
 
         form.getChildren().addAll(filters, buttons, table);
         loadReturnProductionData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -1417,286 +1554,8 @@ private static void loadReturnPurchaseData(TableView<ReturnPurchaseRecord> table
         return filters;
     }
 
-private static void exportReport(String reportName, ObservableList<?> data) {
-    if (data == null || data.isEmpty()) {
-        showAlert("Error", "No data to export! Please generate the report first.");
-        return;
-    }
-
-    File exportDir = new File(EXPORT_PATH);
-    if (!exportDir.exists()) {
-        exportDir.mkdirs();
-    }
-
-    String filename = EXPORT_PATH + File.separator + reportName + "_" + 
-                     LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".pdf";
-    
-    try {
-        InvoiceData invoiceData = createInvoiceData(reportName, data);
-        if (invoiceData.getItems() == null || invoiceData.getItems().isEmpty()) {
-            showAlert("Error", "No items to export in the report!");
-            return;
-        }
-        System.out.println("invoice data size: " + invoiceData.getItems().size());
-        for (Item item : invoiceData.getItems()) {
-            System.out.println("Item: " + item.getName() + ", Qty: " + item.getQuantity() + 
-                              ", Price: " + item.getUnitPrice() + ", Discount: " + item.getDiscountPercent());
-        }
-        
-        // Use specialized invoice generators for Sales and Return Sales books
-        if (reportName.equals("SalesBook")) {
-            SalesInvoiceGenerator.generateSalesInvoicePDF(invoiceData, filename);
-        } else if (reportName.equals("ReturnSalesBook")) {
-            SalesInvoiceGenerator.generateReturnSalesInvoicePDF(invoiceData, filename);
-        } else {
-            // Use default generator for other reports
-            InvoiceGenerator.generatePDF(invoiceData, filename);
-        }
-        
-        showAlert("Success", "Report successfully exported to:\n" + new File(filename).getAbsolutePath());
-    } catch (Exception e) {
-        showAlert("Error", "Failed to export report: " + e.getMessage());
-        e.printStackTrace();
-    }
-}
-    private static void printReport(String reportName, ObservableList<?> data) {
-        if (data.isEmpty()) {
-            showAlert("Error", "No data to print!");
-            return;
-        }
-
-        String filename = EXPORT_PATH + reportName + "_" + System.currentTimeMillis() + ".pdf";
-        InvoiceData invoiceData = createInvoiceData(reportName, data);
-        try {
-            // Use specialized invoice generators for Sales and Return Sales books
-            if (reportName.equals("SalesBook")) {
-                SalesInvoiceGenerator.generateSalesInvoicePDF(invoiceData, filename);
-            } else if (reportName.equals("ReturnSalesBook")) {
-                SalesInvoiceGenerator.generateReturnSalesInvoicePDF(invoiceData, filename);
-            } else {
-                // Use default generator for other reports
-                InvoiceGenerator.generatePDF(invoiceData, filename);
-            }
-            
-            // Use the new print functionality
-            boolean printSuccess = InvoiceGenerator.printPDF(filename);
-            
-            if (printSuccess) {
-                showAlert("Success", "Report sent to printer successfully!");
-            } else {
-                showAlert("Warning", "Report was generated but printing failed. Check your printer connection.\n" +
-                         "Report saved to: " + filename);
-            }
-        } catch (Exception e) {
-            showAlert("Error", "Failed to print report: " + e.getMessage());
-        }
-    }
-
-private static InvoiceData createInvoiceData(String reportName, ObservableList<?> data) {
-    List<Item> items = new ArrayList<>();
-    String entityName = "General Report";
-    String entityAddress = "N/A";
-    String entityTehsil = "";  // New field for Tehsil
-    String entityContact = "";  // New field for Contact
-    String invoiceNumber = reportName + "_Report"; // Generic identifier for the report
-    String date = LocalDate.now().format(DATE_FORMATTER);
-    double previousBalance = 0.0;
-    String type = InvoiceData.TYPE_SALE; // Default type
-
-    switch (reportName) {
-        case "PurchaseBook":
-            type = InvoiceData.TYPE_PURCHASE;
-            // First, get supplier details from the first record to use in the invoice header
-            if (!data.isEmpty()) {
-                PurchaseRecord firstRecord = (PurchaseRecord) data.get(0);
-                String supplierName = firstRecord.getSupplierName();
-                entityName = supplierName != null ? supplierName : "Unknown Supplier";
-                
-                // Get more supplier details if available
-                if (config.database != null && config.database.isConnected() && supplierName != null) {
-                    try {
-                        Object[] supplier = config.database.getSupplierDetails(supplierName);
-                        if (supplier != null) {
-                            // Using supplier details array [id, name, address, tehsil, contact, ...]
-                            entityAddress = supplier[2] != null ? supplier[2].toString() : "N/A";
-                            entityTehsil = supplier[3] != null ? supplier[3].toString() : "";
-                            entityContact = supplier[4] != null ? supplier[4].toString() : "";
-                            System.out.println("Found supplier details: " + entityName + ", " + entityAddress + ", " + entityContact);
-                        }
-                    } catch (Exception e) {
-                        System.err.println("Error retrieving supplier details: " + e.getMessage());
-                    }
-                }
-            }
-            
-            for (Object record : data) {
-                PurchaseRecord pr = (PurchaseRecord) record;
-                double discountPercentage = pr.getAmount() != 0 ? pr.getDiscount() / pr.getAmount() * 100 : 0.0;
-                items.add(new Item(
-                    pr.getSupplierName() + " (Invoice: " + pr.getInvoiceNumber() + ")",
-                    1, 
-                    pr.getAmount(), 
-                    discountPercentage
-                ));
-                System.out.println("Item: " + pr.getItemName() + ", Brand: " + pr.getBrandName() + 
-                                  ", Manufacturer: " + pr.getManufacturerName() + 
-                                  ", Qty: " + pr.getQuantity() + ", Unit Price: " + pr.getUnitPrice() + 
-                                  ", Item Total: " + pr.getItemTotal());
-                // Use first invoice number if needed
-                if (items.size() == 1) {
-                    invoiceNumber = pr.getInvoiceNumber();
-                }
-            }
-            break;
-        case "ReturnPurchaseBook":
-            for (Object record : data) {
-                ReturnPurchaseRecord rpr = (ReturnPurchaseRecord) record;
-                double discountPercentage = rpr.getTotalAmount() != 0 ? rpr.getDiscountAmount() / rpr.getTotalAmount() * 100 : 0.0;
-                items.add(new Item(
-                    rpr.getItemName() + " - " + rpr.getBrandName() + " (Return Invoice: " + rpr.getReturnInvoice() + ")",
-                    (int) rpr.getQuantity(), 
-                    rpr.getUnitPrice(), 
-                    discountPercentage
-                ));
-                System.out.println("Return Item: " + rpr.getItemName() + ", Brand: " + rpr.getBrandName() + 
-                                  ", Supplier: " + rpr.getSupplier() + 
-                                  ", Qty: " + rpr.getQuantity() + ", Unit Price: " + rpr.getUnitPrice() + 
-                                  ", Total: " + rpr.getTotalAmount());
-                if (items.size() == 1) {
-                    invoiceNumber = rpr.getReturnInvoice();
-                }
-            }
-            break;
-        case "RawStockUsageBook":
-            for (Object record : data) {
-                RawStockRecord rsr = (RawStockRecord) record;
-                items.add(new Item(
-                    rsr.getItem() + " (Ref: " + rsr.getReference() + ")",
-                    (int) rsr.getQuantity(), 
-                    0.0, 
-                    0.0
-                ));
-                if (items.size() == 1) {
-                    invoiceNumber = rsr.getReference();
-                }
-            }
-            break;
-        case "ProductionBook":
-            for (Object record : data) {
-                ProductionRecord pr = (ProductionRecord) record;
-                items.add(new Item(
-                    pr.getProduct() + " (Notes: " + pr.getNotes() + ")",
-                    (int) pr.getQuantity(), 
-                    0.0, 
-                    0.0
-                ));
-                if (items.size() == 1) {
-                    invoiceNumber = reportName + "_Report"; // No specific invoice number
-                }
-            }
-            break;
-        case "ReturnProductionBook":
-            for (Object record : data) {
-                ReturnProductionRecord rpr = (ReturnProductionRecord) record;
-                items.add(new Item(
-                    "Return (Ref: " + rpr.getReference() + ")",
-                    (int) rpr.getQuantity(), 
-                    0.0, 
-                    0.0
-                ));
-                if (items.size() == 1) {
-                    invoiceNumber = rpr.getReference();
-                }
-            }
-            break;
-        case "SalesBook":
-            type = InvoiceData.TYPE_SALE;
-            // For Sales Book, extract customer info from the first record
-            if (!data.isEmpty()) {
-                SalesRecord firstRecord = (SalesRecord) data.get(0);
-                entityName = firstRecord.getCustomer();
-                
-                // For now, just use simple address info
-                // This could be enhanced in the future to retrieve more details
-                entityAddress = "Khalil Abad, Amangarh, Nowshera";
-                entityContact = "Customer Contact";
-                System.out.println("Using customer: " + entityName);
-            }
-            
-            for (Object record : data) {
-                SalesRecord sr = (SalesRecord) record;
-                double discountPercentage = sr.getAmount() != 0 ? sr.getDiscount() / sr.getAmount() * 100 : 0.0;
-                items.add(new Item(
-                    "Sales Transaction - Invoice: " + sr.getInvoiceNumber() + " (Customer: " + sr.getCustomer() + ")",
-                    1, 
-                    sr.getAmount(), 
-                    discountPercentage
-                ));
-                if (items.size() == 1) {
-                    invoiceNumber = sr.getInvoiceNumber();
-                }
-            }
-            break;
-        case "ReturnSalesBook":
-            type = InvoiceData.TYPE_SALE_RETURN;
-            // For Return Sales Book, extract customer info from the first record
-            if (!data.isEmpty()) {
-                ReturnSalesRecord firstRecord = (ReturnSalesRecord) data.get(0);
-                entityName = firstRecord.getCustomer();
-                
-                // For now, just use simple address info
-                // This could be enhanced in the future to retrieve more details
-                entityAddress = "Khalil Abad, Amangarh, Nowshera";
-                entityContact = "Customer Contact";
-                System.out.println("Using customer for return: " + entityName);
-            }
-            
-            for (Object record : data) {
-                ReturnSalesRecord rsr = (ReturnSalesRecord) record;
-                items.add(new Item(
-                    "Return Transaction - Return Invoice: " + rsr.getReturnInvoice() + " (Customer: " + rsr.getCustomer() + ")" + 
-                    (rsr.getOriginalInvoice() != null && !rsr.getOriginalInvoice().isEmpty() ? 
-                     " [Original Invoice: " + rsr.getOriginalInvoice() + "]" : ""),
-                    1, 
-                    rsr.getAmount(), 
-                    0.0
-                ));
-                if (items.size() == 1) {
-                    invoiceNumber = rsr.getReturnInvoice();
-                }
-            }
-            break;
-        default:
-            break;
-    }
-
-    System.out.println("Invoice Data:");
-    System.out.println("Invoice Number: " + invoiceNumber);
-    System.out.println("Date: " + date);
-    System.out.println("Entity Name: " + entityName);
-    System.out.println("Entity Address: " + entityAddress);
-    System.out.println("Entity Tehsil: " + entityTehsil);
-    System.out.println("Entity Contact: " + entityContact);
-    System.out.println("Previous Balance: " + previousBalance);
-    System.out.println("Items:");
-    for (Item item : items) {
-        System.out.println("  Name: " + item.getName() +
-                          ", Quantity: " + item.getQuantity() +
-                          ", Unit Price: " + item.getUnitPrice() +
-                          ", Discount %: " + item.getDiscountPercent());
-    }
-    
-    // Create an InvoiceData object with the type
-    InvoiceData invoiceData = new InvoiceData(type, invoiceNumber, date, entityName, entityAddress, items, previousBalance);
-    
-    // Set additional metadata if available in the future
-    // This is where we'd set tehsil, contact, etc. if the InvoiceData class supported it
-    
-    return invoiceData;
-}
-       
     // Assumed PurchaseRecord class
-static class PurchaseRecord {
+    static class PurchaseRecord {
     private final SimpleStringProperty rawPurchaseInvoiceId;
     private final SimpleStringProperty invoiceNumber;
     private final SimpleStringProperty supplierName;
