@@ -1356,21 +1356,24 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             
             TableColumn<Object[], String> itemCol = new TableColumn<>("Item Name");
             itemCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[0]));
-            itemCol.setPrefWidth(200);
             
             TableColumn<Object[], String> brandCol = new TableColumn<>("Brand");
             brandCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[1]));
-            brandCol.setPrefWidth(150);
             
             TableColumn<Object[], String> quantityCol = new TableColumn<>("Total Quantity");
-            quantityCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue()[2].toString()));
-            quantityCol.setPrefWidth(120);
+            quantityCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", (Double) cellData.getValue()[2])));
+            
+            TableColumn<Object[], String> unitCostCol = new TableColumn<>("Unit Cost");
+            unitCostCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", (Double) cellData.getValue()[3])));
             
             TableColumn<Object[], String> valueCol = new TableColumn<>("Total Value");
-            valueCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", Double.parseDouble(cellData.getValue()[3].toString()))));
-            valueCol.setPrefWidth(120);
+            valueCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", (Double) cellData.getValue()[4])));
             
-            table.getColumns().addAll(itemCol, brandCol, quantityCol, valueCol);
+            TableColumn<Object[], String> usageCountCol = new TableColumn<>("Usage Count");
+            usageCountCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue()[5].toString()));
+            
+            table.getColumns().addAll(itemCol, brandCol, quantityCol, unitCostCol, valueCol, usageCountCol);
+            table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
             
             ObservableList<Object[]> data = FXCollections.observableArrayList(usageData);
             table.setItems(data);
@@ -1400,33 +1403,30 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             
             TableColumn<Object[], String> invoiceCol = new TableColumn<>("Invoice #");
             invoiceCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[0]));
-            invoiceCol.setPrefWidth(100);
             
             TableColumn<Object[], String> dateCol = new TableColumn<>("Date");
             dateCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[1]));
-            dateCol.setPrefWidth(100);
+            
+            TableColumn<Object[], String> referenceCol = new TableColumn<>("Reference");
+            referenceCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[2]));
             
             TableColumn<Object[], String> itemCol = new TableColumn<>("Item");
-            itemCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[2]));
-            itemCol.setPrefWidth(150);
+            itemCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[3]));
             
             TableColumn<Object[], String> brandCol = new TableColumn<>("Brand");
-            brandCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[3]));
-            brandCol.setPrefWidth(120);
+            brandCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[4]));
             
             TableColumn<Object[], String> quantityCol = new TableColumn<>("Quantity");
-            quantityCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue()[4].toString()));
-            quantityCol.setPrefWidth(80);
+            quantityCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", (Double) cellData.getValue()[5])));
             
             TableColumn<Object[], String> unitCostCol = new TableColumn<>("Unit Cost");
-            unitCostCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", Double.parseDouble(cellData.getValue()[5].toString()))));
-            unitCostCol.setPrefWidth(100);
+            unitCostCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", (Double) cellData.getValue()[6])));
             
             TableColumn<Object[], String> totalCol = new TableColumn<>("Total");
-            totalCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", Double.parseDouble(cellData.getValue()[6].toString()))));
-            totalCol.setPrefWidth(100);
+            totalCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(String.format("%.2f", (Double) cellData.getValue()[7])));
             
-            table.getColumns().addAll(invoiceCol, dateCol, itemCol, brandCol, quantityCol, unitCostCol, totalCol);
+            table.getColumns().addAll(invoiceCol, dateCol, referenceCol, itemCol, brandCol, quantityCol, unitCostCol, totalCol);
+            table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
             
             ObservableList<Object[]> data = FXCollections.observableArrayList(detailData);
             table.setItems(data);
