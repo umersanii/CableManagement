@@ -536,6 +536,12 @@ public class EmployeeManagementContent {
         return col;
     }
 
+    private static <T> TableColumn<LoanData, T> createLoanColumn(String title, Function<LoanData, ObservableValue<T>> property) {
+        TableColumn<LoanData, T> col = new TableColumn<>(title);
+        col.setCellValueFactory(cellData -> property.apply(cellData.getValue()));
+        return col;
+    }
+
     ////////////////////////////////////////////////////////////////////
     ///                   View Salary Reports Form                   ///
     ////////////////////////////////////////////////////////////////////
@@ -1278,18 +1284,98 @@ public class EmployeeManagementContent {
         VBox.setVgrow(recentLoansTable, Priority.ALWAYS);
 
         recentLoansTable.getColumns().addAll(
-            createColumn("Employee", data -> data.employeeNameProperty()),
-            createColumn("Loan Amount", data -> data.loanAmountProperty().asObject()),
-            createColumn("Loan Date", data -> data.loanDateProperty()),
-            createColumn("Due Date", data -> data.dueDateProperty()),
-            createColumn("Status", data -> data.statusProperty()),
-            createColumn("Remaining", data -> data.remainingAmountProperty().asObject())
+            createLoanColumn("Employee", data -> data.employeeNameProperty()),
+            createLoanColumn("Loan Amount", data -> data.loanAmountProperty().asObject()),
+            createLoanColumn("Loan Date", data -> data.loanDateProperty()),
+            createLoanColumn("Due Date", data -> data.dueDateProperty()),
+            createLoanColumn("Status", data -> data.statusProperty()),
+            createLoanColumn("Remaining", data -> data.remainingAmountProperty().asObject())
         );
 
         ObservableList<LoanData> recentLoansData = FXCollections.observableArrayList();
         recentLoansTable.setItems(recentLoansData);
 
-        // Employee Combo Action, Save Button, View Loans → keep your logic as is...
+        // Employee selection event handler
+        employeeCombo.setOnAction(e -> {
+            String selectedEmployee = employeeCombo.getValue();
+            if (selectedEmployee != null && !selectedEmployee.isEmpty()) {
+                loadEmployeeDetails(database, selectedEmployee, empIdValue, designationValue, 
+                                 salaryTypeValue, baseSalaryValue);
+                // Clear status
+                statusLabel.setText("");
+            } else {
+                clearEmployeeDetails(empIdValue, designationValue, salaryTypeValue, baseSalaryValue);
+            }
+        });
+
+        // Save loan button event handler
+        saveBtn.setOnAction(e -> {
+            String employee = employeeCombo.getValue();
+            String amountText = amountField.getText().trim();
+            LocalDate loanDate = loanDateField.getValue();
+            LocalDate dueDate = dueDateField.getValue();
+            String description = descriptionField.getText().trim();
+            
+            if (employee == null || employee.isEmpty()) {
+                statusLabel.setText("Please select an employee.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                return;
+            }
+            
+            if (amountText.isEmpty() || loanDate == null) {
+                statusLabel.setText("Please fill in all required fields.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                return;
+            }
+            
+            try {
+                double amount = Double.parseDouble(amountText);
+                if (amount <= 0) {
+                    statusLabel.setText("Loan amount must be positive.");
+                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                    return;
+                }
+                
+                int employeeId = database.getEmployeeIdByName(employee);
+                if (employeeId == -1) {
+                    statusLabel.setText("Employee not found.");
+                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                    return;
+                }
+                
+                String dueDateStr = (dueDate != null) ? dueDate.toString() : null;
+                
+                if (database.insertEmployeeLoan(employeeId, amount, loanDate.toString(), dueDateStr, description)) {
+                    statusLabel.setText("Loan registered successfully!");
+                    statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+                    
+                    // Clear form
+                    amountField.clear();
+                    loanDateField.setValue(LocalDate.now());
+                    dueDateField.setValue(null);
+                    descriptionField.clear();
+                    
+                    // Refresh recent loans
+                    loadRecentLoans(database, recentLoansData);
+                } else {
+                    statusLabel.setText("Failed to register loan. Please try again.");
+                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                }
+            } catch (NumberFormatException ex) {
+                statusLabel.setText("Please enter a valid loan amount.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+            }
+        });
+        
+        // View all loans button
+        viewLoansBtn.setOnAction(e -> {
+            loadRecentLoans(database, recentLoansData);
+            statusLabel.setText("Showing recent loan records.");
+            statusLabel.setStyle("-fx-text-fill: blue; -fx-font-weight: bold;");
+        });
+
+        // Load initial data
+        loadRecentLoans(database, recentLoansData);
 
         // --- Responsive Layout ---
         VBox content = new VBox(20);
@@ -1512,12 +1598,6 @@ public class EmployeeManagementContent {
         value.setStyle("-fx-text-fill: #2c3e50;");
         grid.add(label, col, row);
         grid.add(value, col + 1, row);
-    }
-
-    private static <T> TableColumn<LoanData, T> createColumn(String title, Function<LoanData, ObservableValue<T>> prop) {
-        TableColumn<LoanData, T> col = new TableColumn<>(title);
-        col.setCellValueFactory(cell -> prop.apply(cell.getValue()));
-        return col;
     }
 
 
@@ -2013,6 +2093,28 @@ public class EmployeeManagementContent {
             count++;
         }
     }
+    
+    private static void loadRecentLoans(SQLiteDatabase database, ObservableList<LoanData> loansData) {
+        loansData.clear();
+        List<Object[]> loans = database.getAllEmployeeLoans();
+        
+        // Load only the most recent 10 records
+        int count = 0;
+        for (Object[] row : loans) {
+            if (count >= 10) break;
+            loansData.add(new LoanData(
+                (String) row[0],    // employee_name
+                (Double) row[1],    // loan_amount
+                (String) row[2],    // loan_date
+                (String) row[3],    // due_date
+                (String) row[4],    // description
+                (String) row[5],    // status
+                (Double) row[6],    // remaining_amount
+                (Integer) row[7]    // loan_id
+            ));
+            count++;
+        }
+    }
 
     // Inner class for advance salary table data with JavaFX properties
     public static class AdvanceSalaryData {
@@ -2050,28 +2152,6 @@ public class EmployeeManagementContent {
     }
 
     // Helper methods for loan functionality
-    private static void loadRecentLoans(SQLiteDatabase database, ObservableList<LoanData> loanData) {
-        loanData.clear();
-        List<Object[]> loans = database.getAllEmployeeLoans();
-        
-        // Load only the most recent 10 records
-        int count = 0;
-        for (Object[] row : loans) {
-            if (count >= 10) break;
-            loanData.add(new LoanData(
-                (String) row[0],   // employee_name
-                (Double) row[1],   // loan_amount
-                (String) row[2],   // loan_date
-                (String) row[3],   // due_date
-                (String) row[4],   // description
-                (String) row[5],   // status
-                (Double) row[6],   // remaining_amount
-                (Integer) row[7]   // loan_id
-            ));
-            count++;
-        }
-    }
-    
     private static void loadLoanReportData(SQLiteDatabase database, ObservableList<LoanData> loanData, 
                                          String startDate, String endDate, String employeeName, String status) {
         loanData.clear();
