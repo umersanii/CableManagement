@@ -1941,7 +1941,7 @@ public class ProductionStock {
         // Date range selection
         HBox dateRangeBox = new HBox(20);
         DatePicker startDatePicker = new DatePicker();
-        startDatePicker.setValue(LocalDate.now().minusDays(7));
+        startDatePicker.setValue(LocalDate.now().minusDays(30)); // Default to last 30 days
         DatePicker endDatePicker = new DatePicker();
         endDatePicker.setValue(LocalDate.now());
         dateRangeBox.getChildren().addAll(
@@ -1949,61 +1949,333 @@ public class ProductionStock {
             createFormRow("End Date:", endDatePicker)
         );
 
-        // Report type selection
-        ComboBox<String> reportTypeCombo = new ComboBox<>();
-        reportTypeCombo.getItems().addAll(
-            "Daily Production Summary",
-            "Product-wise Usage",
-            "Raw Material Consumption",
-            "Sales vs Production"
-        );
-        reportTypeCombo.getSelectionModel().selectFirst();
-
-        // Generate button
+        // Control buttons
+        HBox controlBox = new HBox(15);
+        controlBox.setAlignment(Pos.CENTER_LEFT);
         Button generateBtn = createSubmitButton("Generate Report");
+        Button exportBtn = createActionButton("Export to CSV");
+        Button refreshBtn = createActionButton("Refresh");
+        controlBox.getChildren().addAll(generateBtn, exportBtn, refreshBtn);
 
-        // Report display area
-        ListView<String> reportView = createEnhancedListView();
-        reportView.setPrefHeight(400);
+        // Summary statistics
+        HBox summaryBox = new HBox(30);
+        summaryBox.setAlignment(Pos.CENTER_LEFT);
+        summaryBox.setPadding(new Insets(15));
+        summaryBox.setStyle("-fx-background-color: #f8f9fa; -fx-border-radius: 5; -fx-border-color: #dee2e6; -fx-border-width: 1;");
+        
+        Label totalRecordsLabel = new Label("Total Records: 0");
+        totalRecordsLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #495057;");
+        
+        Label productionRecordsLabel = new Label("Production Records: 0");
+        productionRecordsLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #28a745;");
+        
+        Label rawUsageRecordsLabel = new Label("Raw Usage Records: 0");
+        rawUsageRecordsLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #dc3545;");
+        
+        summaryBox.getChildren().addAll(totalRecordsLabel, productionRecordsLabel, rawUsageRecordsLabel);
+
+        // Create the main usage report table
+        TableView<UsageReportRecord> usageTable = createUsageReportTable();
+        usageTable.setPrefHeight(450);
+        usageTable.setMaxHeight(Double.MAX_VALUE);
+        
+        // Table container with scroll
+        VBox tableContainer = new VBox(10);
+        tableContainer.getChildren().addAll(
+            createSubheading("Production & Raw Material Usage Records"),
+            usageTable
+        );
+        
+        VBox.setVgrow(tableContainer, Priority.ALWAYS);
+        VBox.setVgrow(usageTable, Priority.ALWAYS);
 
         form.getChildren().addAll(
             heading,
             dateRangeBox,
-            createFormRow("Report Type:", reportTypeCombo),
-            generateBtn,
-            createSubheading("Report Results:"),
-            reportView
+            controlBox,
+            summaryBox,
+            tableContainer
         );
 
-        // Event handler
+        // Event handlers
         generateBtn.setOnAction(e -> {
             String startDate = startDatePicker.getValue().format(DATE_FORMATTER);
             String endDate = endDatePicker.getValue().format(DATE_FORMATTER);
-            String reportType = reportTypeCombo.getSelectionModel().getSelectedItem();
-            
-            // In real app, fetch data from database
-            reportView.getItems().clear();
-            reportView.getItems().add("Production Stock Usage Report");
-            reportView.getItems().add("Period: " + startDate + " to " + endDate);
-            reportView.getItems().add("Report Type: " + reportType);
-            reportView.getItems().add("");
-            
-            // Sample report data
-            if (reportType.equals("Daily Production Summary")) {
-                reportView.getItems().add("Date       | Product          | Quantity");
-                reportView.getItems().add("2023-01-01 | Copper Cable 25m | 50");
-                reportView.getItems().add("2023-01-01 | PVC Wire 50m     | 30");
-                reportView.getItems().add("2023-01-02 | Copper Cable 25m | 45");
-            } else if (reportType.equals("Raw Material Consumption")) {
-                reportView.getItems().add("Material          | Quantity Used");
-                reportView.getItems().add("Copper Wire 8mm   | 1250m");
-                reportView.getItems().add("PVC Granules      | 450kg");
-                reportView.getItems().add("Aluminum Conductor| 800m");
-            }
-            // Other report types would have different formats
+            loadUsageReportData(usageTable, startDate, endDate, totalRecordsLabel, productionRecordsLabel, rawUsageRecordsLabel);
+        });
+        
+        refreshBtn.setOnAction(e -> {
+            String startDate = startDatePicker.getValue().format(DATE_FORMATTER);
+            String endDate = endDatePicker.getValue().format(DATE_FORMATTER);
+            loadUsageReportData(usageTable, startDate, endDate, totalRecordsLabel, productionRecordsLabel, rawUsageRecordsLabel);
+        });
+        
+        exportBtn.setOnAction(e -> {
+            // TODO: Implement CSV export functionality
+            showAlert("Export", "CSV export functionality will be implemented in future version");
         });
 
+        // Load initial data
+        String initialStartDate = startDatePicker.getValue().format(DATE_FORMATTER);
+        String initialEndDate = endDatePicker.getValue().format(DATE_FORMATTER);
+        loadUsageReportData(usageTable, initialStartDate, initialEndDate, totalRecordsLabel, productionRecordsLabel, rawUsageRecordsLabel);
+
         return form;
+    }
+
+    // Create table for combined usage report
+    private static TableView<UsageReportRecord> createUsageReportTable() {
+        TableView<UsageReportRecord> table = new TableView<>();
+        table.getStyleClass().add("table-view");
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        
+        // Date column
+        TableColumn<UsageReportRecord, String> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getDate()));
+        dateCol.setPrefWidth(120);
+        dateCol.setStyle("-fx-alignment: CENTER;");
+        
+        // Type column (Production or Raw Usage)
+        TableColumn<UsageReportRecord, String> typeCol = new TableColumn<>("Type");
+        typeCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getType()));
+        typeCol.setPrefWidth(100);
+        typeCol.setCellFactory(col -> new TableCell<UsageReportRecord, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    if ("Production".equals(item)) {
+                        setStyle("-fx-text-fill: #28a745; -fx-font-weight: bold;");
+                    } else if ("Raw Usage".equals(item)) {
+                        setStyle("-fx-text-fill: #dc3545; -fx-font-weight: bold;");
+                    }
+                }
+            }
+        });
+        
+        // Invoice/Reference Number column
+        TableColumn<UsageReportRecord, String> invoiceCol = new TableColumn<>("Invoice/Ref #");
+        invoiceCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getInvoiceNumber()));
+        invoiceCol.setPrefWidth(130);
+        
+        // Item Name column
+        TableColumn<UsageReportRecord, String> itemCol = new TableColumn<>("Item Name");
+        itemCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getItemName()));
+        itemCol.setPrefWidth(200);
+        
+        // Brand column
+        TableColumn<UsageReportRecord, String> brandCol = new TableColumn<>("Brand");
+        brandCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getBrand()));
+        brandCol.setPrefWidth(120);
+        
+        // Quantity column
+        TableColumn<UsageReportRecord, String> quantityCol = new TableColumn<>("Quantity");
+        quantityCol.setCellValueFactory(data -> new SimpleStringProperty(formatNumber(data.getValue().getQuantity())));
+        quantityCol.setPrefWidth(100);
+        quantityCol.setStyle("-fx-alignment: CENTER;");
+        
+        // Purpose/Notes column
+        TableColumn<UsageReportRecord, String> purposeCol = new TableColumn<>("Purpose/Notes");
+        purposeCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPurpose()));
+        purposeCol.setPrefWidth(150);
+        
+        // Unit Cost column
+        TableColumn<UsageReportRecord, String> unitCostCol = new TableColumn<>("Unit Cost");
+        unitCostCol.setCellValueFactory(data -> new SimpleStringProperty(formatNumber(data.getValue().getUnitCost())));
+        unitCostCol.setPrefWidth(100);
+        unitCostCol.setStyle("-fx-alignment: CENTER;");
+        
+        // Total Value column
+        TableColumn<UsageReportRecord, String> totalValueCol = new TableColumn<>("Total Value");
+        totalValueCol.setCellValueFactory(data -> new SimpleStringProperty(formatNumber(data.getValue().getTotalValue())));
+        totalValueCol.setPrefWidth(110);
+        totalValueCol.setStyle("-fx-alignment: CENTER;");
+        totalValueCol.setCellFactory(col -> new TableCell<UsageReportRecord, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    setStyle("-fx-font-weight: bold; -fx-text-fill: #495057;");
+                }
+            }
+        });
+        
+        table.getColumns().addAll(dateCol, typeCol, invoiceCol, itemCol, brandCol, quantityCol, purposeCol, unitCostCol, totalValueCol);
+        
+        // Set placeholder text
+        table.setPlaceholder(new Label("No usage records found for the selected date range"));
+        
+        return table;
+    }
+
+    // Load usage report data from database
+    private static void loadUsageReportData(TableView<UsageReportRecord> table, String startDate, String endDate,
+                                          Label totalRecordsLabel, Label productionRecordsLabel, Label rawUsageRecordsLabel) {
+        ObservableList<UsageReportRecord> records = FXCollections.observableArrayList();
+        int productionCount = 0;
+        int rawUsageCount = 0;
+        
+        try {
+            // Load Production Invoice records
+            List<Object[]> productionInvoices = database.getAllProductionInvoices();
+            for (Object[] invoice : productionInvoices) {
+                String invoiceDate = (String) invoice[1]; // production_date
+                
+                // Check if date falls within range
+                if (isDateInRange(invoiceDate, startDate, endDate)) {
+                    int invoiceId = (Integer) invoice[0];
+                    String notes = (String) invoice[2];
+                    String productName = (String) invoice[3];
+                    double quantity = ((Number) invoice[4]).doubleValue();
+                    
+                    // Get additional details for production items
+                    try {
+                        List<Object[]> productionItems = sqliteDatabase.getProductionItemsByInvoiceId(invoiceId);
+                        for (Object[] item : productionItems) {
+                            String itemProductName = (String) item[1];
+                            String brandName = (String) item[2];
+                            double itemQuantity = ((Number) item[3]).doubleValue();
+                            double unitCost = ((Number) item[4]).doubleValue();
+                            
+                            records.add(new UsageReportRecord(
+                                invoiceDate,
+                                "Production",
+                                "PROD-" + invoiceId,
+                                itemProductName,
+                                brandName,
+                                itemQuantity,
+                                notes != null ? notes : "Production",
+                                unitCost,
+                                itemQuantity * unitCost
+                            ));
+                            productionCount++;
+                        }
+                    } catch (Exception e) {
+                        // Fallback - use invoice level data
+                        records.add(new UsageReportRecord(
+                            invoiceDate,
+                            "Production",
+                            "PROD-" + invoiceId,
+                            productName,
+                            "Unknown",
+                            quantity,
+                            notes != null ? notes : "Production",
+                            0.0,
+                            0.0
+                        ));
+                        productionCount++;
+                    }
+                }
+            }
+            
+            // Load Raw Stock Use Invoice records
+            List<Object[]> rawUseInvoices = database.getAllRawStockUseInvoices();
+            for (Object[] invoice : rawUseInvoices) {
+                String useInvoiceNumber = (String) invoice[0];
+                String usageDate = (String) invoice[1];
+                double totalUsageAmount = ((Number) invoice[2]).doubleValue();
+                String referencePurpose = (String) invoice[3];
+                
+                // Check if date falls within range
+                if (isDateInRange(usageDate, startDate, endDate)) {
+                    // For raw usage, we need to get the individual items
+                    // Since we don't have a method to get raw usage items by invoice number,
+                    // we'll show the invoice summary for now
+                    records.add(new UsageReportRecord(
+                        usageDate,
+                        "Raw Usage",
+                        useInvoiceNumber,
+                        "Mixed Raw Materials",
+                        "Various",
+                        1.0, // placeholder quantity
+                        referencePurpose != null ? referencePurpose : "Raw material usage",
+                        totalUsageAmount,
+                        totalUsageAmount
+                    ));
+                    rawUsageCount++;
+                }
+            }
+            
+            // Sort records by date (most recent first)
+            records.sort((r1, r2) -> r2.getDate().compareTo(r1.getDate()));
+            
+            // Update table
+            table.setItems(records);
+            
+            // Update summary labels
+            totalRecordsLabel.setText("Total Records: " + records.size());
+            productionRecordsLabel.setText("Production Records: " + productionCount);
+            rawUsageRecordsLabel.setText("Raw Usage Records: " + rawUsageCount);
+            
+        } catch (Exception e) {
+            System.err.println("Error loading usage report data: " + e.getMessage());
+            e.printStackTrace();
+            showAlert("Database Error", "Failed to load usage report data: " + e.getMessage());
+            
+            // Reset summary labels on error
+            totalRecordsLabel.setText("Total Records: 0");
+            productionRecordsLabel.setText("Production Records: 0");
+            rawUsageRecordsLabel.setText("Raw Usage Records: 0");
+        }
+    }
+    
+    // Helper method to check if a date falls within the specified range
+    private static boolean isDateInRange(String dateStr, String startDate, String endDate) {
+        try {
+            LocalDate date = LocalDate.parse(dateStr, DATE_FORMATTER);
+            LocalDate start = LocalDate.parse(startDate, DATE_FORMATTER);
+            LocalDate end = LocalDate.parse(endDate, DATE_FORMATTER);
+            
+            return !date.isBefore(start) && !date.isAfter(end);
+        } catch (Exception e) {
+            System.err.println("Error parsing date: " + dateStr);
+            return false;
+        }
+    }
+
+    // Data model class for usage report records
+    private static class UsageReportRecord {
+        private final String date;
+        private final String type;
+        private final String invoiceNumber;
+        private final String itemName;
+        private final String brand;
+        private final double quantity;
+        private final String purpose;
+        private final double unitCost;
+        private final double totalValue;
+        
+        public UsageReportRecord(String date, String type, String invoiceNumber, String itemName, String brand,
+                               double quantity, String purpose, double unitCost, double totalValue) {
+            this.date = date;
+            this.type = type;
+            this.invoiceNumber = invoiceNumber;
+            this.itemName = itemName;
+            this.brand = brand;
+            this.quantity = quantity;
+            this.purpose = purpose;
+            this.unitCost = unitCost;
+            this.totalValue = totalValue;
+        }
+        
+        // Getters
+        public String getDate() { return date; }
+        public String getType() { return type; }
+        public String getInvoiceNumber() { return invoiceNumber; }
+        public String getItemName() { return itemName; }
+        public String getBrand() { return brand; }
+        public double getQuantity() { return quantity; }
+        public String getPurpose() { return purpose; }
+        public double getUnitCost() { return unitCost; }
+        public double getTotalValue() { return totalValue; }
     }
 
     private static ListView<String> createEnhancedListView() {
