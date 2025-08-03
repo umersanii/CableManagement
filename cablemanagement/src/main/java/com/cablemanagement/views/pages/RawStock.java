@@ -1039,11 +1039,89 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         itemButtonsBox.getChildren().addAll(addItemBtn, removeItemBtn);
 
         // Submit button
-        Button submitBtn = createSubmitButton("Submit Use Invoice");
-        submitBtn.setOnAction(e -> handleRawStockUseInvoiceSubmit(
-            invoiceNumberField, usageDatePicker, referencePurposeField,
-            selectedItemsTable, totalLabel
-        ));
+        Button submitBtn = createSubmitButton("Print Use Invoice");
+        submitBtn.setOnAction(e -> {
+            try {
+                // Validate inputs
+                if (selectedItemsTable.getItems().isEmpty()) {
+                    showAlert(Alert.AlertType.ERROR, "Validation Error", "Please select at least one item to use");
+                    return;
+                }
+
+                String invoiceNumber = invoiceNumberField.getText();
+                String usageDate = usageDatePicker.getValue().format(DATE_FORMATTER);
+                String referencePurpose = referencePurposeField.getText().trim();
+                
+                // Calculate total amount
+                double totalAmount = selectedItemsTable.getItems().stream()
+                        .mapToDouble(item -> item.getQuantityUsed() * item.getUnitCost())
+                        .sum();
+
+                // First, save the invoice to database
+                int invoiceId = database.insertRawStockUseInvoiceAndGetId(invoiceNumber, usageDate, totalAmount, referencePurpose);
+                
+                if (invoiceId > 0) {
+                    List<RawStockUseItem> items = new ArrayList<>(selectedItemsTable.getItems());
+                    boolean itemsInserted = database.insertRawStockUseInvoiceItems(invoiceId, items);
+                    
+                    if (itemsInserted) {
+                        // Prepare items for printing
+                        List<Item> printItems = new ArrayList<>();
+                        for (RawStockUseItem item : items) {
+                            printItems.add(new Item(
+                                item.getRawStockName(),
+                                (int)Math.floor(item.getQuantityUsed()),
+                                item.getUnitCost(),
+                                0.0  // No discount for use items
+                            ));
+                        }
+
+                        // Create invoice data for printing
+                        InvoiceData invoiceData = new InvoiceData(
+                            invoiceNumber,  // Invoice number
+                            usageDate,      // Date
+                            "STOCK USAGE INVOICE", // Title instead of supplier name
+                            String.format("Reference/Purpose: %s\nTotal Usage Amount: %.2f", 
+                                referencePurpose, totalAmount),  // Purpose as address field
+                            0.0,  // No discount for usage
+                            printItems
+                        );
+
+                        // Try to open invoice for print preview first
+                        boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Stock Usage");
+                        
+                        if (previewSuccess) {
+                            showAlert(Alert.AlertType.INFORMATION, "Success", 
+                                String.format("Raw Stock Use Invoice %s created successfully!\nTotal Amount: %.2f\n\nThe invoice has been opened for preview.", 
+                                invoiceNumber, totalAmount));
+                            clearUseInvoiceForm(invoiceNumberField, usageDatePicker, referencePurposeField, 
+                                              selectedItemsTable, totalLabel);
+                        } else {
+                            // Fallback to printer selection if preview fails
+                            boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Stock Usage");
+                            if (printSuccess) {
+                                showAlert(Alert.AlertType.INFORMATION, "Success", 
+                                    String.format("Raw Stock Use Invoice %s created and printed successfully!\nTotal Amount: %.2f", 
+                                    invoiceNumber, totalAmount));
+                                clearUseInvoiceForm(invoiceNumberField, usageDatePicker, referencePurposeField, 
+                                                  selectedItemsTable, totalLabel);
+                            } else {
+                                showAlert(Alert.AlertType.WARNING, "Partial Success", 
+                                    String.format("Raw Stock Use Invoice %s created but printing failed.\nTotal Amount: %.2f\nYou can print it later from the records.", 
+                                    invoiceNumber, totalAmount));
+                            }
+                        }
+                    } else {
+                        showAlert(Alert.AlertType.ERROR, "Database Error", "Failed to save invoice items.");
+                    }
+                } else {
+                    showAlert(Alert.AlertType.ERROR, "Database Error", "Failed to create invoice.");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                showAlert(Alert.AlertType.ERROR, "Error", "An error occurred: " + ex.getMessage());
+            }
+        });
 
         // Add all components to form
         form.getChildren().addAll(
@@ -2172,8 +2250,49 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                         boolean itemsInserted = database.insertRawStockUseInvoiceItems(invoiceId, items);
                         
                         if (itemsInserted) {
-                            showAlert(Alert.AlertType.INFORMATION, "Success", 
-                                "Raw Stock Use Invoice created successfully!\nInvoice Number: " + retryInvoiceNumber);
+                            // Prepare items for printing
+                            List<Item> printItems = new ArrayList<>();
+                            for (RawStockUseItem item : items) {
+                                printItems.add(new Item(
+                                    item.getRawStockName(),
+                                    (int)Math.floor(item.getQuantityUsed()),
+                                    item.getUnitCost(),
+                                    0.0  // No discount for use items
+                                ));
+                            }
+
+                            // Create invoice data for printing
+                            InvoiceData invoiceData = new InvoiceData(
+                                retryInvoiceNumber,
+                                usageDate,
+                                "Raw Stock Usage",
+                                "Reference/Purpose: " + referencePurpose,
+                                0.0,
+                                printItems
+                            );
+
+                            // Try to open invoice for print preview first
+                            boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Stock Usage");
+                            
+                            if (previewSuccess) {
+                                showAlert(Alert.AlertType.INFORMATION, "Success", 
+                                    String.format("Raw Stock Use Invoice %s created successfully!\nTotal Amount: %.2f\n\nThe invoice has been opened for preview.", 
+                                    retryInvoiceNumber, totalAmount));
+                            } else {
+                                // If preview fails, try direct printing
+                                boolean printSuccess = PrintManager.printInvoice(invoiceData, "Stock Usage", true);
+                                if (printSuccess) {
+                                    showAlert(Alert.AlertType.INFORMATION, "Success", 
+                                        String.format("Raw Stock Use Invoice %s created and printed successfully!\nTotal Amount: %.2f", 
+                                        retryInvoiceNumber, totalAmount));
+                                } else {
+                                    showAlert(Alert.AlertType.WARNING, "Partial Success", 
+                                        String.format("Raw Stock Use Invoice %s created but printing failed.\nTotal Amount: %.2f\nYou can print it later from the records.", 
+                                        retryInvoiceNumber, totalAmount));
+                                }
+                            }
+
+                            // Clear form after successful creation and print attempt
                             clearUseInvoiceForm(invoiceNumberField, usageDatePicker, referencePurposeField, 
                                               selectedItemsTable, totalLabel);
                         } else {

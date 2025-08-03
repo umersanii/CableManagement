@@ -441,9 +441,129 @@ public class SQLiteDatabase implements db {
         }
     }
 
+    private void initializeViews() {
+        try {
+            // First ensure the Views directory exists in the database
+            ensureViewsExist();
+            
+            // Drop and recreate View_Purchase_Book
+            connection.createStatement().execute("DROP VIEW IF EXISTS View_Purchase_Book");
+            
+            // Create detailed view with item-level data
+            String sql = "CREATE VIEW View_Purchase_Book AS " +
+                       "SELECT " +
+                       "    rpi.raw_purchase_invoice_id, " +
+                       "    rpi.invoice_number, " +
+                       "    s.supplier_name, " +
+                       "    rpi.invoice_date, " +
+                       "    rs.item_name, " +
+                       "    b.brand_name, " +
+                       "    m.manufacturer_name, " +
+                       "    rpii.quantity, " +
+                       "    rpii.unit_price, " +
+                       "    (rpii.quantity * rpii.unit_price) AS item_total, " +
+                       "    rpi.total_amount, " +
+                       "    rpi.discount_amount, " +
+                       "    rpi.paid_amount, " +
+                       "    (rpi.total_amount - rpi.paid_amount) AS balance " +
+                       "FROM Raw_Purchase_Invoice rpi " +
+                       "JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
+                       "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
+                       "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                       "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                       "JOIN Manufacturer m ON b.manufacturer_id = m.manufacturer_id";
+            connection.createStatement().execute(sql);
+
+            // Drop and recreate View_Production_Book
+            connection.createStatement().execute("DROP VIEW IF EXISTS View_Production_Book");
+            
+            // Create production view
+            sql = "CREATE VIEW View_Production_Book AS " +
+                 "SELECT " +
+                 "    pi.production_invoice_id, " +
+                 "    pi.production_date, " +
+                 "    ps.product_name, " +
+                 "    pii.quantity_produced AS quantity, " +
+                 "    ps.unit_cost, " +
+                 "    (pii.quantity_produced * ps.unit_cost) AS total_cost, " +
+                 "    b.brand_name, " +
+                 "    m.manufacturer_name, " +
+                 "    pi.notes " +
+                 "FROM Production_Invoice pi " +
+                 "JOIN Production_Invoice_Item pii ON pi.production_invoice_id = pii.production_invoice_id " +
+                 "JOIN ProductionStock ps ON pii.production_id = ps.production_id " +
+                 "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                 "JOIN Manufacturer m ON b.manufacturer_id = m.manufacturer_id";
+            connection.createStatement().execute(sql);
+            System.out.println("Successfully created View_Production_Book view");
+            
+            // Drop and recreate View_Return_Purchase_Book
+            connection.createStatement().execute("DROP VIEW IF EXISTS View_Return_Purchase_Book");
+            
+            // Create return purchases view with same column structure as View_Purchase_Book
+            sql = "CREATE VIEW View_Return_Purchase_Book AS " +
+                 "SELECT " +
+                 "    rpri.raw_purchase_return_invoice_id AS raw_purchase_invoice_id, " +
+                 "    rpri.return_invoice_number AS invoice_number, " +
+                 "    s.supplier_name, " +
+                 "    rpri.return_date AS invoice_date, " +
+                 "    rs.item_name, " +
+                 "    b.brand_name, " +
+                 "    m.manufacturer_name, " +
+                 "    rprii.quantity AS quantity, " +
+                 "    rprii.unit_price, " +
+                 "    (rprii.quantity * rprii.unit_price) AS item_total, " +
+                 "    rpri.total_return_amount AS total_amount, " +
+                 "    0 AS discount_amount, " +  // Return invoices don't have discounts
+                 "    rpri.total_return_amount AS paid_amount, " + // Full amount is considered paid in returns
+                 "    0 AS balance " +  // No balance in returns
+                 "FROM Raw_Purchase_Return_Invoice rpri " +
+                 "JOIN Supplier s ON rpri.supplier_id = s.supplier_id " +
+                 "JOIN Raw_Purchase_Return_Invoice_Item rprii ON rpri.raw_purchase_return_invoice_id = rprii.raw_purchase_return_invoice_id " +
+                 "JOIN Raw_Stock rs ON rprii.raw_stock_id = rs.stock_id " +
+                 "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                 "JOIN Manufacturer m ON b.manufacturer_id = m.manufacturer_id";
+            connection.createStatement().execute(sql);
+            System.out.println("Successfully created View_Return_Purchase_Book view");
+            
+            // Drop and recreate View_Return_Production_Book
+            connection.createStatement().execute("DROP VIEW IF EXISTS View_Return_Production_Book");
+            
+            // Create return production view
+            sql = "CREATE VIEW View_Return_Production_Book AS " +
+                 "SELECT " +
+                 "    pri.production_return_invoice_id, " +
+                 "    pri.return_invoice_number, " +
+                 "    pri.return_date, " +
+                 "    prii.quantity_returned AS quantity, " +
+                 "    prii.unit_cost, " +
+                 "    prii.total_cost, " +
+                 "    ps.product_name, " +
+                 "    b.brand_name, " +
+                 "    m.manufacturer_name, " +
+                 "    pri.notes " +
+                 "FROM Production_Return_Invoice pri " +
+                 "JOIN Production_Return_Invoice_Item prii ON pri.production_return_invoice_id = prii.production_return_invoice_id " +
+                 "JOIN ProductionStock ps ON prii.production_id = ps.production_id " +
+                 "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                 "JOIN Manufacturer m ON b.manufacturer_id = m.manufacturer_id";
+            connection.createStatement().execute(sql);
+            System.out.println("Successfully created View_Return_Production_Book view");
+            
+            System.out.println("All database views initialized successfully");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            System.err.println("Error initializing views: " + e.getMessage());
+            throw new RuntimeException("Failed to initialize database views", e);
+        }
+    }
+
     private void initializeDatabase() {
         try {
             Statement stmt = connection.createStatement();
+            
+            // Enable foreign keys
+            stmt.execute("PRAGMA foreign_keys = ON");
             
             // Create all required tables based on the schema
                 String[] createTableQueries = {
@@ -836,6 +956,9 @@ public class SQLiteDatabase implements db {
             
             stmt.close();
             System.out.println("Database initialized successfully with all required tables.");
+            
+            // Initialize views after tables are created
+            initializeViews();
             
         } catch (SQLException e) {
             System.err.println("Error initializing database: " + e.getMessage());
@@ -1275,19 +1398,75 @@ public class SQLiteDatabase implements db {
         
     @Override
     public boolean insertBrand(String name, String province, String district, String tehsil) {
-        // For now, use a simple approach since Brand table doesn't have tehsil_id
-        // We'll just use the first available manufacturer or default manufacturer
-        String insertQuery = "INSERT INTO Brand (brand_name, manufacturer_id) VALUES (?, ?)";
-        
-        try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
-            insertStmt.setString(1, name);
-            insertStmt.setInt(2, 1); // Use default manufacturer_id = 1
+        try {
+            connection.setAutoCommit(false);
             
-            return insertStmt.executeUpdate() > 0;
+            // First ensure default province exists
+            String checkProvinceQuery = "SELECT province_id FROM Province WHERE province_id = 1";
+            try (Statement stmt = connection.createStatement()) {
+                ResultSet rs = stmt.executeQuery(checkProvinceQuery);
+                if (!rs.next()) {
+                    String createDefaultProvince = "INSERT INTO Province (province_id, province_name) VALUES (1, 'Default Province')";
+                    stmt.executeUpdate(createDefaultProvince);
+                }
+            }
+            
+            // Ensure default district exists
+            String checkDistrictQuery = "SELECT district_id FROM District WHERE district_id = 1";
+            try (Statement stmt = connection.createStatement()) {
+                ResultSet rs = stmt.executeQuery(checkDistrictQuery);
+                if (!rs.next()) {
+                    String createDefaultDistrict = "INSERT INTO District (district_id, district_name, province_id) VALUES (1, 'Default District', 1)";
+                    stmt.executeUpdate(createDefaultDistrict);
+                }
+            }
+            
+            // Ensure default tehsil exists
+            String checkTehsilQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_id = 1";
+            try (Statement stmt = connection.createStatement()) {
+                ResultSet rs = stmt.executeQuery(checkTehsilQuery);
+                if (!rs.next()) {
+                    String createDefaultTehsil = "INSERT INTO Tehsil (tehsil_id, tehsil_name, district_id) VALUES (1, 'Default Tehsil', 1)";
+                    stmt.executeUpdate(createDefaultTehsil);
+                }
+            }
+
+            // Ensure default manufacturer exists
+            String checkManufacturerQuery = "SELECT manufacturer_id FROM Manufacturer WHERE manufacturer_id = 1";
+            try (Statement stmt = connection.createStatement()) {
+                ResultSet rs = stmt.executeQuery(checkManufacturerQuery);
+                if (!rs.next()) {
+                    String createDefaultManufacturer = "INSERT INTO Manufacturer (manufacturer_id, manufacturer_name, tehsil_id) VALUES (1, 'Default Manufacturer', 1)";
+                    stmt.executeUpdate(createDefaultManufacturer);
+                }
+            }
+
+            // Now insert the brand using default manufacturer
+            String insertQuery = "INSERT INTO Brand (brand_name, manufacturer_id) VALUES (?, ?)";
+            try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+                insertStmt.setString(1, name);
+                insertStmt.setInt(2, 1); // Use default manufacturer_id = 1
+                
+                boolean result = insertStmt.executeUpdate() > 0;
+                connection.commit();
+                return result;
+            }
         } catch (SQLException e) {
+            try {
+                connection.rollback();
+            } catch (SQLException rollbackEx) {
+                System.err.println("Error rolling back transaction: " + rollbackEx.getMessage());
+            }
+            System.err.println("Error inserting brand: " + e.getMessage());
             e.printStackTrace();
+            return false;
+        } finally {
+            try {
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                System.err.println("Error resetting auto-commit: " + e.getMessage());
+            }
         }
-        return false;
     }
 
     @Override
