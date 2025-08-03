@@ -123,69 +123,57 @@ public class BankManagementContent {
 }
 
 private static BankTransaction createTransactionFromRow(Object[] row, boolean isBankTransaction) {
-    if (row == null || row.length < 4) { // Minimum: id, date, type, amount
+    if (row == null || row.length < 4) { // Minimum: date, type, amount, description
         System.err.println("Invalid row data - expected at least 4 columns, got " + 
                          (row == null ? "null" : row.length));
         return null;
     }
 
     try {
-        // Map columns according to your database structure
-        int id = safeParseInt(row[0]);
-        String date = row[1] != null ? row[1].toString() : LocalDate.now().toString();
-        String type = row[2] != null ? row[2].toString() : "unknown";
-        double amount = safeParseDouble(row[3]);
-        
-        // Optional columns
-        String description = row.length > 4 && row[4] != null ? row[4].toString() : "";
-        
-        // For cash transactions, bankId and relatedBankId are not in the database
-        int bankId = 0; // Default for cash transactions
-        int relatedBankId = type.equals("transfer_from_bank") ? 1 : 0; // Adjust as needed
-        
-        return new BankTransaction(id, bankId, date, type, amount, description, relatedBankId);
+        if (isBankTransaction) {
+            // Bank transaction format: [transaction_date, bank_name, transaction_type, amount, description]
+            String date = row[0] != null ? row[0].toString() : LocalDate.now().toString();
+            String bankName = row[1] != null ? row[1].toString() : "";
+            String type = row[2] != null ? row[2].toString() : "unknown";
+            double amount = safeParseDouble(row[3]);
+            String description = row.length > 4 && row[4] != null ? row[4].toString() : "";
+            
+            // Find bank ID from bank name
+            int bankId = findBankIdByName(bankName);
+            
+            return new BankTransaction(0, bankId, date, type, amount, description, 0);
+        } else {
+            // Cash transaction format: [date, transaction_type, amount, description, source]
+            String date = row[0] != null ? row[0].toString() : LocalDate.now().toString();
+            String type = row[1] != null ? row[1].toString() : "unknown";
+            double amount = safeParseDouble(row[2]);
+            String description = row.length > 3 && row[3] != null ? row[3].toString() : "";
+            
+            // For cash transactions, bankId is 0
+            int bankId = 0;
+            int relatedBankId = 0;
+            
+            // If it's a transfer involving a bank, try to find the related bank
+            if (type.equals("transfer_from_bank") || type.equals("transfer_to_bank")) {
+                // You might need to parse the description or have additional logic to find the related bank
+                relatedBankId = 0; // For now, set to 0 but could be enhanced
+            }
+            
+            return new BankTransaction(0, bankId, date, type, amount, description, relatedBankId);
+        }
     } catch (Exception e) {
         System.err.println("Error creating transaction from row: " + e.getMessage());
         return null;
     }
 }
 
-private static String normalizeTransactionType(String type, boolean isBankTransaction) {
-    if (type == null) return "other";
-    
-    String lowerType = type.toLowerCase();
-    if (isBankTransaction) {
-        switch (lowerType) {
-            case "deposit":
-            case "withdraw":
-            case "transfer_in":
-            case "transfer_out":
-                return lowerType;
-            default:
-                return "other";
-        }
-    } else {
-        switch (lowerType) {
-            case "transfer_from_bank":
-            case "cash_in":
-            case "cash_out":
-                return lowerType;
-            default:
-                return "other";
+private static int findBankIdByName(String bankName) {
+    for (Bank bank : registeredBanks) {
+        if (bank.getBankName().equals(bankName)) {
+            return bank.getBankId();
         }
     }
-}
-
-private static int safeParseInt(Object value) {
-    if (value == null) return 0;
-    try {
-        if (value instanceof Number) {
-            return ((Number) value).intValue();
-        }
-        return Integer.parseInt(value.toString());
-    } catch (NumberFormatException e) {
-        return 0;
-    }
+    return 0; // Return 0 if bank not found
 }
 
 private static double safeParseDouble(Object value) {
@@ -320,7 +308,6 @@ private static double safeParseDouble(Object value) {
             String accNum = accountNumberField.getText().trim();
 
             if (!name.isEmpty() && !accNum.isEmpty()) {
-                Bank bank = new Bank(0, name, branch, accNum, 0.0);
                 if (config.database != null && config.database.isConnected()) {
                     if (config.database.insertBank(name, branch, accNum)) {
                         // Optionally, fetch the new bank's ID and balance from DB if needed
@@ -853,89 +840,6 @@ private static double safeParseDouble(Object value) {
         });
 
         return form;
-    }
-
-    private static TableView<BankTransaction> createCashTransactionsTable() {
-        TableView<BankTransaction> table = new TableView<>();
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        table.setPrefHeight(300);
-
-        // Date Column
-        TableColumn<BankTransaction, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(cell -> {
-            String dateStr = cell.getValue().getTransactionDate();
-            try {
-                LocalDate date = LocalDate.parse(dateStr);
-                return new ReadOnlyStringWrapper(date.format(DateTimeFormatter.ofPattern("dd-MMM-yyyy")));
-            } catch (Exception e) {
-                return new ReadOnlyStringWrapper(dateStr);
-            }
-        });
-        dateCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
-
-        // Type Column
-        TableColumn<BankTransaction, String> typeCol = new TableColumn<>("Type");
-        typeCol.setCellValueFactory(cell -> {
-            String type = cell.getValue().getTransactionType();
-            String displayType = type.replace("_", " ");
-            return new ReadOnlyStringWrapper(displayType.substring(0, 1).toUpperCase() + displayType.substring(1));
-        });
-        typeCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
-
-        // Amount Column
-        TableColumn<BankTransaction, String> amountCol = new TableColumn<>("Amount");
-        amountCol.setCellValueFactory(cell -> {
-            double amount = cell.getValue().getAmount();
-            String type = cell.getValue().getTransactionType();
-            String sign = type.equals("cash_out") ? "-" : "+";
-            return new ReadOnlyStringWrapper(String.format("%s Rs. %,.2f", sign, amount));
-        });
-        amountCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
-
-        // Description Column
-        TableColumn<BankTransaction, String> descCol = new TableColumn<>("Description");
-        descCol.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().getDescription()));
-        descCol.prefWidthProperty().bind(table.widthProperty().multiply(0.35));
-
-        // Actions Column
-        TableColumn<BankTransaction, Void> actionsCol = new TableColumn<>("Actions");
-        actionsCol.setCellFactory(col -> new TableCell<>() {
-            private final Button editButton = new Button("Edit");
-            private final Button deleteButton = new Button("Delete");
-
-            {
-                editButton.getStyleClass().add("button");
-                deleteButton.getStyleClass().add("delete-button");
-                editButton.setStyle("-fx-font-size: 11px; -fx-padding: 3 8 3 8;");
-                deleteButton.setStyle("-fx-font-size: 11px; -fx-padding: 3 8 3 8;");
-
-                editButton.setOnAction(e -> {
-                    BankTransaction selected = getTableView().getItems().get(getIndex());
-                    editCashTransaction(selected);
-                });
-
-                deleteButton.setOnAction(e -> {
-                    BankTransaction selected = getTableView().getItems().get(getIndex());
-                    deleteCashTransaction(selected, table);
-                });
-            }
-
-            @Override
-            protected void updateItem(Void item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty) {
-                    setGraphic(null);
-                } else {
-                    HBox buttons = new HBox(5, editButton, deleteButton);
-                    buttons.setAlignment(Pos.CENTER);
-                    setGraphic(buttons);
-                }
-            }
-        });
-        actionsCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
-
-        table.getColumns().addAll(dateCol, typeCol, amountCol, descCol, actionsCol);
-        return table;
     }
 
     private static boolean validateCashTransactionForm(ComboBox<String> type, TextField amount, 
