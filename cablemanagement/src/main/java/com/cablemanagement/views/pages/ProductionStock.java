@@ -682,7 +682,7 @@ public class ProductionStock {
                     }
                     
                     // Create invoice data for printing
-                    String title = "Production Return Invoice";
+                    String title = "Production Return";
                     String address = notes != null && !notes.isEmpty() ? notes : "Return Production Items";
                     InvoiceData invoiceData = new InvoiceData(
                         returnInvoiceNumber,

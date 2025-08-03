@@ -513,16 +513,16 @@ private static TableView<PurchaseRecord> createPurchaseTable(ObservableList<Purc
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         TableColumn<ProductionRecord, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(new PropertyValueFactory<>("date"));
+        dateCol.setCellValueFactory(cellData -> cellData.getValue().dateProperty());
 
         TableColumn<ProductionRecord, String> productCol = new TableColumn<>("Product");
-        productCol.setCellValueFactory(new PropertyValueFactory<>("product"));
+        productCol.setCellValueFactory(cellData -> cellData.getValue().productProperty());
 
         TableColumn<ProductionRecord, Double> qtyCol = new TableColumn<>("Quantity");
-        qtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
+        qtyCol.setCellValueFactory(cellData -> cellData.getValue().quantityProperty().asObject());
 
         TableColumn<ProductionRecord, String> notesCol = new TableColumn<>("Notes");
-        notesCol.setCellValueFactory(new PropertyValueFactory<>("notes"));
+        notesCol.setCellValueFactory(cellData -> cellData.getValue().notesProperty());
 
         table.getColumns().addAll(dateCol, productCol, qtyCol, notesCol);
         table.setItems(data);
@@ -535,13 +535,13 @@ private static TableView<PurchaseRecord> createPurchaseTable(ObservableList<Purc
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         TableColumn<ReturnProductionRecord, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(new PropertyValueFactory<>("date"));
+        dateCol.setCellValueFactory(cellData -> cellData.getValue().dateProperty());
 
         TableColumn<ReturnProductionRecord, String> refCol = new TableColumn<>("Reference");
-        refCol.setCellValueFactory(new PropertyValueFactory<>("reference"));
+        refCol.setCellValueFactory(cellData -> cellData.getValue().referenceProperty());
 
         TableColumn<ReturnProductionRecord, Double> qtyCol = new TableColumn<>("Quantity");
-        qtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
+        qtyCol.setCellValueFactory(cellData -> cellData.getValue().quantityProperty().asObject());
 
         table.getColumns().addAll(dateCol, refCol, qtyCol);
         table.setItems(data);
@@ -770,21 +770,37 @@ private static void loadReturnPurchaseData(TableView<ReturnPurchaseRecord> table
         }
 
         Map<String, String> filters = new HashMap<>();
-        if (fromDate.getValue() != null) filters.put("production_date", ">= '" + fromDate.getValue().format(DATE_FORMATTER) + "'");
-        if (toDate.getValue() != null) filters.put("production_date", "<= '" + toDate.getValue().format(DATE_FORMATTER) + "'");
+        if (fromDate.getValue() != null) {
+            filters.put("production_date", fromDate.getValue().format(DATE_FORMATTER));
+            System.out.println("From date filter: " + fromDate.getValue().format(DATE_FORMATTER));
+        }
+        if (toDate.getValue() != null) {
+            filters.put("production_date", toDate.getValue().format(DATE_FORMATTER));
+            System.out.println("To date filter: " + toDate.getValue().format(DATE_FORMATTER));
+        }
         if (productFilter.getValue() != null && !productFilter.getValue().equals("All Products")) {
-            filters.put("production_stock_name", "= '" + productFilter.getValue() + "'");
+            filters.put("product_name", productFilter.getValue());
+            System.out.println("Product filter: " + productFilter.getValue());
         }
 
+        System.out.println("Executing query for View_Production_Book");
+        // Use production_date instead of date in the filter
         List<Object[]> rows = config.database.getViewData("View_Production_Book", filters);
+        System.out.println("Retrieved " + (rows != null ? rows.size() : 0) + " rows from View_Production_Book");
+        
         ObservableList<ProductionRecord> data = FXCollections.observableArrayList();
-        for (Object[] row : rows) {
-            data.add(new ProductionRecord(
-                row[0] != null ? row[0].toString() : "",
-                row[1] != null ? row[1].toString() : "",
-                row[2] != null ? Double.parseDouble(row[2].toString()) : 0.0,
-                row[3] != null ? row[3].toString() : ""
-            ));
+        if (rows != null) {
+            for (Object[] row : rows) {
+                if (row != null) {
+                    System.out.println("Processing row: " + java.util.Arrays.toString(row));
+                    data.add(new ProductionRecord(
+                        row[1] != null ? row[1].toString() : "", // production_date
+                        row[2] != null ? row[2].toString() : "", // product_name
+                        row[3] != null ? Double.parseDouble(row[3].toString()) : 0.0, // quantity_produced
+                        row[8] != null ? row[8].toString() : "" // notes
+                    ));
+                }
+            }
         }
         table.setItems(data);
     }
@@ -796,17 +812,32 @@ private static void loadReturnPurchaseData(TableView<ReturnPurchaseRecord> table
         }
 
         Map<String, String> filters = new HashMap<>();
-        if (fromDate.getValue() != null) filters.put("return_date", ">= '" + fromDate.getValue().format(DATE_FORMATTER) + "'");
-        if (toDate.getValue() != null) filters.put("return_date", "<= '" + toDate.getValue().format(DATE_FORMATTER) + "'");
+        if (fromDate.getValue() != null) {
+            filters.put("return_date", fromDate.getValue().format(DATE_FORMATTER));
+            System.out.println("From date filter: " + fromDate.getValue().format(DATE_FORMATTER));
+        }
+        if (toDate.getValue() != null) {
+            filters.put("return_date", toDate.getValue().format(DATE_FORMATTER));
+            System.out.println("To date filter: " + toDate.getValue().format(DATE_FORMATTER));
+        }
 
+        System.out.println("Loading return production data with filters: " + filters);
+        System.out.println("Executing query for View_Return_Production_Book");
         List<Object[]> rows = config.database.getViewData("View_Return_Production_Book", filters);
+        System.out.println("Retrieved " + (rows != null ? rows.size() : 0) + " rows from View_Return_Production_Book");
+
         ObservableList<ReturnProductionRecord> data = FXCollections.observableArrayList();
-        for (Object[] row : rows) {
-            data.add(new ReturnProductionRecord(
-                row[0] != null ? row[0].toString() : "",
-                row[1] != null ? row[1].toString() : "",
-                row[2] != null ? Double.parseDouble(row[2].toString()) : 0.0
-            ));
+        if (rows != null) {
+            for (Object[] row : rows) {
+                if (row != null) {
+                    System.out.println("Processing row: " + java.util.Arrays.toString(row));
+                    data.add(new ReturnProductionRecord(
+                        row[2] != null ? row[2].toString() : "", // return_date
+                        row[1] != null ? row[1].toString() : "", // return_invoice_number
+                        row[3] != null ? Double.parseDouble(row[3].toString()) : 0.0 // quantity_returned
+                    ));
+                }
+            }
         }
         table.setItems(data);
     }
