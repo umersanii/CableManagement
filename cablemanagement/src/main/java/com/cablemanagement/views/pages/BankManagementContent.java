@@ -6,6 +6,7 @@ import com.cablemanagement.model.BankTransaction;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -582,7 +583,7 @@ private static double safeParseDouble(Object value) {
             LocalDate date = datePicker.getValue();
 
             if (from != null && to != null && !amountText.isEmpty() && date != null) {
-                if (from.getBankId() == to.getBankId()) {
+                if (from.getBankName().equals(to.getBankName()) && from.getAccountNumber().equals(to.getAccountNumber())) {
                     showAlert("Error", "Cannot transfer to the same bank account!");
                     return;
                 }
@@ -1110,6 +1111,51 @@ private static double safeParseDouble(Object value) {
 private static VBox viewCashLedger() {
     VBox box = createSection("Cash Ledger", "Complete record of all cash and bank transactions");
     
+    // Filter controls
+    TextField searchField = new TextField();
+    searchField.setPromptText("Search by description...");
+    searchField.setPrefWidth(250);
+    searchField.getStyleClass().add("text-field");
+    
+    ComboBox<String> sourceFilter = new ComboBox<>();
+    sourceFilter.getItems().addAll("All Sources", "Cash Only", "Bank Only");
+    sourceFilter.setValue("All Sources");
+    sourceFilter.setPrefWidth(150);
+    sourceFilter.getStyleClass().add("combo-box");
+    
+    ComboBox<String> typeFilter = new ComboBox<>();
+    typeFilter.getItems().addAll("All Types", "Cash In", "Cash Out", "Transfer", "Deposit", "Withdraw");
+    typeFilter.setValue("All Types");
+    typeFilter.setPrefWidth(150);
+    typeFilter.getStyleClass().add("combo-box");
+    
+    DatePicker fromDatePicker = new DatePicker();
+    fromDatePicker.setPromptText("From Date");
+    fromDatePicker.setPrefWidth(150);
+    
+    DatePicker toDatePicker = new DatePicker();
+    toDatePicker.setPromptText("To Date");
+    toDatePicker.setPrefWidth(150);
+    
+    Button resetButton = new Button("Reset Filters");
+    resetButton.getStyleClass().add("button");
+    
+    HBox filterRow1 = new HBox(10, 
+        new VBox(5, new Label("Search:"), searchField),
+        new VBox(5, new Label("Source:"), sourceFilter),
+        new VBox(5, new Label("Type:"), typeFilter)
+    );
+    
+    HBox filterRow2 = new HBox(10, 
+        new VBox(5, new Label("From Date:"), fromDatePicker),
+        new VBox(5, new Label("To Date:"), toDatePicker),
+        new VBox(5, new Label(" "), resetButton)
+    );
+    
+    VBox filterContainer = new VBox(10, filterRow1, filterRow2);
+    filterContainer.setPadding(new Insets(0, 0, 20, 0));
+    
+    // Transaction table
     TableView<BankTransaction> ledgerTable = new TableView<>();
     ledgerTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
@@ -1127,15 +1173,103 @@ private static VBox viewCashLedger() {
 
     // Source Column
     TableColumn<BankTransaction, String> sourceCol = new TableColumn<>("Source");
-    sourceCol.setCellValueFactory(cell -> 
-        new ReadOnlyStringWrapper(cell.getValue().getBankId() == 0 ? "Cash" : "Bank"));
+    sourceCol.setCellValueFactory(cell -> {
+        // Determine source based on transaction type and bankId
+        BankTransaction txn = cell.getValue();
+        String type = txn.getTransactionType().toLowerCase();
+        int bankId = txn.getBankId();
+        
+        // Special handling for transfer cases
+        if (type.equals("transfer_from_bank")) {
+            return new ReadOnlyStringWrapper("Cash ← Bank");
+        } else if (type.equals("transfer_to_bank")) {
+            return new ReadOnlyStringWrapper("Cash → Bank");
+        } else if (type.equals("transfer_in")) {
+            return new ReadOnlyStringWrapper("Bank ← Bank");
+        } else if (type.equals("transfer_out")) {
+            return new ReadOnlyStringWrapper("Bank → Bank");
+        }
+        
+        // Handle standard cases
+        if (bankId == 0 || type.contains("cash")) {
+            return new ReadOnlyStringWrapper("Cash");
+        } else if (type.equals("deposit") || type.equals("withdraw")) {
+            return new ReadOnlyStringWrapper("Bank");
+        } else {
+            // For any other types, check bankId as fallback
+            return new ReadOnlyStringWrapper(bankId > 0 ? "Bank" : "Cash");
+        }
+    });
+
+    // Bank Name Column
+    TableColumn<BankTransaction, String> bankNameCol = new TableColumn<>("Bank Name");
+    bankNameCol.setCellValueFactory(cell -> {
+        BankTransaction txn = cell.getValue();
+        int bankId = txn.getBankId();
+        int relatedBankId = txn.getRelatedBankId();
+        String type = txn.getTransactionType().toLowerCase();
+        
+        // For cash transactions with no bank involvement
+        if (bankId == 0 && relatedBankId == 0) {
+            return new ReadOnlyStringWrapper("-");
+        }
+        
+        // For cash transactions involving bank transfers
+        if (bankId == 0 && relatedBankId > 0) {
+            if (type.equals("transfer_from_bank")) {
+                Bank bank = findBankById(relatedBankId);
+                return new ReadOnlyStringWrapper(bank != null ? bank.getBankName() : "Unknown Bank");
+            } else if (type.equals("transfer_to_bank")) {
+                Bank bank = findBankById(relatedBankId);
+                return new ReadOnlyStringWrapper(bank != null ? bank.getBankName() : "Unknown Bank");
+            }
+            return new ReadOnlyStringWrapper("-");
+        }
+        
+        // For bank transactions
+        Bank bank = findBankById(bankId);
+        String bankName = bank != null ? bank.getBankName() : "Unknown Bank";
+        
+        // If it's a transfer between banks, show both banks
+        if (type.equals("transfer_out") && relatedBankId > 0) {
+            Bank toBank = findBankById(relatedBankId);
+            return new ReadOnlyStringWrapper(bankName + " → " + (toBank != null ? toBank.getBankName() : "Unknown Bank"));
+        } else if (type.equals("transfer_in") && relatedBankId > 0) {
+            Bank fromBank = findBankById(relatedBankId);
+            return new ReadOnlyStringWrapper((fromBank != null ? fromBank.getBankName() : "Unknown Bank") + " → " + bankName);
+        }
+        
+        return new ReadOnlyStringWrapper(bankName);
+    });
 
     // Type Column
     TableColumn<BankTransaction, String> typeCol = new TableColumn<>("Type");
     typeCol.setCellValueFactory(cell -> {
-        String type = cell.getValue().getTransactionType();
-        type = type.replace("_", " ");
-        return new ReadOnlyStringWrapper(type.substring(0, 1).toUpperCase() + type.substring(1));
+        String type = cell.getValue().getTransactionType().toLowerCase();
+        
+        // Map internal transaction type names to user-friendly display names
+        switch (type) {
+            case "deposit": 
+                return new ReadOnlyStringWrapper("Deposit");
+            case "withdraw": 
+                return new ReadOnlyStringWrapper("Withdraw");
+            case "transfer_in": 
+                return new ReadOnlyStringWrapper("Transfer (In)");
+            case "transfer_out": 
+                return new ReadOnlyStringWrapper("Transfer (Out)");
+            case "transfer_to_bank": 
+                return new ReadOnlyStringWrapper("Transfer to Bank");
+            case "transfer_from_bank": 
+                return new ReadOnlyStringWrapper("Transfer from Bank");
+            case "cash_in": 
+                return new ReadOnlyStringWrapper("Cash In");
+            case "cash_out": 
+                return new ReadOnlyStringWrapper("Cash Out");
+            default:
+                // Fallback: Convert underscore to spaces and capitalize
+                type = type.replace("_", " ");
+                return new ReadOnlyStringWrapper(type.substring(0, 1).toUpperCase() + type.substring(1));
+        }
     });
 
     // Amount Column
@@ -1148,55 +1282,175 @@ private static VBox viewCashLedger() {
     descCol.setCellValueFactory(cell -> 
         new ReadOnlyStringWrapper(cell.getValue().getDescription()));
 
-    ledgerTable.getColumns().addAll(dateCol, sourceCol, typeCol, amountCol, descCol);
+    ledgerTable.getColumns().addAll(dateCol, sourceCol, bankNameCol, typeCol, amountCol, descCol);
     
-    // Load data
-    try {
-        List<Object[]> rawTransactions = config.database.getAllCashTransactions();
-        ObservableList<BankTransaction> transactions = FXCollections.observableArrayList();
-        
-        for (Object[] row : rawTransactions) {
-            BankTransaction transaction = new BankTransaction(
-                0, // transactionId
-                row[4].equals("bank") ? 1 : 0, // bankId (1 for bank, 0 for cash)
-                row[0].toString(), // date
-                row[1].toString(), // type
-                Double.parseDouble(row[2].toString()), // amount
-                row[3].toString(), // description
-                0  // relatedBankId
-            );
-            transactions.add(transaction);
-        }
-        
-        ledgerTable.setItems(transactions);
-    } catch (Exception e) {
-        System.err.println("Error loading transactions: " + e.getMessage());
-        showAlert("Error", "Failed to load transactions: " + e.getMessage());
+    // Load all transactions (bank and cash)
+    ObservableList<BankTransaction> allTransactions = FXCollections.observableArrayList();
+    
+    // Log bank transactions for debugging
+    System.out.println("Bank transactions loaded: " + bankTransactions.size());
+    for (BankTransaction bt : bankTransactions) {
+        System.out.println("Bank transaction: ID=" + bt.getBankId() + 
+                          ", Type=" + bt.getTransactionType() + 
+                          ", Amount=" + bt.getAmount() + 
+                          ", RelatedBank=" + bt.getRelatedBankId());
     }
-
-    box.getChildren().add(ledgerTable);
+    
+    // Log cash transactions for debugging
+    System.out.println("Cash transactions loaded: " + cashTransactions.size());
+    
+    // Make sure we have loaded the bank data
+    if (registeredBanks.isEmpty()) {
+        loadBanksFromDatabase();
+    }
+    
+    // Add transactions to the combined list
+    allTransactions.addAll(bankTransactions);
+    allTransactions.addAll(cashTransactions);
+    
+    // Sort by date (newest first)
+    allTransactions.sort((t1, t2) -> {
+        try {
+            LocalDate d1 = LocalDate.parse(t1.getTransactionDate());
+            LocalDate d2 = LocalDate.parse(t2.getTransactionDate());
+            return d2.compareTo(d1); // Descending order
+        } catch (Exception e) {
+            return 0;
+        }
+    });
+    
+    // Set the full dataset
+    ledgerTable.setItems(allTransactions);
+    
+    // Create filtered list for search and filtering
+    FilteredList<BankTransaction> filteredData = new FilteredList<>(allTransactions, p -> true);
+    
+    // Add listeners to all filter controls
+    searchField.textProperty().addListener((observable, oldValue, newValue) -> applyFilters(
+        filteredData, searchField.getText(), sourceFilter.getValue(), 
+        typeFilter.getValue(), fromDatePicker.getValue(), toDatePicker.getValue()
+    ));
+    
+    sourceFilter.valueProperty().addListener((observable, oldValue, newValue) -> applyFilters(
+        filteredData, searchField.getText(), sourceFilter.getValue(), 
+        typeFilter.getValue(), fromDatePicker.getValue(), toDatePicker.getValue()
+    ));
+    
+    typeFilter.valueProperty().addListener((observable, oldValue, newValue) -> applyFilters(
+        filteredData, searchField.getText(), sourceFilter.getValue(), 
+        typeFilter.getValue(), fromDatePicker.getValue(), toDatePicker.getValue()
+    ));
+    
+    fromDatePicker.valueProperty().addListener((observable, oldValue, newValue) -> applyFilters(
+        filteredData, searchField.getText(), sourceFilter.getValue(), 
+        typeFilter.getValue(), fromDatePicker.getValue(), toDatePicker.getValue()
+    ));
+    
+    toDatePicker.valueProperty().addListener((observable, oldValue, newValue) -> applyFilters(
+        filteredData, searchField.getText(), sourceFilter.getValue(), 
+        typeFilter.getValue(), fromDatePicker.getValue(), toDatePicker.getValue()
+    ));
+    
+    // Reset button action
+    resetButton.setOnAction(e -> {
+        searchField.clear();
+        sourceFilter.setValue("All Sources");
+        typeFilter.setValue("All Types");
+        fromDatePicker.setValue(null);
+        toDatePicker.setValue(null);
+        
+        // Explicitly reapply filters to reset the table view
+        applyFilters(
+            filteredData, null, "All Sources", "All Types", null, null
+        );
+    });
+    
+    // Connect filtered list to table
+    ledgerTable.setItems(filteredData);
+    
+    box.getChildren().addAll(filterContainer, ledgerTable);
     return box;
 }
-private static void loadCashTransactions(TableView<BankTransaction> table) {
-    ObservableList<BankTransaction> transactions = FXCollections.observableArrayList();
-    
-    if (config.database != null && config.database.isConnected()) {
-        List<Object[]> cashRows = config.database.getAllCashTransactions();
-        for (Object[] row : cashRows) {
-            try {
-                BankTransaction transaction = createTransactionFromRow(row, false);
-                if (transaction != null) {
-                    transactions.add(transaction);
-                    System.out.println("Loaded transaction: " + transaction);
+
+// Helper method for applying filters to the transaction list
+private static void applyFilters(FilteredList<BankTransaction> filteredData, String searchText, 
+                               String sourceFilter, String typeFilter, 
+                               LocalDate fromDate, LocalDate toDate) {
+    filteredData.setPredicate(transaction -> {
+        // If all filters are empty or default, show all items
+        boolean matchesSearch = searchText == null || searchText.isEmpty() || 
+                transaction.getDescription().toLowerCase().contains(searchText.toLowerCase());
+        
+        // Source filtering
+        boolean matchesSource = true;
+        if (sourceFilter != null && !sourceFilter.equals("All Sources")) {
+            String txnType = transaction.getTransactionType().toLowerCase();
+            int bankId = transaction.getBankId();
+            
+            if (sourceFilter.equals("Cash Only")) {
+                // Cash source: bankId = 0 OR transaction type is transfer_from_bank or contains "cash"
+                matchesSource = bankId == 0 || txnType.equals("transfer_from_bank") || txnType.contains("cash");
+                
+                // Special case: Exclude bank transactions even if they have a cash-related type
+                if (bankId > 0 && !txnType.equals("transfer_to_cash") && !txnType.equals("transfer_from_bank")) {
+                    matchesSource = false;
                 }
-            } catch (Exception e) {
-                System.err.println("Error processing cash transaction row: " + e.getMessage());
+            } else if (sourceFilter.equals("Bank Only")) {
+                // Bank source: bankId > 0 OR transaction type is bank-related
+                matchesSource = bankId > 0 || txnType.equals("deposit") || txnType.equals("withdraw") ||
+                               txnType.contains("transfer") && !txnType.contains("cash");
+                
+                // Special case: Exclude cash transactions even if they have a bank-related type
+                if (bankId == 0 && !txnType.equals("transfer_to_bank") && !txnType.contains("bank")) {
+                    matchesSource = false;
+                }
             }
         }
-    }
-    
-    table.setItems(transactions);
+        
+        // Type filtering
+        boolean matchesType = true;
+        if (typeFilter != null && !typeFilter.equals("All Types")) {
+            String txnType = transaction.getTransactionType().toLowerCase();
+            
+            switch (typeFilter) {
+                case "Cash In":
+                    matchesType = txnType.equals("cash_in") || txnType.equals("transfer_from_bank");
+                    break;
+                case "Cash Out":
+                    matchesType = txnType.equals("cash_out") || txnType.equals("transfer_to_bank");
+                    break;
+                case "Transfer":
+                    matchesType = txnType.contains("transfer");
+                    break;
+                case "Deposit":
+                    matchesType = txnType.equals("deposit");
+                    break;
+                case "Withdraw":
+                    matchesType = txnType.equals("withdraw");
+                    break;
+                default:
+                    matchesType = true;
+            }
+        }
+        
+        // Date filtering
+        boolean matchesDateRange = true;
+        try {
+            LocalDate txnDate = LocalDate.parse(transaction.getTransactionDate());
+            if (fromDate != null && txnDate.isBefore(fromDate)) {
+                matchesDateRange = false;
+            }
+            if (toDate != null && txnDate.isAfter(toDate)) {
+                matchesDateRange = false;
+            }
+        } catch (Exception e) {
+            // If date parsing fails, keep the record
+        }
+        
+        return matchesSearch && matchesSource && matchesType && matchesDateRange;
+    });
 }
+// Method removed as it's not used
     private static Bank findBankById(int bankId) {
         for (Bank bank : registeredBanks) {
             if (bank.getBankId() == bankId) {

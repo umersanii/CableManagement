@@ -644,7 +644,7 @@ public class SQLiteDatabase implements db {
 
                     // Bank table
                     "CREATE TABLE IF NOT EXISTS Bank (" +
-                    "bank_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "bank_id INTEGER PRIMARY KEY," +
                     "bank_name TEXT NOT NULL," +
                     "account_number TEXT," +
                     "branch_name TEXT," +
@@ -4158,13 +4158,27 @@ public class SQLiteDatabase implements db {
 
     @Override
     public boolean insertBank(String bankName, String accountNumber, String branchName) {
-        String query = "INSERT INTO Bank (bank_name, account_number, branch_name) VALUES (?, ?, ?)";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, bankName);
-            pstmt.setString(2, accountNumber);
-            pstmt.setString(3, branchName);
-            return pstmt.executeUpdate() > 0;
+        // Check if this is the first bank entry to assign ID 0
+        try {
+            Statement countStmt = connection.createStatement();
+            ResultSet rs = countStmt.executeQuery("SELECT COUNT(*) FROM Bank");
+            boolean isFirstBank = false;
+            if (rs.next() && rs.getInt(1) == 0) {
+                isFirstBank = true;
+            }
+            rs.close();
+            countStmt.close();
+            
+            String query = isFirstBank ? 
+                "INSERT INTO Bank (bank_id, bank_name, account_number, branch_name) VALUES (0, ?, ?, ?)" : 
+                "INSERT INTO Bank (bank_name, account_number, branch_name) VALUES (?, ?, ?)";
+            
+            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+                pstmt.setString(1, bankName);
+                pstmt.setString(2, accountNumber);
+                pstmt.setString(3, branchName);
+                return pstmt.executeUpdate() > 0;
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
