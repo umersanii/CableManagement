@@ -254,7 +254,12 @@ public class InvoiceGenerator {
                 summary.setWidths(new float[]{5f, 5f});
                 summary.setSpacingBefore(10f);
                 
-                summary.addCell(new Phrase("Total Production Quantity:", regularFont));
+                // Different label based on whether it's a production or return production invoice
+                if (data.getType().toLowerCase().equals(InvoiceData.TYPE_PRODUCTION_RETURN)) {
+                    summary.addCell(new Phrase("Total Return Quantity:", regularFont));
+                } else {
+                    summary.addCell(new Phrase("Total Production Quantity:", regularFont));
+                }
                 summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
             } else {
                 // Regular summary table for purchase/sales invoices

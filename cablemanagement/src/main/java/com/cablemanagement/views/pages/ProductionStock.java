@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import com.cablemanagement.database.SQLiteDatabase;
 import com.cablemanagement.database.db;
 import com.cablemanagement.model.Brand;
+import com.cablemanagement.model.Customer;
 import com.cablemanagement.model.ProductionStockItem;
 import com.cablemanagement.invoice.PrintManager;
 import com.cablemanagement.invoice.InvoiceData;
@@ -681,17 +682,21 @@ public class ProductionStock {
                         ));
                     }
                     
-                    // Create invoice data for printing
-                    String title = "Production Return";
-                    String address = notes != null && !notes.isEmpty() ? notes : "Return Production Items";
+                    // Create invoice data for printing with proper type and metadata
                     InvoiceData invoiceData = new InvoiceData(
+                        InvoiceData.TYPE_PRODUCTION_RETURN,
                         returnInvoiceNumber,
                         returnDate,
-                        title,
-                        address,
-                        0.0, // no previous balance for returns
-                        printItems
+                        "PRODUCTION RETURN INVOICE",
+                        "", // Empty address field
+                        printItems,
+                        0.0 // no previous balance for returns
                     );
+                    
+                    // Add notes as metadata
+                    invoiceData.setMetadata("tehsil", "");
+                    invoiceData.setMetadata("contact", "");
+                    invoiceData.setMetadata("notes", notes);
                     
                     // Try to open for preview first
                     boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Production Return");
@@ -1279,26 +1284,39 @@ public class ProductionStock {
                             ));
                         }
                         
-                        // Get customer address (you may want to enhance this to get actual address from database)
-                        String customerAddress = "Customer Address"; // Default placeholder
+                        // Get customer details from database
+                        String contactNumber = "";
+                        String tehsil = "";
+                        
                         try {
-                            // Try to get actual customer address from database if available
-                            // Note: This method may not exist in the current db interface
-                            // You can implement it in SQLiteDatabase class if needed
-                            customerAddress = "Customer Address - " + customer;
-                        } catch (Exception addressEx) {
-                            // Use default if error occurs
-                            System.out.println("Could not retrieve customer address, using default");
+                            // Get all customers and find the matching one to extract details
+                            List<Customer> customers = sqliteDatabase.getAllCustomers();
+                            for (Customer c : customers) {
+                                if (c.nameProperty().get().equals(customer)) {
+                                    contactNumber = c.contactProperty().get();
+                                    tehsil = c.tehsilProperty().get();
+                                    break;
+                                }
+                            }
+                        } catch (Exception ex) {
+                            System.err.println("Could not retrieve customer details: " + ex.getMessage());
+                            ex.printStackTrace();
                         }
                         
+                        // Create invoice data with proper type and metadata
                         InvoiceData invoiceData = new InvoiceData(
+                            InvoiceData.TYPE_SALE,
                             invoiceNumber,
                             date,
                             customer,
-                            customerAddress,
-                            0.0, // previous balance (you may want to implement this)
-                            printItems
+                            "", // Empty address field as requested
+                            printItems,
+                            0.0 // previous balance
                         );
+                        
+                        // Add metadata for contact and tehsil
+                        invoiceData.setMetadata("contact", contactNumber);
+                        invoiceData.setMetadata("tehsil", tehsil);
                         
                         // Open invoice for print preview (like Ctrl+P behavior)
                         boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Sales");
@@ -1716,16 +1734,40 @@ public class ProductionStock {
                         ));
                     }
                     
-                    // Create invoice data for printing
-                    String customerAddress = "Customer Address - " + customer; // You may enhance this to get actual address
+                    // Get customer details from database
+                    String contactNumber = "";
+                    String tehsil = "";
+                    
+                    try {
+                        // Get all customers and find the matching one to extract details
+                        List<Customer> customers = sqliteDatabase.getAllCustomers();
+                        for (Customer c : customers) {
+                            if (c.nameProperty().get().equals(customer)) {
+                                contactNumber = c.contactProperty().get();
+                                tehsil = c.tehsilProperty().get();
+                                break;
+                            }
+                        }
+                    } catch (Exception ex) {
+                        System.err.println("Could not retrieve customer details: " + ex.getMessage());
+                        ex.printStackTrace();
+                    }
+                    
+                    // Create invoice data for printing with proper type and metadata
                     InvoiceData invoiceData = new InvoiceData(
+                        InvoiceData.TYPE_SALE_RETURN,
                         returnInvoiceNumber,
                         date,
                         customer,
-                        customerAddress,
-                        0.0, // previous balance
-                        printItems
+                        "", // Empty address field as requested
+                        printItems,
+                        0.0 // previous balance
                     );
+                    
+                    // Add metadata
+                    invoiceData.setMetadata("contact", contactNumber);
+                    invoiceData.setMetadata("tehsil", tehsil);
+                    invoiceData.setMetadata("originalInvoiceNumber", originalInvoiceNumber);
                     
                     // Open invoice for print preview
                     boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Sales Return");
