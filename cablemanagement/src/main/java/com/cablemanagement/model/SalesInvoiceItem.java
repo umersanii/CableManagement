@@ -9,23 +9,55 @@ public class SalesInvoiceItem {
     private final StringProperty productName;
     private final DoubleProperty quantity;
     private final DoubleProperty unitPrice;
+    private final DoubleProperty discountPercentage;
+    private final DoubleProperty discountAmount;
     private final DoubleProperty totalPrice;
 
     public SalesInvoiceItem(int id, int salesInvoiceId, int productionStockId, String productName,
-                           double quantity, double unitPrice) {
+                           double quantity, double unitPrice, double discountPercentage, double discountAmount) {
         this.id = new SimpleIntegerProperty(id);
         this.salesInvoiceId = new SimpleIntegerProperty(salesInvoiceId);
         this.productionStockId = new SimpleIntegerProperty(productionStockId);
         this.productName = new SimpleStringProperty(productName);
         this.quantity = new SimpleDoubleProperty(quantity);
         this.unitPrice = new SimpleDoubleProperty(unitPrice);
-        this.totalPrice = new SimpleDoubleProperty(quantity * unitPrice);
+        this.discountPercentage = new SimpleDoubleProperty(discountPercentage);
+        this.discountAmount = new SimpleDoubleProperty(discountAmount);
+        this.totalPrice = new SimpleDoubleProperty();
+        
+        // Calculate initial total price
+        calculateTotalPrice();
+        
+        // Add listeners to recalculate when values change
+        this.quantity.addListener((obs, oldVal, newVal) -> calculateTotalPrice());
+        this.unitPrice.addListener((obs, oldVal, newVal) -> calculateTotalPrice());
+        this.discountPercentage.addListener((obs, oldVal, newVal) -> calculateTotalPrice());
+        this.discountAmount.addListener((obs, oldVal, newVal) -> calculateTotalPrice());
     }
 
     // Constructor without ID for new items
     public SalesInvoiceItem(int salesInvoiceId, int productionStockId, String productName,
+                           double quantity, double unitPrice, double discountPercentage, double discountAmount) {
+        this(0, salesInvoiceId, productionStockId, productName, quantity, unitPrice, discountPercentage, discountAmount);
+    }
+    
+    // Constructor with backward compatibility (no discount)
+    public SalesInvoiceItem(int id, int salesInvoiceId, int productionStockId, String productName,
                            double quantity, double unitPrice) {
-        this(0, salesInvoiceId, productionStockId, productName, quantity, unitPrice);
+        this(id, salesInvoiceId, productionStockId, productName, quantity, unitPrice, 0.0, 0.0);
+    }
+
+    // Constructor without ID for new items (backward compatibility)
+    public SalesInvoiceItem(int salesInvoiceId, int productionStockId, String productName,
+                           double quantity, double unitPrice) {
+        this(0, salesInvoiceId, productionStockId, productName, quantity, unitPrice, 0.0, 0.0);
+    }
+    
+    private void calculateTotalPrice() {
+        double basePrice = quantity.get() * unitPrice.get();
+        // discountAmount now contains the total discount for all quantity
+        double finalPrice = basePrice - discountAmount.get();
+        this.totalPrice.set(Math.max(0, finalPrice)); // Ensure price is not negative
     }
 
     // Property getters
@@ -35,6 +67,8 @@ public class SalesInvoiceItem {
     public StringProperty productNameProperty() { return productName; }
     public DoubleProperty quantityProperty() { return quantity; }
     public DoubleProperty unitPriceProperty() { return unitPrice; }
+    public DoubleProperty discountPercentageProperty() { return discountPercentage; }
+    public DoubleProperty discountAmountProperty() { return discountAmount; }
     public DoubleProperty totalPriceProperty() { return totalPrice; }
 
     // Value getters
@@ -44,6 +78,8 @@ public class SalesInvoiceItem {
     public String getProductName() { return productName.get(); }
     public double getQuantity() { return quantity.get(); }
     public double getUnitPrice() { return unitPrice.get(); }
+    public double getDiscountPercentage() { return discountPercentage.get(); }
+    public double getDiscountAmount() { return discountAmount.get(); }
     public double getTotalPrice() { return totalPrice.get(); }
 
     // Value setters
@@ -53,10 +89,14 @@ public class SalesInvoiceItem {
     public void setProductName(String productName) { this.productName.set(productName); }
     public void setQuantity(double quantity) { 
         this.quantity.set(quantity);
-        this.totalPrice.set(quantity * this.unitPrice.get());
     }
     public void setUnitPrice(double unitPrice) { 
         this.unitPrice.set(unitPrice);
-        this.totalPrice.set(this.quantity.get() * unitPrice);
+    }
+    public void setDiscountPercentage(double discountPercentage) {
+        this.discountPercentage.set(discountPercentage);
+    }
+    public void setDiscountAmount(double discountAmount) {
+        this.discountAmount.set(discountAmount);
     }
 }

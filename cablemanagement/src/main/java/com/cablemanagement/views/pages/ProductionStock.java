@@ -811,7 +811,7 @@ public class ProductionStock {
             showAlert("Database Error", "Failed to load products: " + e.getMessage());
         }
         
-        TextField quantityField = createTextField("1");
+        TextField quantityField = createTextField("");
         quantityField.setPromptText("Enter Quantity");
         quantityField.setPrefWidth(120);
         
@@ -827,6 +827,61 @@ public class ProductionStock {
         stockAvailableField.setEditable(false);
         stockAvailableField.setStyle("-fx-background-color: #e8f5e8; -fx-border-color: #28a745;");
         
+        // Discount fields
+        TextField discountPercentageField = createTextField("0.0");
+        discountPercentageField.setPromptText("Discount %");
+        discountPercentageField.setPrefWidth(120);
+        discountPercentageField.setEditable(false); // Make this read-only as it will be calculated
+        discountPercentageField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
+        
+        TextField discountPerUnitField = createTextField("");
+        discountPerUnitField.setPromptText("Discount Per Unit");
+        discountPerUnitField.setPrefWidth(120);
+        
+        TextField totalDiscountField = createTextField("");
+        totalDiscountField.setPromptText("Total Discount");
+        totalDiscountField.setPrefWidth(120);
+        totalDiscountField.setEditable(false); // Read-only, calculated automatically
+        totalDiscountField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
+        
+        // Helper method to update discount calculations
+        Runnable updateDiscountCalculations = () -> {
+            try {
+                String discountPerUnitText = discountPerUnitField.getText().trim();
+                String quantityText = quantityField.getText().trim();
+                String priceText = priceField.getText().trim();
+                
+                if (!discountPerUnitText.isEmpty() && !quantityText.isEmpty() && !priceText.isEmpty()) {
+                    double discountPerUnit = Double.parseDouble(discountPerUnitText);
+                    double quantity = Double.parseDouble(quantityText);
+                    double unitPrice = Double.parseDouble(priceText);
+                    
+                    // Calculate total discount amount
+                    double totalDiscount = discountPerUnit * quantity;
+                    totalDiscountField.setText(formatNumber(totalDiscount));
+                    
+                    // Calculate discount percentage based on unit price
+                    if (unitPrice > 0) {
+                        double percentage = (discountPerUnit / unitPrice) * 100.0;
+                        discountPercentageField.setText(formatNumber(percentage) + "%");
+                    } else {
+                        discountPercentageField.setText("");
+                    }
+                } else {
+                    totalDiscountField.setText("");
+                    discountPercentageField.setText("");
+                }
+            } catch (NumberFormatException e) {
+                totalDiscountField.setText("");
+                discountPercentageField.setText("0.0");
+            }
+        };
+        
+        // Add listeners to recalculate when values change
+        discountPerUnitField.textProperty().addListener((obs, oldVal, newVal) -> updateDiscountCalculations.run());
+        quantityField.textProperty().addListener((obs, oldVal, newVal) -> updateDiscountCalculations.run());
+        priceField.textProperty().addListener((obs, oldVal, newVal) -> updateDiscountCalculations.run());
+        
         // Auto-fill price and stock when product is selected
         productComboBox.setOnAction(e -> {
             String selectedDisplay = productComboBox.getValue();
@@ -839,7 +894,7 @@ public class ProductionStock {
                         double salePrice = ((Number) product[2]).doubleValue();
                         int availableStock = ((Number) product[3]).intValue();
                         
-                        priceField.setText(String.format("%.2f", salePrice));
+                        priceField.setText(formatNumber(salePrice));
                         stockAvailableField.setText(String.valueOf(availableStock));
                         
                         // Update stock field color based on availability
@@ -875,7 +930,10 @@ public class ProductionStock {
         productGrid.add(createFormRow("Quantity:", quantityField), 1, 0);
         productGrid.add(createFormRow("Unit Price:", priceField), 0, 1);
         productGrid.add(createFormRow("Available Stock:", stockAvailableField), 1, 1);
-        productGrid.add(itemActionButtons, 0, 2, 2, 1);
+        productGrid.add(createFormRow("Discount Per Unit:", discountPerUnitField), 0, 2);
+        productGrid.add(createFormRow("Total Discount:", totalDiscountField), 1, 2);
+        productGrid.add(createFormRow("Discount %:", discountPercentageField), 0, 3);
+        productGrid.add(itemActionButtons, 0, 4, 2, 1);
         
         productSection.getChildren().addAll(productTitle, productGrid);
 
@@ -905,14 +963,14 @@ public class ProductionStock {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("%.1f", item));
+                    setText(formatNumber(item));
                 }
             }
         });
         
         TableColumn<SalesInvoiceItemUI, Double> priceCol = new TableColumn<>("Unit Price");
         priceCol.setCellValueFactory(new PropertyValueFactory<>("unitPrice"));
-        priceCol.setPrefWidth(120);
+        priceCol.setPrefWidth(100);
         priceCol.setCellFactory(col -> new TableCell<SalesInvoiceItemUI, Double>() {
             @Override
             protected void updateItem(Double item, boolean empty) {
@@ -920,7 +978,47 @@ public class ProductionStock {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("%.2f", item));
+                    setText(formatNumber(item));
+                }
+            }
+        });
+        
+        TableColumn<SalesInvoiceItemUI, Double> discountPercentageCol = new TableColumn<>("Discount % (Auto)");
+        discountPercentageCol.setCellValueFactory(new PropertyValueFactory<>("discountPercentage"));
+        discountPercentageCol.setPrefWidth(90);
+        discountPercentageCol.setCellFactory(col -> new TableCell<SalesInvoiceItemUI, Double>() {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(formatNumber(item) + "%");
+                    if (item > 0) {
+                        setStyle("-fx-text-fill: #17a2b8; -fx-font-style: italic;");
+                    } else {
+                        setStyle("");
+                    }
+                }
+            }
+        });
+        
+        TableColumn<SalesInvoiceItemUI, Double> discountAmountCol = new TableColumn<>("Total Discount");
+        discountAmountCol.setCellValueFactory(new PropertyValueFactory<>("discountAmount"));
+        discountAmountCol.setPrefWidth(100);
+        discountAmountCol.setCellFactory(col -> new TableCell<SalesInvoiceItemUI, Double>() {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(formatNumber(item));
+                    if (item > 0) {
+                        setStyle("-fx-text-fill: #dc3545; -fx-font-weight: bold;");
+                    } else {
+                        setStyle("");
+                    }
                 }
             }
         });
@@ -935,13 +1033,13 @@ public class ProductionStock {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(String.format("%.2f", item));
+                    setText(formatNumber(item));
                     setStyle("-fx-font-weight: bold; -fx-text-fill: #28a745;");
                 }
             }
         });
         
-        itemsTable.getColumns().addAll(productCol, quantityCol, priceCol, totalCol);
+        itemsTable.getColumns().addAll(productCol, quantityCol, priceCol, discountPercentageCol, discountAmountCol, totalCol);
         
         ObservableList<SalesInvoiceItemUI> invoiceItems = FXCollections.observableArrayList();
         itemsTable.setItems(invoiceItems);
@@ -1053,9 +1151,12 @@ public class ProductionStock {
         // Clear selection button
         clearSelectionBtn.setOnAction(e -> {
             productComboBox.setValue(null);
-            quantityField.setText("1");
+            quantityField.clear();
             priceField.clear();
             stockAvailableField.clear();
+            discountPerUnitField.clear();
+            totalDiscountField.clear();
+            discountPercentageField.clear();
             stockAvailableField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
         });
         
@@ -1065,6 +1166,8 @@ public class ProductionStock {
             String quantityText = quantityField.getText().trim();
             String priceText = priceField.getText().trim();
             String stockText = stockAvailableField.getText().trim();
+            String discountPerUnitText = discountPerUnitField.getText().trim();
+            String totalDiscountText = totalDiscountField.getText().trim();
             
             // Validation
             if (selectedDisplay == null) {
@@ -1086,6 +1189,14 @@ public class ProductionStock {
                 double qty = Double.parseDouble(quantityText);
                 double price = Double.parseDouble(priceText);
                 int availableStock = stockText.isEmpty() ? 0 : Integer.parseInt(stockText);
+                double discountPerUnit = discountPerUnitText.isEmpty() ? 0.0 : Double.parseDouble(discountPerUnitText);
+                double totalDiscount = totalDiscountText.isEmpty() ? 0.0 : Double.parseDouble(totalDiscountText);
+                
+                // Calculate discount percentage for storage
+                double discountPercentage = 0.0;
+                if (price > 0) {
+                    discountPercentage = (discountPerUnit / price) * 100.0;
+                }
                 
                 if (qty <= 0) {
                     showAlert("Invalid Input", "Quantity must be greater than 0");
@@ -1094,6 +1205,16 @@ public class ProductionStock {
                 
                 if (price <= 0) {
                     showAlert("Invalid Input", "Price must be greater than 0");
+                    return;
+                }
+                
+                if (discountPerUnit < 0) {
+                    showAlert("Invalid Input", "Discount per unit cannot be negative");
+                    return;
+                }
+                
+                if (discountPerUnit > price) {
+                    showAlert("Invalid Input", "Discount per unit cannot exceed unit price");
                     return;
                 }
                 
@@ -1123,7 +1244,7 @@ public class ProductionStock {
                 }
                 
                 if (!productExists) {
-                    SalesInvoiceItemUI newItem = new SalesInvoiceItemUI(productName, qty, price);
+                    SalesInvoiceItemUI newItem = new SalesInvoiceItemUI(productName, qty, price, discountPercentage, totalDiscount);
                     invoiceItems.add(newItem);
                 }
                 
@@ -1133,9 +1254,12 @@ public class ProductionStock {
                 
                 // Clear selection after adding
                 productComboBox.setValue(null);
-                quantityField.setText("1");
+                quantityField.clear();
                 priceField.clear();
                 stockAvailableField.clear();
+                discountPerUnitField.clear();
+                totalDiscountField.clear();
+                discountPercentageField.clear();
                 stockAvailableField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
                 
             } catch (NumberFormatException ex) {
@@ -1255,7 +1379,8 @@ public class ProductionStock {
                         showAlert("Database Error", "Product '" + item.getProductName() + "' not found in database");
                         return;
                     }
-                    items.add(new Object[]{productId, item.getQuantity(), item.getUnitPrice()});
+                    items.add(new Object[]{productId, item.getQuantity(), item.getUnitPrice(), 
+                                          item.getDiscountPercentage(), item.getDiscountAmount()});
                 }
                 
                 // Show confirmation with invoice summary
@@ -1280,7 +1405,7 @@ public class ProductionStock {
                                 item.getProductName(),
                                 (int) item.getQuantity(),
                                 item.getUnitPrice(),
-                                0.0 // discount percent (global discount handled separately)
+                                item.getDiscountPercentage() // individual item discount percentage
                             ));
                         }
                         
@@ -2061,11 +2186,11 @@ public class ProductionStock {
         quantityCol.setPrefWidth(100);
         
         TableColumn<ProductionStockRecord, String> unitCostCol = new TableColumn<>("Unit Cost");
-        unitCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("%.2f", data.getValue().getUnitCost())));
+        unitCostCol.setCellValueFactory(data -> new SimpleStringProperty(formatNumber(data.getValue().getUnitCost())));
         unitCostCol.setPrefWidth(100);
         
         TableColumn<ProductionStockRecord, String> totalCostCol = new TableColumn<>("Total Cost");
-        totalCostCol.setCellValueFactory(data -> new SimpleStringProperty(String.format("%.2f", data.getValue().getTotalCost())));
+        totalCostCol.setCellValueFactory(data -> new SimpleStringProperty(formatNumber(data.getValue().getTotalCost())));
         totalCostCol.setPrefWidth(100);
         
         table.getColumns().addAll(nameCol, brandCol, quantityCol, unitCostCol, totalCostCol);
@@ -2222,10 +2347,10 @@ public class ProductionStock {
             
             for (Object[] stock : productionStocks) {
                 // Format: "Product Name - Brand - Available: X"
-                String item = String.format("%s - %s - Available: %.2f", 
+                String item = String.format("%s - %s - Available: %s", 
                     stock[1], // product_name
                     stock[3], // brand_name
-                    stock[6]  // quantity
+                    formatNumber(((Number) stock[6]).doubleValue())  // quantity
                 );
                 items.add(item);
             }
@@ -2253,10 +2378,10 @@ public class ProductionStock {
             
             for (Object[] stock : rawStocks) {
                 // Format: "Raw Material Name - Brand - Available: X"
-                String item = String.format("%s - %s - Available: %.2f", 
+                String item = String.format("%s - %s - Available: %s", 
                     stock[1], // item_name
                     stock[3], // brand_name
-                    stock[5]  // quantity
+                    formatNumber(((Number) stock[5]).doubleValue())  // quantity
                 );
                 items.add(item);
             }
@@ -2285,7 +2410,7 @@ public class ProductionStock {
                 
                 // Extract product name from the ComboBox selection
                 String productName = selectedProduct.split(" - ")[0];
-                String displayText = String.format("%s - Quantity: %.2f", productName, quantity);
+                String displayText = String.format("%s - Quantity: %s", productName, formatNumber(quantity));
                 
                 itemsList.getItems().add(displayText);
                 productComboBox.setValue(null);
@@ -2314,7 +2439,7 @@ public class ProductionStock {
                 
                 // Extract material name from the ComboBox selection
                 String materialName = selectedMaterial.split(" - ")[0];
-                String displayText = String.format("%s - Quantity Used: %.2f", materialName, quantity);
+                String displayText = String.format("%s - Quantity Used: %s", materialName, formatNumber(quantity));
                 
                 materialsList.getItems().add(displayText);
                 rawMaterialComboBox.setValue(null);
@@ -2682,7 +2807,21 @@ public class ProductionStock {
 
     private static void updateReturnAmount(ObservableList<SalesInvoiceItemUI> items, TextField returnAmountField) {
         double total = items.stream().mapToDouble(SalesInvoiceItemUI::getTotalPrice).sum();
-        returnAmountField.setText(String.format("%.2f", total));
+        returnAmountField.setText(formatNumber(total));
+    }
+
+    // Helper method to format numbers without unnecessary decimals
+    private static String formatNumber(double value) {
+        if (value == Math.floor(value) && !Double.isInfinite(value)) {
+            // It's a whole number
+            return String.valueOf((int) value);
+        } else {
+            // It has decimal places, format to 2 decimal places but remove trailing zeros
+            String formatted = String.format("%.2f", value);
+            // Remove trailing zeros and decimal point if not needed
+            formatted = formatted.replaceAll("0*$", "").replaceAll("\\.$", "");
+            return formatted;
+        }
     }
 
     // UI Model class for Sales Invoice Items
@@ -2690,22 +2829,35 @@ public class ProductionStock {
         private final SimpleStringProperty productName;
         private final SimpleDoubleProperty quantity;
         private final SimpleDoubleProperty unitPrice;
+        private final SimpleDoubleProperty discountPercentage;
+        private final SimpleDoubleProperty discountAmount;
         private final SimpleDoubleProperty totalPrice;
         private final SimpleDoubleProperty originalQuantity;
         private int productionStockId;
 
-        public SalesInvoiceItemUI(String productName, double quantity, double unitPrice) {
+        public SalesInvoiceItemUI(String productName, double quantity, double unitPrice, 
+                                 double discountPercentage, double discountAmount) {
             this.productName = new SimpleStringProperty(productName);
             this.quantity = new SimpleDoubleProperty(quantity);
             this.unitPrice = new SimpleDoubleProperty(unitPrice);
-            this.totalPrice = new SimpleDoubleProperty(quantity * unitPrice);
+            this.discountPercentage = new SimpleDoubleProperty(discountPercentage);
+            this.discountAmount = new SimpleDoubleProperty(discountAmount);
+            this.totalPrice = new SimpleDoubleProperty();
             this.originalQuantity = new SimpleDoubleProperty(quantity);
+            updateTotalPrice();
+        }
+        
+        // Constructor for backward compatibility
+        public SalesInvoiceItemUI(String productName, double quantity, double unitPrice) {
+            this(productName, quantity, unitPrice, 0.0, 0.0);
         }
 
         // Property getters
         public SimpleStringProperty productNameProperty() { return productName; }
         public SimpleDoubleProperty quantityProperty() { return quantity; }
         public SimpleDoubleProperty unitPriceProperty() { return unitPrice; }
+        public SimpleDoubleProperty discountPercentageProperty() { return discountPercentage; }
+        public SimpleDoubleProperty discountAmountProperty() { return discountAmount; }
         public SimpleDoubleProperty totalPriceProperty() { return totalPrice; }
         public SimpleDoubleProperty originalQuantityProperty() { return originalQuantity; }
 
@@ -2713,6 +2865,8 @@ public class ProductionStock {
         public String getProductName() { return productName.get(); }
         public double getQuantity() { return quantity.get(); }
         public double getUnitPrice() { return unitPrice.get(); }
+        public double getDiscountPercentage() { return discountPercentage.get(); }
+        public double getDiscountAmount() { return discountAmount.get(); }
         public double getTotalPrice() { return totalPrice.get(); }
         public double getOriginalQuantity() { return originalQuantity.get(); }
         public int getProductionStockId() { return productionStockId; }
@@ -2730,6 +2884,16 @@ public class ProductionStock {
             updateTotalPrice();
         }
         
+        public void setDiscountPercentage(double discountPercentage) {
+            this.discountPercentage.set(discountPercentage);
+            updateTotalPrice();
+        }
+        
+        public void setDiscountAmount(double discountAmount) {
+            this.discountAmount.set(discountAmount);
+            updateTotalPrice();
+        }
+        
         public void setOriginalQuantity(double originalQuantity) { 
             this.originalQuantity.set(originalQuantity); 
         }
@@ -2739,7 +2903,10 @@ public class ProductionStock {
         }
 
         private void updateTotalPrice() {
-            this.totalPrice.set(this.quantity.get() * this.unitPrice.get());
+            double basePrice = this.quantity.get() * this.unitPrice.get();
+            // discountAmount now contains the total discount for all quantity
+            double finalPrice = basePrice - this.discountAmount.get();
+            this.totalPrice.set(Math.max(0, finalPrice)); // Ensure price is not negative
         }
     }
 

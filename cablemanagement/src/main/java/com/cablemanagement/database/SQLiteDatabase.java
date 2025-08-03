@@ -915,6 +915,8 @@ public class SQLiteDatabase implements db {
                     "production_stock_id INTEGER NOT NULL," +
                     "quantity REAL NOT NULL," +
                     "unit_price REAL NOT NULL," +
+                    "discount_percentage REAL NOT NULL DEFAULT 0.0," +
+                    "discount_amount REAL NOT NULL DEFAULT 0.0," +
                     "total_price REAL NOT NULL," +
                     "FOREIGN KEY (sales_invoice_id) REFERENCES Sales_Invoice(sales_invoice_id)," +
                     "FOREIGN KEY (production_stock_id) REFERENCES ProductionStock(production_id)" +
@@ -950,6 +952,9 @@ public class SQLiteDatabase implements db {
             for (String query : createTableQueries) {
                 stmt.execute(query);
             }
+            
+            // Update existing schema for new features
+            updateSchemaForDiscountSupport(stmt);
             
             // Insert some default data if tables are empty
             // insertDefaultData(stmt);
@@ -1055,7 +1060,40 @@ public class SQLiteDatabase implements db {
     //     ensureViewsExist();
     // }
     
-    
+    private void updateSchemaForDiscountSupport(Statement stmt) throws SQLException {
+        try {
+            // Check if discount columns already exist
+            ResultSet rs = stmt.executeQuery("PRAGMA table_info(Sales_Invoice_Item)");
+            boolean hasDiscountPercentage = false;
+            boolean hasDiscountAmount = false;
+            
+            while (rs.next()) {
+                String columnName = rs.getString("name");
+                if ("discount_percentage".equals(columnName)) {
+                    hasDiscountPercentage = true;
+                }
+                if ("discount_amount".equals(columnName)) {
+                    hasDiscountAmount = true;
+                }
+            }
+            rs.close();
+            
+            // Add discount columns if they don't exist
+            if (!hasDiscountPercentage) {
+                stmt.execute("ALTER TABLE Sales_Invoice_Item ADD COLUMN discount_percentage REAL NOT NULL DEFAULT 0.0");
+                System.out.println("Added discount_percentage column to Sales_Invoice_Item table");
+            }
+            
+            if (!hasDiscountAmount) {
+                stmt.execute("ALTER TABLE Sales_Invoice_Item ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0.0");
+                System.out.println("Added discount_amount column to Sales_Invoice_Item table");
+            }
+            
+        } catch (SQLException e) {
+            System.err.println("Error updating schema for discount support: " + e.getMessage());
+            // Don't re-throw as this might be a new database where columns already exist
+        }
+    }
 
     @Override
     public List<String> getAllTehsils() {
@@ -3791,8 +3829,8 @@ public class SQLiteDatabase implements db {
 
     @Override
     public boolean insertSalesInvoiceItems(int salesInvoiceId, List<Object[]> items) {
-        String query = "INSERT INTO Sales_Invoice_Item (sales_invoice_id, production_stock_id, quantity, unit_price, total_price) " +
-                      "VALUES (?, ?, ?, ?, ?)";
+        String query = "INSERT INTO Sales_Invoice_Item (sales_invoice_id, production_stock_id, quantity, unit_price, discount_percentage, discount_amount, total_price) " +
+                      "VALUES (?, ?, ?, ?, ?, ?, ?)";
         
         try {
             PreparedStatement pstmt = connection.prepareStatement(query);
@@ -3800,12 +3838,22 @@ public class SQLiteDatabase implements db {
                 int productionStockId = (Integer) item[0];
                 double quantity = (Double) item[1];
                 double unitPrice = (Double) item[2];
+                double discountPercentage = item.length > 3 ? (Double) item[3] : 0.0;
+                double discountAmount = item.length > 4 ? (Double) item[4] : 0.0;
+                
+                // Calculate total price with discounts
+                double basePrice = quantity * unitPrice;
+                double percentageDiscount = basePrice * (discountPercentage / 100.0);
+                double totalPrice = basePrice - percentageDiscount - discountAmount;
+                totalPrice = Math.max(0, totalPrice); // Ensure price is not negative
                 
                 pstmt.setInt(1, salesInvoiceId);
                 pstmt.setInt(2, productionStockId);
                 pstmt.setDouble(3, quantity);
                 pstmt.setDouble(4, unitPrice);
-                pstmt.setDouble(5, quantity * unitPrice); // total_price = quantity * unit_price
+                pstmt.setDouble(5, discountPercentage);
+                pstmt.setDouble(6, discountAmount);
+                pstmt.setDouble(7, totalPrice);
                 pstmt.addBatch();
                 
                 // Decrease production stock for each sold item
@@ -3936,7 +3984,9 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getSalesInvoiceItemsByInvoiceId(int salesInvoiceId) {
         List<Object[]> items = new ArrayList<>();
-        String query = "SELECT sii.production_stock_id, ps.product_name, sii.quantity, sii.unit_price " +
+        String query = "SELECT sii.production_stock_id, ps.product_name, sii.quantity, sii.unit_price, " +
+                      "COALESCE(sii.discount_percentage, 0.0) as discount_percentage, " +
+                      "COALESCE(sii.discount_amount, 0.0) as discount_amount " +
                       "FROM Sales_Invoice_Item sii " +
                       "JOIN ProductionStock ps ON sii.production_stock_id = ps.production_id " +
                       "WHERE sii.sales_invoice_id = ?";
@@ -3950,7 +4000,9 @@ public class SQLiteDatabase implements db {
                         rs.getInt("production_stock_id"),
                         rs.getString("product_name"),
                         rs.getDouble("quantity"),
-                        rs.getDouble("unit_price")
+                        rs.getDouble("unit_price"),
+                        rs.getDouble("discount_percentage"),
+                        rs.getDouble("discount_amount")
                     };
                     items.add(row);
                 }
