@@ -109,6 +109,11 @@ public class SQLiteDatabase implements db {
     private Connection connection;
     private String databasePath;
     
+    // Method to get the database connection
+    public Connection getConnection() {
+        return this.connection;
+    }
+    
     // Implement missing methods from db interface
 
     @Override

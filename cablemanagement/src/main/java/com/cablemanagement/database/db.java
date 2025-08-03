@@ -17,6 +17,12 @@ import com.cablemanagement.model.Supplier;
 public interface db {
     
     /**
+     * Get the database connection
+     * @return The active database connection
+     */
+    java.sql.Connection getConnection();
+    
+    /**
      * Get the sales invoice ID by its invoice number
      * @param invoiceNumber The invoice number to look up
      * @return The sales invoice ID, or -1 if not found

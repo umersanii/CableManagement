@@ -156,7 +156,122 @@ public class BooksContent {
 
         loadBtn.setOnAction(e -> loadPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), supplierFilter));
-        printBtn.setOnAction(e -> printReport("PurchaseBook", table.getItems()));
+        
+        // Enhanced print functionality for purchase invoices
+        printBtn.setOnAction(e -> {
+            PurchaseRecord selectedRecord = table.getSelectionModel().getSelectedItem();
+            if (selectedRecord == null) {
+                showAlert("No Selection", "Please select an invoice to print");
+                return;
+            }
+
+            try {
+                // Get invoice details
+                String invoiceNumber = selectedRecord.getInvoiceNumber();
+                String supplier = selectedRecord.getSupplierName();
+                String date = selectedRecord.getInvoiceDate();
+                
+                // Create custom SQL query to get invoice items - fixed table references
+                String query = "SELECT rs.item_name, rpii.quantity, rpii.unit_price, b.brand_name " +
+                              "FROM Raw_Purchase_Invoice_Item rpii " +
+                              "JOIN Raw_Purchase_Invoice rpi ON rpii.raw_purchase_invoice_id = rpi.raw_purchase_invoice_id " +
+                              "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                              "LEFT JOIN Brand b ON rs.brand_id = b.brand_id " +
+                              "WHERE rpi.invoice_number = ?";
+                
+                List<Item> printItems = new ArrayList<>();
+                
+                try {
+                    // Execute the query to get invoice items
+                    java.sql.PreparedStatement stmt = config.database.getConnection().prepareStatement(query);
+                    stmt.setString(1, invoiceNumber);
+                    java.sql.ResultSet rs = stmt.executeQuery();
+                    
+                    while (rs.next()) {
+                        String itemName = rs.getString("item_name");
+                        String brandName = rs.getString("brand_name");
+                        double quantity = rs.getDouble("quantity");
+                        double unitPrice = rs.getDouble("unit_price");
+                        
+                        // Include brand name with item name if available
+                        String displayName = itemName;
+                        if (brandName != null && !brandName.isEmpty()) {
+                            displayName += " - " + brandName;
+                        }
+                        
+                        printItems.add(new Item(displayName, (int)quantity, unitPrice, 0.0));
+                    }
+                    
+                    rs.close();
+                    stmt.close();
+                    
+                } catch (Exception ex) {
+                    System.err.println("Error fetching invoice items: " + ex.getMessage());
+                    ex.printStackTrace();
+                    
+                    // If we couldn't get detailed items, create a generic item based on invoice data
+                    printItems.add(new Item("Purchase Items", 1, selectedRecord.getAmount(), 0.0));
+                }
+                
+                // Get supplier contact and tehsil
+                String contactNumber = "";
+                String tehsil = "";
+                
+                try {
+                    String supplierQuery = "SELECT s.contact_number, t.tehsil_name " +
+                                          "FROM Supplier s " +
+                                          "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                                          "WHERE s.supplier_name = ?";
+                    
+                    java.sql.PreparedStatement supplierStmt = config.database.getConnection().prepareStatement(supplierQuery);
+                    supplierStmt.setString(1, supplier);
+                    java.sql.ResultSet supplierRs = supplierStmt.executeQuery();
+                    
+                    if (supplierRs.next()) {
+                        contactNumber = supplierRs.getString("contact_number");
+                        tehsil = supplierRs.getString("tehsil_name");
+                        
+                        if (contactNumber == null) contactNumber = "";
+                        if (tehsil == null) tehsil = "";
+                    }
+                    
+                    supplierRs.close();
+                    supplierStmt.close();
+                    
+                } catch (Exception ex) {
+                    System.err.println("Error fetching supplier details: " + ex.getMessage());
+                }
+                
+                // Create invoice data for printing with proper type and metadata
+                InvoiceData invoiceData = new InvoiceData(
+                    InvoiceData.TYPE_PURCHASE,
+                    invoiceNumber,
+                    date,
+                    supplier,
+                    "", // Empty address as requested
+                    printItems,
+                    0.0 // Previous balance
+                );
+                
+                // Add metadata
+                invoiceData.setMetadata("contact", contactNumber);
+                invoiceData.setMetadata("tehsil", tehsil);
+
+                // Open invoice for print preview
+                boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Purchase");
+                
+                if (!previewSuccess) {
+                    // Fallback to printer selection if preview fails
+                    boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Purchase");
+                    if (!printSuccess) {
+                        showAlert("Error", "Failed to print invoice " + invoiceNumber);
+                    }
+                }
+            } catch (Exception ex) {
+                showAlert("Error", "Failed to prepare invoice for printing: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
 
         form.getChildren().addAll(filters, buttons, table);
         loadPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -178,7 +293,125 @@ public class BooksContent {
 
         loadBtn.setOnAction(e -> loadReturnPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
                 (DatePicker) filters.getChildren().get(1).lookup(".date-picker"), supplierFilter));
-        printBtn.setOnAction(e -> printReport("ReturnPurchaseBook", table.getItems()));
+                
+        // Enhanced print functionality for return purchase invoices
+        printBtn.setOnAction(e -> {
+            ReturnPurchaseRecord selectedRecord = table.getSelectionModel().getSelectedItem();
+            if (selectedRecord == null) {
+                showAlert("No Selection", "Please select a return invoice to print");
+                return;
+            }
+
+            try {
+                // Get invoice details
+                String returnInvoiceNumber = selectedRecord.getReturnInvoice();
+                String supplier = selectedRecord.getSupplier();
+                String date = selectedRecord.getDate();
+                
+                // Create custom SQL query to get return invoice items - fixed table references
+                String query = "SELECT rs.item_name, rprii.quantity, rprii.unit_price, b.brand_name " +
+                              "FROM Raw_Purchase_Return_Invoice_Item rprii " +
+                              "JOIN Raw_Purchase_Return_Invoice rpri ON rprii.raw_purchase_return_invoice_id = rpri.raw_purchase_return_invoice_id " +
+                              "JOIN Raw_Stock rs ON rprii.raw_stock_id = rs.stock_id " +
+                              "LEFT JOIN Brand b ON rs.brand_id = b.brand_id " +
+                              "WHERE rpri.return_invoice_number = ?";
+                
+                List<Item> printItems = new ArrayList<>();
+                
+                try {
+                    // Execute the query to get invoice items
+                    java.sql.PreparedStatement stmt = config.database.getConnection().prepareStatement(query);
+                    stmt.setString(1, returnInvoiceNumber);
+                    java.sql.ResultSet rs = stmt.executeQuery();
+                    
+                    while (rs.next()) {
+                        String itemName = rs.getString("item_name");
+                        String brandName = rs.getString("brand_name");
+                        double quantity = rs.getDouble("quantity");
+                        double unitPrice = rs.getDouble("unit_price");
+                        
+                        // Include brand name with item name if available
+                        String displayName = itemName;
+                        if (brandName != null && !brandName.isEmpty()) {
+                            displayName += " - " + brandName;
+                        }
+                        
+                        printItems.add(new Item(displayName, (int)quantity, unitPrice, 0.0));
+                    }
+                    
+                    rs.close();
+                    stmt.close();
+                    
+                } catch (Exception ex) {
+                    System.err.println("Error fetching return invoice items: " + ex.getMessage());
+                    ex.printStackTrace();
+                    
+                    // If we couldn't get detailed items, create a generic item based on invoice data
+                    printItems.add(new Item(selectedRecord.getItemName() + " - " + selectedRecord.getBrandName(), 
+                                          (int)selectedRecord.getQuantity(), 
+                                          selectedRecord.getUnitPrice(), 
+                                          0.0));
+                }
+                
+                // Get supplier contact and tehsil
+                String contactNumber = "";
+                String tehsil = "";
+                
+                try {
+                    String supplierQuery = "SELECT s.contact_number, t.tehsil_name " +
+                                          "FROM Supplier s " +
+                                          "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                                          "WHERE s.supplier_name = ?";
+                    
+                    java.sql.PreparedStatement supplierStmt = config.database.getConnection().prepareStatement(supplierQuery);
+                    supplierStmt.setString(1, supplier);
+                    java.sql.ResultSet supplierRs = supplierStmt.executeQuery();
+                    
+                    if (supplierRs.next()) {
+                        contactNumber = supplierRs.getString("contact_number");
+                        tehsil = supplierRs.getString("tehsil_name");
+                        
+                        if (contactNumber == null) contactNumber = "";
+                        if (tehsil == null) tehsil = "";
+                    }
+                    
+                    supplierRs.close();
+                    supplierStmt.close();
+                    
+                } catch (Exception ex) {
+                    System.err.println("Error fetching supplier details: " + ex.getMessage());
+                }
+                
+                // Create invoice data for printing with proper type and metadata
+                InvoiceData invoiceData = new InvoiceData(
+                    InvoiceData.TYPE_PURCHASE_RETURN,
+                    returnInvoiceNumber,
+                    date,
+                    supplier,
+                    "", // Empty address as requested
+                    printItems,
+                    0.0 // Previous balance
+                );
+                
+                // Add metadata
+                invoiceData.setMetadata("contact", contactNumber);
+                invoiceData.setMetadata("tehsil", tehsil);
+
+                // Open invoice for print preview
+                boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Purchase Return");
+                
+                if (!previewSuccess) {
+                    // Fallback to printer selection if preview fails
+                    boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Purchase Return");
+                    if (!printSuccess) {
+                        showAlert("Error", "Failed to print return invoice " + returnInvoiceNumber);
+                    }
+                }
+            } catch (Exception ex) {
+                showAlert("Error", "Failed to prepare return invoice for printing: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
 
         form.getChildren().addAll(filters, buttons, table);
         loadReturnPurchaseData(table, (DatePicker) filters.getChildren().get(0).lookup(".date-picker"),
@@ -299,15 +532,49 @@ public class BooksContent {
                     printItems.add(new Item(productName, (int)quantity, unitPrice, 0.0));
                 }
 
-                // Create invoice data object
+                // Get customer details from database
+                String contactNumber = "";
+                String tehsil = "";
+                
+                try {
+                    String customerQuery = "SELECT c.contact_number, t.tehsil_name " +
+                                          "FROM Customer c " +
+                                          "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                                          "WHERE c.customer_name = ?";
+                    
+                    java.sql.PreparedStatement customerStmt = config.database.getConnection().prepareStatement(customerQuery);
+                    customerStmt.setString(1, selectedRecord.getCustomer());
+                    java.sql.ResultSet customerRs = customerStmt.executeQuery();
+                    
+                    if (customerRs.next()) {
+                        contactNumber = customerRs.getString("contact_number");
+                        tehsil = customerRs.getString("tehsil_name");
+                        
+                        if (contactNumber == null) contactNumber = "";
+                        if (tehsil == null) tehsil = "";
+                    }
+                    
+                    customerRs.close();
+                    customerStmt.close();
+                    
+                } catch (Exception ex) {
+                    System.err.println("Error fetching customer details: " + ex.getMessage());
+                }
+                
+                // Create invoice data object with proper type and metadata
                 InvoiceData invoiceData = new InvoiceData(
+                    InvoiceData.TYPE_SALE,
                     invoiceNumber,
                     selectedRecord.getDate(),
                     selectedRecord.getCustomer(),
-                    "Customer Address - " + selectedRecord.getCustomer(), // You might want to get actual address
-                    0.0, // Previous balance
-                    printItems
+                    "", // Empty address as requested
+                    printItems,
+                    0.0 // Previous balance
                 );
+                
+                // Add metadata
+                invoiceData.setMetadata("contact", contactNumber);
+                invoiceData.setMetadata("tehsil", tehsil);
 
                 // Open invoice for print preview
                 boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Sales");
@@ -377,15 +644,49 @@ public class BooksContent {
                     printItems.add(new Item(productName, (int)quantity, unitPrice, 0.0));
                 }
 
-                // Create invoice data object for return invoice
+                // Get customer details from database
+                String contactNumber = "";
+                String tehsil = "";
+                
+                try {
+                    String customerQuery = "SELECT c.contact_number, t.tehsil_name " +
+                                          "FROM Customer c " +
+                                          "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                                          "WHERE c.customer_name = ?";
+                    
+                    java.sql.PreparedStatement customerStmt = config.database.getConnection().prepareStatement(customerQuery);
+                    customerStmt.setString(1, selectedRecord.getCustomer());
+                    java.sql.ResultSet customerRs = customerStmt.executeQuery();
+                    
+                    if (customerRs.next()) {
+                        contactNumber = customerRs.getString("contact_number");
+                        tehsil = customerRs.getString("tehsil_name");
+                        
+                        if (contactNumber == null) contactNumber = "";
+                        if (tehsil == null) tehsil = "";
+                    }
+                    
+                    customerRs.close();
+                    customerStmt.close();
+                    
+                } catch (Exception ex) {
+                    System.err.println("Error fetching customer details: " + ex.getMessage());
+                }
+                
+                // Create invoice data object for return invoice with proper type
                 InvoiceData invoiceData = new InvoiceData(
+                    InvoiceData.TYPE_SALE_RETURN,
                     returnInvoiceNumber,
                     selectedRecord.getDate(),
                     selectedRecord.getCustomer(),
-                    "Customer Address - " + selectedRecord.getCustomer(), // Could be enhanced to get actual address
-                    0.0, // Previous balance
-                    printItems
+                    "", // Empty address as requested
+                    printItems,
+                    0.0 // Previous balance
                 );
+                
+                // Add metadata
+                invoiceData.setMetadata("contact", contactNumber);
+                invoiceData.setMetadata("tehsil", tehsil);
 
                 // Open return invoice for print preview
                 boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Return Sales");
