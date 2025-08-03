@@ -940,15 +940,30 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                     }
 
                     String supplierName = supplierComboBox.getValue();
-                    String supplierAddress = "Supplier Address - " + supplierName;
-                    InvoiceData invoiceData = new InvoiceData(
+                    
+                    // Get supplier details from database
+                    Object[] supplierDetails = database.getSupplierDetails(supplierName);
+                    
+                    // Extract supplier details safely (using same structure as purchase invoice)
+                    // supplierDetails array format: [id, name, address, tehsil, contact]
+                    String supplierTehsil = (supplierDetails != null && supplierDetails.length > 3 && supplierDetails[3] != null) ? 
+                        supplierDetails[3].toString() : "";
+                    String supplierContact = (supplierDetails != null && supplierDetails.length > 4 && supplierDetails[4] != null) ? 
+                        supplierDetails[4].toString() : "";
+                    
+                    // Create invoice data with proper title
+                    InvoiceData invoiceData = InvoiceData.createReturnPurchaseInvoice(
                         returnInvoiceNumber,
                         returnDate,
                         supplierName,
-                        supplierAddress,
-                        0.0, // No previous balance for returns
-                        printItems
+                        "", // Empty address as we'll use metadata
+                        printItems,
+                        0.0
                     );
+                    
+                    // Add supplier details as metadata
+                    invoiceData.setMetadata("tehsil", supplierTehsil);
+                    invoiceData.setMetadata("contact", supplierContact);
 
                     // Try to open invoice for print preview first
                     boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Purchase Return");
