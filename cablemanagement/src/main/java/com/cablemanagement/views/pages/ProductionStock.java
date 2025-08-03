@@ -2352,15 +2352,21 @@ public class ProductionStock {
                 }
             }
 
-            // Create invoice data for printing
+            // Create invoice data for printing with proper type and metadata
             InvoiceData invoiceData = new InvoiceData(
+                InvoiceData.TYPE_PRODUCTION,
                 invoiceNumberField.getText(),
                 productionDate,
-                "Production Invoice",
-                "Notes: " + notes,
-                0.0, // not applicable for production
-                printItems
+                "PRODUCTION INVOICE",
+                "", // Empty address field
+                printItems,
+                0.0 // not applicable for production
             );
+            
+            // Add reference/notes as metadata
+            invoiceData.setMetadata("tehsil", "");
+            invoiceData.setMetadata("contact", "");
+            invoiceData.setMetadata("notes", notes);
             
             // Open invoice for print preview
             boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Production");

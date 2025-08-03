@@ -41,6 +41,10 @@ public class InvoiceGenerator {
                 return "Sales Return Invoice";
             case "raw_stock":
                 return "Stock Usage Invoice";
+            case "production":
+                return "Production Invoice";
+            case "production_return":
+                return "Production Return Invoice";
             default:
                 return "Invoice";
         }
@@ -122,6 +126,12 @@ public class InvoiceGenerator {
                 // For Raw Stock Usage, display reference/purpose
                 if (data.hasMetadata("reference")) {
                     entityInfo.append("Reference/Purpose: ").append(data.getMetadata("reference"));
+                }
+            } else if (data.getType().toLowerCase().equals(InvoiceData.TYPE_PRODUCTION) ||
+                      data.getType().toLowerCase().equals(InvoiceData.TYPE_PRODUCTION_RETURN)) {
+                // For Production Invoice, display notes
+                if (data.hasMetadata("notes")) {
+                    entityInfo.append("Notes: ").append(data.getMetadata("notes"));
                 }
             } else {
                 // For other invoice types (purchase/sales)
@@ -236,6 +246,16 @@ public class InvoiceGenerator {
                 
                 summary.addCell(new Phrase("Total Usage Amount:", regularFont));
                 summary.addCell(new Phrase(String.format("%.2f", totalAmount), regularFont));
+            } else if (data.getType().toLowerCase().equals(InvoiceData.TYPE_PRODUCTION) ||
+                      data.getType().toLowerCase().equals(InvoiceData.TYPE_PRODUCTION_RETURN)) {
+                // Simplified summary table for Production Invoices
+                summary = new PdfPTable(2);
+                summary.setWidthPercentage(100);
+                summary.setWidths(new float[]{5f, 5f});
+                summary.setSpacingBefore(10f);
+                
+                summary.addCell(new Phrase("Total Production Quantity:", regularFont));
+                summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
             } else {
                 // Regular summary table for purchase/sales invoices
                 summary = new PdfPTable(4);
@@ -278,6 +298,9 @@ public class InvoiceGenerator {
             // Adjust the right signature label based on invoice type
             String rightSignatureLabel = "Supplier Signature: ____________________";
             if (data.getType().toLowerCase().equals(InvoiceData.TYPE_RAW_STOCK)) {
+                rightSignatureLabel = "Approved By: ____________________";
+            } else if (data.getType().toLowerCase().equals(InvoiceData.TYPE_PRODUCTION) ||
+                      data.getType().toLowerCase().equals(InvoiceData.TYPE_PRODUCTION_RETURN)) {
                 rightSignatureLabel = "Approved By: ____________________";
             } else if (data.getType().toLowerCase().contains("sale")) {
                 rightSignatureLabel = "Customer Signature: ____________________";
