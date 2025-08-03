@@ -1173,16 +1173,22 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                             ));
                         }
 
-                        // Create invoice data for printing
+                        // Create invoice data for printing with proper type and metadata
                         InvoiceData invoiceData = new InvoiceData(
+                            InvoiceData.TYPE_RAW_STOCK,
                             invoiceNumber,  // Invoice number
                             usageDate,      // Date
                             "STOCK USAGE INVOICE", // Title instead of supplier name
-                            String.format("Reference/Purpose: %s\nTotal Usage Amount: %.2f", 
-                                referencePurpose, totalAmount),  // Purpose as address field
-                            0.0,  // No discount for usage
-                            printItems
+                            "",             // Empty address field
+                            printItems,
+                            0.0             // No previous balance for usage
                         );
+                        
+                        // Add reference/purpose as metadata
+                        invoiceData.setMetadata("tehsil", "");
+                        invoiceData.setMetadata("contact", "");
+                        invoiceData.setMetadata("reference", referencePurpose);
+                        invoiceData.setMetadata("totalAmount", totalAmount);
 
                         // Try to open invoice for print preview first
                         boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Stock Usage");

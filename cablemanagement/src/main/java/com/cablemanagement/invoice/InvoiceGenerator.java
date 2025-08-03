@@ -39,6 +39,8 @@ public class InvoiceGenerator {
                 return "Sales Invoice";
             case "sale_return":
                 return "Sales Return Invoice";
+            case "raw_stock":
+                return "Stock Usage Invoice";
             default:
                 return "Invoice";
         }
@@ -113,25 +115,36 @@ public class InvoiceGenerator {
             infoTable.setWidths(new float[]{6f, 4f});
 
             // Dynamic entity info based on invoice type with enhanced metadata
-            String entityLabel = data.getType().toLowerCase().contains("purchase") ? "Supplier" : "Customer";
             StringBuilder entityInfo = new StringBuilder();
-            // Only display entity name without the label for suppliers as requested
-            if (data.getType().toLowerCase().contains("purchase")) {
-                entityInfo.append(data.getEntityName());
+            
+            // Handle different invoice types
+            if (data.getType().toLowerCase().equals(InvoiceData.TYPE_RAW_STOCK)) {
+                // For Raw Stock Usage, display reference/purpose
+                if (data.hasMetadata("reference")) {
+                    entityInfo.append("Reference/Purpose: ").append(data.getMetadata("reference"));
+                }
             } else {
-                entityInfo.append(entityLabel).append(": ").append(data.getEntityName());
-            }
-            
-            // Skip adding the address as per client request
-            
-            // Add tehsil if available in metadata
-            if (data.hasMetadata("tehsil") && !data.getMetadata("tehsil").toString().isEmpty()) {
-                entityInfo.append("\nTehsil: ").append(data.getMetadata("tehsil"));
-            }
-            
-            // Add contact if available in metadata
-            if (data.hasMetadata("contact") && !data.getMetadata("contact").toString().isEmpty()) {
-                entityInfo.append("\nContact: ").append(data.getMetadata("contact"));
+                // For other invoice types (purchase/sales)
+                String entityLabel = data.getType().toLowerCase().contains("purchase") ? "Supplier" : "Customer";
+                
+                // Only display entity name without the label for suppliers as requested
+                if (data.getType().toLowerCase().contains("purchase")) {
+                    entityInfo.append(data.getEntityName());
+                } else {
+                    entityInfo.append(entityLabel).append(": ").append(data.getEntityName());
+                }
+                
+                // Skip adding the address as per client request
+                
+                // Add tehsil if available in metadata
+                if (data.hasMetadata("tehsil") && !data.getMetadata("tehsil").toString().isEmpty()) {
+                    entityInfo.append("\nTehsil: ").append(data.getMetadata("tehsil"));
+                }
+                
+                // Add contact if available in metadata
+                if (data.hasMetadata("contact") && !data.getMetadata("contact").toString().isEmpty()) {
+                    entityInfo.append("\nContact: ").append(data.getMetadata("contact"));
+                }
             }
             
             PdfPCell entityCell = new PdfPCell(new Phrase(entityInfo.toString(), regularFont));
@@ -187,7 +200,7 @@ public class InvoiceGenerator {
             document.add(table);
             document.add(Chunk.NEWLINE);
 
-            // Summary Table
+            // Summary Table - handling different for raw stock vs other invoice types
             double totalDiscount = items.stream().mapToDouble(i -> i.getQuantity() * i.getUnitPrice() * i.getDiscountPercent() / 100.0).sum();
             double totalBalance = total + data.getPreviousBalance();
             int totalQuantity = items.stream().mapToInt(Item::getQuantity).sum();
@@ -204,32 +217,53 @@ public class InvoiceGenerator {
             summaryHeadingTable.addCell(summaryHeading);
             document.add(summaryHeadingTable);
 
+            // Different summary tables based on invoice type
+            PdfPTable summary;
+            
+            if (data.getType().toLowerCase().equals(InvoiceData.TYPE_RAW_STOCK)) {
+                // Simplified summary table for Raw Stock Usage
+                summary = new PdfPTable(2);
+                summary.setWidthPercentage(100);
+                summary.setWidths(new float[]{5f, 5f});
+                summary.setSpacingBefore(10f);
+                
+                // Get total amount from metadata if available, otherwise calculate
+                Object totalAmountObj = data.hasMetadata("totalAmount") ? data.getMetadata("totalAmount") : total;
+                double totalAmount = totalAmountObj instanceof Number ? ((Number)totalAmountObj).doubleValue() : total;
 
-            PdfPTable summary = new PdfPTable(4);
-            summary.setWidthPercentage(100);
-            summary.setWidths(new float[]{3f, 3f, 3f, 3f});
-            summary.setSpacingBefore(10f);
-
-            summary.addCell(new Phrase("Bill:", regularFont));
-            summary.addCell(new Phrase(String.format("%.2f", total + totalDiscount), regularFont));
-            summary.addCell(new Phrase("Discount:", regularFont));
-            summary.addCell(new Phrase(String.format("%.2f", totalDiscount), regularFont));
-
-            summary.addCell(new Phrase("Current Net Bill:", regularFont));
-            summary.addCell(new Phrase(String.format("%.2f", total), regularFont));
-            summary.addCell(new Phrase("Previous Balance:", regularFont));
-            summary.addCell(new Phrase(String.format("%.2f", data.getPreviousBalance()), regularFont));
-
-            summary.addCell(new Phrase("Total Quantity:", regularFont));
-            summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
-            summary.addCell(new Phrase("Total Balance:", regularFont));
-            summary.addCell(new Phrase(String.format("%.2f", totalBalance), regularFont));
-
-            summary.addCell(new Phrase("Paid:", regularFont));
-            summary.addCell(new Phrase("0.00", regularFont));
-            summary.addCell(new Phrase("Net Balance:", regularFont));
-            summary.addCell(new Phrase(String.format("%.2f", totalBalance), regularFont));
-
+                summary.addCell(new Phrase("Total Quantity:", regularFont));
+                summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
+                
+                summary.addCell(new Phrase("Total Usage Amount:", regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", totalAmount), regularFont));
+            } else {
+                // Regular summary table for purchase/sales invoices
+                summary = new PdfPTable(4);
+                summary.setWidthPercentage(100);
+                summary.setWidths(new float[]{3f, 3f, 3f, 3f});
+                summary.setSpacingBefore(10f);
+                
+                summary.addCell(new Phrase("Bill:", regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", total + totalDiscount), regularFont));
+                summary.addCell(new Phrase("Discount:", regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", totalDiscount), regularFont));
+                
+                summary.addCell(new Phrase("Current Net Bill:", regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", total), regularFont));
+                summary.addCell(new Phrase("Previous Balance:", regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", data.getPreviousBalance()), regularFont));
+                
+                summary.addCell(new Phrase("Total Quantity:", regularFont));
+                summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
+                summary.addCell(new Phrase("Total Balance:", regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", totalBalance), regularFont));
+                
+                summary.addCell(new Phrase("Paid:", regularFont));
+                summary.addCell(new Phrase("0.00", regularFont));
+                summary.addCell(new Phrase("Net Balance:", regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", totalBalance), regularFont));
+            }
+            
             document.add(summary);
             document.add(Chunk.NEWLINE);
 
@@ -241,7 +275,15 @@ public class InvoiceGenerator {
             leftSig.setBorder(Rectangle.NO_BORDER);
             leftSig.setHorizontalAlignment(Element.ALIGN_LEFT);
 
-            PdfPCell rightSig = new PdfPCell(new Phrase("Supplier Signature: ____________________", regularFont));
+            // Adjust the right signature label based on invoice type
+            String rightSignatureLabel = "Supplier Signature: ____________________";
+            if (data.getType().toLowerCase().equals(InvoiceData.TYPE_RAW_STOCK)) {
+                rightSignatureLabel = "Approved By: ____________________";
+            } else if (data.getType().toLowerCase().contains("sale")) {
+                rightSignatureLabel = "Customer Signature: ____________________";
+            }
+            
+            PdfPCell rightSig = new PdfPCell(new Phrase(rightSignatureLabel, regularFont));
             rightSig.setBorder(Rectangle.NO_BORDER);
             rightSig.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
