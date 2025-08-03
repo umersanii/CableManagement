@@ -140,6 +140,7 @@ private static BankTransaction createTransactionFromRow(Object[] row, boolean is
             
             // Find bank ID from bank name
             int bankId = findBankIdByName(bankName);
+            System.out.println("Creating bank transaction - Bank Name: " + bankName + ", Found Bank ID: " + bankId);
             
             return new BankTransaction(0, bankId, date, type, amount, description, 0);
         } else {
@@ -1075,75 +1076,84 @@ private static VBox viewCashLedger() {
         }
     });
 
-    // Source Column
-    TableColumn<BankTransaction, String> sourceCol = new TableColumn<>("Source");
-    sourceCol.setCellValueFactory(cell -> {
-        // Determine source based on transaction type and bankId
-        BankTransaction txn = cell.getValue();
-        String type = txn.getTransactionType().toLowerCase();
-        int bankId = txn.getBankId();
-        
-        // Special handling for transfer cases
-        if (type.equals("transfer_from_bank")) {
-            return new ReadOnlyStringWrapper("Cash ← Bank");
-        } else if (type.equals("transfer_to_bank")) {
-            return new ReadOnlyStringWrapper("Cash → Bank");
-        } else if (type.equals("transfer_in")) {
-            return new ReadOnlyStringWrapper("Bank ← Bank");
-        } else if (type.equals("transfer_out")) {
-            return new ReadOnlyStringWrapper("Bank → Bank");
-        }
-        
-        // Handle standard cases
-        if (bankId == 0 || type.contains("cash")) {
-            return new ReadOnlyStringWrapper("Cash");
-        } else if (type.equals("deposit") || type.equals("withdraw")) {
-            return new ReadOnlyStringWrapper("Bank");
-        } else {
-            // For any other types, check bankId as fallback
-            return new ReadOnlyStringWrapper(bankId > 0 ? "Bank" : "Cash");
-        }
-    });
-
-    // Bank Name Column
-    TableColumn<BankTransaction, String> bankNameCol = new TableColumn<>("Bank Name");
-    bankNameCol.setCellValueFactory(cell -> {
+    // Bank In Column - Shows the bank where money is coming from or being received
+    TableColumn<BankTransaction, String> bankInCol = new TableColumn<>("Bank In");
+    bankInCol.setCellValueFactory(cell -> {
         BankTransaction txn = cell.getValue();
         int bankId = txn.getBankId();
         int relatedBankId = txn.getRelatedBankId();
         String type = txn.getTransactionType().toLowerCase();
         
-        // For cash transactions with no bank involvement
-        if (bankId == 0 && relatedBankId == 0) {
-            return new ReadOnlyStringWrapper("-");
+        System.out.println("DEBUG Bank In - Type: " + type + ", BankId: " + bankId + ", RelatedBankId: " + relatedBankId);
+        
+        switch (type) {
+            case "deposit":
+            case "transfer_in":
+            case "transfer_from_bank":
+                // Money is coming INTO this bank
+                Bank bank = findBankById(bankId);
+                if (bank != null) {
+                    System.out.println("DEBUG Bank In - Found bank: " + bank.getBankName());
+                    return new ReadOnlyStringWrapper(bank.getBankName());
+                } else if (type.equals("transfer_from_bank") && relatedBankId > 0) {
+                    // For cash transactions from bank, show the source bank
+                    Bank sourceBank = findBankById(relatedBankId);
+                    String result = sourceBank != null ? sourceBank.getBankName() : "-";
+                    System.out.println("DEBUG Bank In - Transfer from bank, result: " + result);
+                    return new ReadOnlyStringWrapper(result);
+                }
+                System.out.println("DEBUG Bank In - No bank found, returning -");
+                return new ReadOnlyStringWrapper("-");
+                
+            case "cash_in":
+                // Pure cash transaction, no bank involved
+                System.out.println("DEBUG Bank In - Cash in, returning -");
+                return new ReadOnlyStringWrapper("-");
+                
+            default:
+                System.out.println("DEBUG Bank In - Default case, returning -");
+                return new ReadOnlyStringWrapper("-");
         }
+    });
+
+    // Bank Out Column - Shows the bank where money is going out from
+    TableColumn<BankTransaction, String> bankOutCol = new TableColumn<>("Bank Out");
+    bankOutCol.setCellValueFactory(cell -> {
+        BankTransaction txn = cell.getValue();
+        int bankId = txn.getBankId();
+        int relatedBankId = txn.getRelatedBankId();
+        String type = txn.getTransactionType().toLowerCase();
         
-        // For cash transactions involving bank transfers
-        if (bankId == 0 && relatedBankId > 0) {
-            if (type.equals("transfer_from_bank")) {
-                Bank bank = findBankById(relatedBankId);
-                return new ReadOnlyStringWrapper(bank != null ? bank.getBankName() : "Unknown Bank");
-            } else if (type.equals("transfer_to_bank")) {
-                Bank bank = findBankById(relatedBankId);
-                return new ReadOnlyStringWrapper(bank != null ? bank.getBankName() : "Unknown Bank");
-            }
-            return new ReadOnlyStringWrapper("-");
+        System.out.println("DEBUG Bank Out - Type: " + type + ", BankId: " + bankId + ", RelatedBankId: " + relatedBankId);
+        
+        switch (type) {
+            case "withdraw":
+            case "transfer_out":
+            case "transfer_to_bank":
+                // Money is going OUT from this bank
+                Bank bank = findBankById(bankId);
+                if (bank != null) {
+                    System.out.println("DEBUG Bank Out - Found bank: " + bank.getBankName());
+                    return new ReadOnlyStringWrapper(bank.getBankName());
+                } else if (type.equals("transfer_to_bank") && relatedBankId > 0) {
+                    // For cash transactions to bank, show the destination bank
+                    Bank destBank = findBankById(relatedBankId);
+                    String result = destBank != null ? destBank.getBankName() : "-";
+                    System.out.println("DEBUG Bank Out - Transfer to bank, result: " + result);
+                    return new ReadOnlyStringWrapper(result);
+                }
+                System.out.println("DEBUG Bank Out - No bank found, returning -");
+                return new ReadOnlyStringWrapper("-");
+                
+            case "cash_out":
+                // Pure cash transaction, no bank involved
+                System.out.println("DEBUG Bank Out - Cash out, returning -");
+                return new ReadOnlyStringWrapper("-");
+                
+            default:
+                System.out.println("DEBUG Bank Out - Default case, returning -");
+                return new ReadOnlyStringWrapper("-");
         }
-        
-        // For bank transactions
-        Bank bank = findBankById(bankId);
-        String bankName = bank != null ? bank.getBankName() : "Unknown Bank";
-        
-        // If it's a transfer between banks, show both banks
-        if (type.equals("transfer_out") && relatedBankId > 0) {
-            Bank toBank = findBankById(relatedBankId);
-            return new ReadOnlyStringWrapper(bankName + " → " + (toBank != null ? toBank.getBankName() : "Unknown Bank"));
-        } else if (type.equals("transfer_in") && relatedBankId > 0) {
-            Bank fromBank = findBankById(relatedBankId);
-            return new ReadOnlyStringWrapper((fromBank != null ? fromBank.getBankName() : "Unknown Bank") + " → " + bankName);
-        }
-        
-        return new ReadOnlyStringWrapper(bankName);
     });
 
     // Type Column
@@ -1186,22 +1196,10 @@ private static VBox viewCashLedger() {
     descCol.setCellValueFactory(cell -> 
         new ReadOnlyStringWrapper(cell.getValue().getDescription()));
 
-    ledgerTable.getColumns().addAll(dateCol, sourceCol, bankNameCol, typeCol, amountCol, descCol);
+    ledgerTable.getColumns().addAll(dateCol, bankInCol, bankOutCol, typeCol, amountCol, descCol);
     
     // Load all transactions (bank and cash)
     ObservableList<BankTransaction> allTransactions = FXCollections.observableArrayList();
-    
-    // Log bank transactions for debugging
-    System.out.println("Bank transactions loaded: " + bankTransactions.size());
-    for (BankTransaction bt : bankTransactions) {
-        System.out.println("Bank transaction: ID=" + bt.getBankId() + 
-                          ", Type=" + bt.getTransactionType() + 
-                          ", Amount=" + bt.getAmount() + 
-                          ", RelatedBank=" + bt.getRelatedBankId());
-    }
-    
-    // Log cash transactions for debugging
-    System.out.println("Cash transactions loaded: " + cashTransactions.size());
     
     // Make sure we have loaded the bank data
     if (registeredBanks.isEmpty()) {
