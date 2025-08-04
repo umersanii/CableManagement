@@ -112,6 +112,12 @@ public class RawStock {
         }
         brandCombo.setPrefWidth(200);
         
+        // Unit ComboBox for selecting units
+        ComboBox<String> unitCombo = new ComboBox<>();
+        unitCombo.setPromptText("Select Unit");
+        unitCombo.getItems().addAll(database.getAllUnits());
+        unitCombo.setPrefWidth(200);
+        
         // Supplier ComboBox (optional)
         ComboBox<String> supplierCombo = new ComboBox<>();
         supplierCombo.setPromptText("Select Supplier");
@@ -126,7 +132,7 @@ public class RawStock {
         refreshRawStockTable(stockTable);
 
         submitBtn.setOnAction(e -> handleRawStockSubmit(
-            nameField, brandCombo, supplierCombo,
+            nameField, brandCombo, unitCombo, supplierCombo,
             quantityField, unitPriceField,
             stockTable
         ));
@@ -138,6 +144,7 @@ public class RawStock {
             heading, 
             createFormRow("Stock Name:", nameField),
             createFormRow("Brand:", brandCombo),
+            createFormRow("Unit:", unitCombo),
             createFormRow("Supplier:", supplierCombo),
             createFormRow("Quantity:", quantityField),
             createFormRow("Unit Price:", unitPriceField),
@@ -175,6 +182,10 @@ public class RawStock {
         TableColumn<RawStockRecord, String> brandCol = new TableColumn<>("Brand");
         brandCol.setCellValueFactory(new PropertyValueFactory<>("brand"));
         brandCol.setPrefWidth(120);
+        
+        TableColumn<RawStockRecord, String> unitCol = new TableColumn<>("Unit");
+        unitCol.setCellValueFactory(new PropertyValueFactory<>("unit"));
+        unitCol.setPrefWidth(60);
         
         TableColumn<RawStockRecord, Double> qtyCol = new TableColumn<>("Quantity");
         qtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
@@ -221,7 +232,7 @@ public class RawStock {
             }
         });
         
-        table.getColumns().addAll(idCol, nameCol, brandCol, qtyCol, priceCol, totalCol);
+        table.getColumns().addAll(idCol, nameCol, brandCol, unitCol, qtyCol, priceCol, totalCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
         // Apply CSS class for proper header styling (defined in style.css)
@@ -239,9 +250,10 @@ public class RawStock {
                 (Integer) row[0],  // stock_id
                 (String) row[1],   // item_name
                 (String) row[2],   // brand_name
-                (Double) row[3],   // quantity (converted to double)
-                (Double) row[4],   // unit_price
-                (Double) row[5]    // total_cost
+                (String) row[3],   // unit_name
+                (Double) row[4],   // quantity
+                (Double) row[5],   // unit_price
+                (Double) row[6]    // total_cost
             ));
         }
         
@@ -1823,18 +1835,19 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
 
     // Form submission handlers
     private static void handleRawStockSubmit(
-        TextField nameField, ComboBox<String> brandCombo, ComboBox<String> supplierCombo,
+        TextField nameField, ComboBox<String> brandCombo, ComboBox<String> unitCombo, ComboBox<String> supplierCombo,
         TextField quantityField, TextField unitPriceField,
         TableView<RawStockRecord> stockTable
     ) {
         String name = nameField.getText().trim();
         String brand = brandCombo.getValue();
+        String unit = unitCombo.getValue();
         String supplier = supplierCombo.getValue(); // Optional
         String quantityText = quantityField.getText().trim();
         String unitPriceText = unitPriceField.getText().trim();
 
-        if (name.isEmpty() || brand == null || unitPriceText.isEmpty() || quantityText.isEmpty()) {
-            showAlert(Alert.AlertType.ERROR, "Error", "Name, Brand, Quantity, and Unit Price are required");
+        if (name.isEmpty() || brand == null || unit == null || unitPriceText.isEmpty() || quantityText.isEmpty()) {
+            showAlert(Alert.AlertType.ERROR, "Error", "Name, Brand, Unit, Quantity, and Unit Price are required");
             return;
         }
 
@@ -1842,8 +1855,8 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             int quantity = Integer.parseInt(quantityText);
             double unitPrice = Double.parseDouble(unitPriceText);
             
-            // Insert into RawStock table using the existing database method
-            boolean success = database.insertRawStock(name, "", brand, "", quantity, unitPrice, 0.0);
+            // Insert into RawStock table using the updated database method with unit
+            boolean success = database.insertRawStock(name, "", brand, unit, quantity, unitPrice, 0.0);
             
             if (success) {
                 showAlert(Alert.AlertType.INFORMATION, "Success", "Raw stock registered successfully!");
@@ -1851,6 +1864,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 // Clear fields
                 nameField.clear();
                 brandCombo.setValue(null);
+                unitCombo.setValue(null);
                 supplierCombo.setValue(null);
                 quantityField.clear();
                 unitPriceField.clear();
@@ -2503,15 +2517,17 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         private final Integer id;
         private final String name;
         private final String brand;
+        private final String unit;
         private final Double quantity;
         private final Double unitPrice;
         private final Double totalCost;
 
-        public RawStockRecord(Integer id, String name, String brand,
+        public RawStockRecord(Integer id, String name, String brand, String unit,
                              Double quantity, Double unitPrice, Double totalCost) {
             this.id = id;
             this.name = name;
             this.brand = brand;
+            this.unit = unit;
             this.quantity = quantity;
             this.unitPrice = unitPrice;
             this.totalCost = totalCost;
@@ -2520,6 +2536,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         public Integer getId() { return id; }
         public String getName() { return name; }
         public String getBrand() { return brand; }
+        public String getUnit() { return unit; }
         public Double getQuantity() { return quantity; }
         public Double getUnitPrice() { return unitPrice; }
         public Double getTotalCost() { return totalCost; }

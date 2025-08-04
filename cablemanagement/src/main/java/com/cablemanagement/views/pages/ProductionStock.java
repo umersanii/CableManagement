@@ -148,6 +148,20 @@ public class ProductionStock {
             showAlert("Database Error", "Failed to load brands: " + e.getMessage());
         }
 
+        // Unit ComboBox
+        ComboBox<String> unitCombo = new ComboBox<>();
+        unitCombo.setPromptText("-- Select Unit --");
+        unitCombo.setEditable(false);
+        unitCombo.setPrefWidth(300);
+        unitCombo.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
+        
+        try {
+            List<String> units = database.getAllUnits();
+            unitCombo.setItems(FXCollections.observableArrayList(units));
+        } catch (Exception e) {
+            showAlert("Database Error", "Failed to load units: " + e.getMessage());
+        }
+
         // Quantity Field
         TextField quantityField = createTextField("Enter Quantity");
         quantityField.setPrefWidth(300);
@@ -166,9 +180,10 @@ public class ProductionStock {
         // Add fields to grid with labels
         inputGrid.add(createFormRow("Product Name:", nameField), 0, 0);
         inputGrid.add(createFormRow("Brand:", brandCombo), 0, 1);
-        inputGrid.add(createFormRow("Quantity:", quantityField), 0, 2);
-        inputGrid.add(createFormRow("Unit Cost:", unitCostField), 0, 3);
-        inputGrid.add(createFormRow("Sale Price:", salePriceField), 0, 4);
+        inputGrid.add(createFormRow("Unit:", unitCombo), 0, 2);
+        inputGrid.add(createFormRow("Quantity:", quantityField), 0, 3);
+        inputGrid.add(createFormRow("Unit Cost:", unitCostField), 0, 4);
+        inputGrid.add(createFormRow("Sale Price:", salePriceField), 0, 5);
 
         // Action buttons for the form
         HBox buttonBox = new HBox(15);
@@ -272,6 +287,7 @@ public class ProductionStock {
         clearBtn.setOnAction(e -> {
             nameField.clear();
             brandCombo.setValue(null);
+            unitCombo.setValue(null);
             quantityField.clear();
             unitCostField.clear();
             salePriceField.clear();
@@ -280,7 +296,7 @@ public class ProductionStock {
 
         // Submit button
         submitBtn.setOnAction(e -> handleProductionStockSubmit(
-            nameField, brandCombo, quantityField, unitCostField, salePriceField, stockTable,
+            nameField, brandCombo, unitCombo, quantityField, unitCostField, salePriceField, stockTable,
             totalItemsLabel, totalValueLabel, lowStockLabel
         ));
 
@@ -2310,13 +2326,14 @@ public class ProductionStock {
 
     // Production Stock specific methods
     private static void handleProductionStockSubmit(
-            TextField nameField, ComboBox<String> brandCombo, 
+            TextField nameField, ComboBox<String> brandCombo, ComboBox<String> unitCombo,
             TextField quantityField, TextField unitCostField, TextField salePriceField,
             TableView<ProductionStockRecord> stockTable,
             Label totalItemsLabel, Label totalValueLabel, Label lowStockLabel) {
         
         String name = nameField.getText().trim();
         String brand = brandCombo.getSelectionModel().getSelectedItem();
+        String unit = unitCombo.getSelectionModel().getSelectedItem();
         String quantityText = quantityField.getText().trim();
         String unitCostText = unitCostField.getText().trim();
         String salePriceText = salePriceField.getText().trim();
@@ -2331,6 +2348,12 @@ public class ProductionStock {
         if (brand == null || brand.isEmpty()) {
             showAlert("Missing Information", "Please select a brand.");
             brandCombo.requestFocus();
+            return;
+        }
+        
+        if (unit == null || unit.isEmpty()) {
+            showAlert("Missing Information", "Please select a unit.");
+            unitCombo.requestFocus();
             return;
         }
         
@@ -2407,21 +2430,22 @@ public class ProductionStock {
                     return; // User cancelled
                 }
             } else {
-                // Insert new production stock - using the new overloaded method
-                boolean success = database.insertProductionStock(name, "", brand, "", quantity, unitCost, salePrice, 0.0);
+                // Insert new production stock - using the new overloaded method with unit
+                boolean success = database.insertProductionStock(name, "", brand, unit, quantity, salePrice, 0.0);
                 
                 if (!success) {
                     showAlert("Error", "Failed to register production stock. Please check database connection.");
                     return;
                 }
                 
-                showAlert("Success", String.format("Production Stock registered successfully!\n\nProduct: %s\nBrand: %s\nQuantity: %d\nUnit Cost: %.2f\nSale Price: %.2f\nProfit Margin: %.1f%%", 
-                    name, brand, quantity, unitCost, salePrice, ((salePrice - unitCost) / unitCost) * 100));
+                showAlert("Success", String.format("Production Stock registered successfully!\n\nProduct: %s\nBrand: %s\nUnit: %s\nQuantity: %d\nUnit Cost: %.2f\nSale Price: %.2f\nProfit Margin: %.1f%%", 
+                    name, brand, unit, quantity, unitCost, salePrice, ((salePrice - unitCost) / unitCost) * 100));
             }
             
             // Clear form after successful submission
             nameField.clear();
             brandCombo.getSelectionModel().clearSelection();
+            unitCombo.getSelectionModel().clearSelection();
             quantityField.clear();
             unitCostField.clear();
             salePriceField.clear();
@@ -2453,6 +2477,10 @@ public class ProductionStock {
         brandCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getBrand()));
         brandCol.setPrefWidth(120);
         
+        TableColumn<ProductionStockRecord, String> unitCol = new TableColumn<>("Unit");
+        unitCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getUnit()));
+        unitCol.setPrefWidth(60);
+        
         TableColumn<ProductionStockRecord, String> quantityCol = new TableColumn<>("Quantity");
         quantityCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getQuantity())));
         quantityCol.setPrefWidth(100);
@@ -2465,7 +2493,7 @@ public class ProductionStock {
         totalCostCol.setCellValueFactory(data -> new SimpleStringProperty(formatNumber(data.getValue().getTotalCost())));
         totalCostCol.setPrefWidth(100);
         
-        table.getColumns().addAll(nameCol, brandCol, quantityCol, unitCostCol, totalCostCol);
+        table.getColumns().addAll(nameCol, brandCol, unitCol, quantityCol, unitCostCol, totalCostCol);
         return table;
     }
 
@@ -2479,12 +2507,13 @@ public class ProductionStock {
                 data.add(new ProductionStockRecord(
                     (Integer) stock[0],   // production_id
                     (String) stock[1],    // product_name
-                    (String) stock[2],    // product_description
+                    (String) stock[2],    // product_description (empty string)
                     (String) stock[3],    // brand_name
-                    (String) stock[4],    // brand_description
-                    (Integer) stock[5],   // quantity
-                    (Double) stock[6],    // unit_cost
-                    (Double) stock[7]     // sale_price
+                    (String) stock[4],    // brand_description (empty string)
+                    (String) stock[5] != null ? (String) stock[5] : "N/A",   // unit_name
+                    (Integer) stock[6],   // quantity
+                    (Double) stock[7],    // unit_cost
+                    (Double) stock[8]     // sale_price
                 ));
             }
         } catch (Exception e) {
@@ -2503,6 +2532,7 @@ public class ProductionStock {
         private final String description;
         private final String brand;
         private final String brandDescription;
+        private final String unit;
         private final int quantity;
         private final double unitCost;
         private final double salePrice;
@@ -2514,6 +2544,7 @@ public class ProductionStock {
             this.description = "";
             this.brand = brand;
             this.brandDescription = "";
+            this.unit = "N/A";
             this.quantity = quantity;
             this.unitCost = unitCost;
             this.salePrice = totalCost; // Use totalCost as salePrice for backward compatibility
@@ -2521,12 +2552,13 @@ public class ProductionStock {
         
         // New comprehensive constructor
         public ProductionStockRecord(int productionId, String name, String description, String brand, 
-                                   String brandDescription, int quantity, double unitCost, double salePrice) {
+                                   String brandDescription, String unit, int quantity, double unitCost, double salePrice) {
             this.productionId = productionId;
             this.name = name;
             this.description = description;
             this.brand = brand;
             this.brandDescription = brandDescription;
+            this.unit = unit;
             this.quantity = quantity;
             this.unitCost = unitCost;
             this.salePrice = salePrice;
@@ -2538,6 +2570,7 @@ public class ProductionStock {
         public String getDescription() { return description; }
         public String getBrand() { return brand; }
         public String getBrandDescription() { return brandDescription; }
+        public String getUnit() { return unit; }
         public int getQuantity() { return quantity; }
         public double getUnitCost() { return unitCost; }
         public double getSalePrice() { return salePrice; }
@@ -3234,9 +3267,10 @@ public class ProductionStock {
                 String productDesc = (String) stock[2];
                 String brandName = (String) stock[3];
                 String brandDesc = (String) stock[4];
-                int quantity = (Integer) stock[5];
-                double unitCost = (Double) stock[6];
-                double salePrice = (Double) stock[7];
+                String unitName = (String) stock[5];
+                int quantity = (Integer) stock[6];
+                double unitCost = (Double) stock[7];
+                double salePrice = (Double) stock[8];
                 
                 boolean matchesSearch = true;
                 boolean matchesBrand = true;
@@ -3255,7 +3289,7 @@ public class ProductionStock {
                 
                 if (matchesSearch && matchesBrand) {
                     filteredRecords.add(new ProductionStockRecord(
-                        productionId, productName, productDesc, brandName, brandDesc, 
+                        productionId, productName, productDesc, brandName, brandDesc, unitName, 
                         quantity, unitCost, salePrice
                     ));
                 }
