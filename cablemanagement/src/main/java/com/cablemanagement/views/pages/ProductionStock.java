@@ -1428,6 +1428,14 @@ public class ProductionStock {
                             ex.printStackTrace();
                         }
                         
+                        // Get customer balance details for PDF
+                        Object[] balanceDetails = database.getCustomerInvoiceBalanceDetails(
+                            customer, invoiceNumber, totalAmount, paidAmount
+                        );
+                        double previousBalance = (Double) balanceDetails[0];
+                        double totalBalance = (Double) balanceDetails[1];
+                        double netBalance = (Double) balanceDetails[2];
+                        
                         // Create invoice data with proper type and metadata
                         InvoiceData invoiceData = new InvoiceData(
                             InvoiceData.TYPE_SALE,
@@ -1436,8 +1444,13 @@ public class ProductionStock {
                             customer,
                             "", // Empty address field as requested
                             printItems,
-                            0.0 // previous balance
+                            previousBalance // Use calculated previous balance
                         );
+                        
+                        // Set all balance details
+                        invoiceData.setBalanceDetails(previousBalance, totalBalance, netBalance);
+                        invoiceData.setPaidAmount(paidAmount);
+                        invoiceData.setDiscountAmount(discount);
                         
                         // Add metadata for contact and tehsil
                         invoiceData.setMetadata("contact", contactNumber);
@@ -1699,10 +1712,20 @@ public class ProductionStock {
                         availableItems.clear();
                         
                         for (Object[] item : originalItems) {
+                            // Calculate net unit price (after discount)
+                            double originalUnitPrice = (Double) item[3];
+                            double discountAmount = (Double) item[5];
+                            double quantity = (Double) item[2];
+                            
+                            // Net unit price = (Original amount - total discount) / quantity
+                            double originalAmount = originalUnitPrice * quantity;
+                            double netAmount = originalAmount - discountAmount;
+                            double netUnitPrice = netAmount / quantity;
+                            
                             SalesInvoiceItemUI itemUI = new SalesInvoiceItemUI(
                                 (String) item[1], // product_name
-                                (Double) item[2], // quantity
-                                (Double) item[3]  // unit_price
+                                quantity,         // quantity
+                                netUnitPrice      // net unit price after discount
                             );
                             itemUI.setProductionStockId((Integer) item[0]);
                             availableItems.add(itemUI);
@@ -1851,11 +1874,16 @@ public class ProductionStock {
                     // Prepare invoice data for printing
                     List<Item> printItems = new ArrayList<>();
                     for (SalesInvoiceItemUI item : returnItems) {
+                        // Calculate the net unit price (what was actually paid after discount)
+                        double originalAmount = item.getUnitPrice() * item.getQuantity();
+                        double netAmount = originalAmount - item.getDiscountAmount();
+                        double netUnitPrice = netAmount / item.getQuantity();
+                        
                         printItems.add(new Item(
                             item.getProductName(),
                             (int) item.getQuantity(),
-                            item.getUnitPrice(),
-                            0.0 // discount percent for returns is 0
+                            netUnitPrice, // Use net unit price instead of original price
+                            0.0 // No discount percentage for return invoice display
                         ));
                     }
                     
@@ -1878,6 +1906,23 @@ public class ProductionStock {
                         ex.printStackTrace();
                     }
                     
+                    // Get customer balance details for PDF (for return, we need to calculate return impact)
+                    Object[] balanceDetails = database.getCustomerInvoiceBalanceDetails(
+                        customer, returnInvoiceNumber, 0.0, 0.0  // Return doesn't add to balance, so amounts are 0
+                    );
+                    double previousBalance = (Double) balanceDetails[0];
+                    
+                    // Calculate return impact on balance from print items using net prices
+                    double returnImpactAmount = 0.0;
+                    for (Item item : printItems) {
+                        // Since printItems now contain net unit prices, just multiply by quantity
+                        returnImpactAmount += item.getUnitPrice() * item.getQuantity();
+                    }
+                    
+                    // For return invoices: Total Balance = Previous Balance - Return Amount
+                    double totalBalance = previousBalance - returnImpactAmount;
+                    double netBalance = totalBalance; // No payment involved in returns, net balance equals total balance
+                    
                     // Create invoice data for printing with proper type and metadata
                     InvoiceData invoiceData = new InvoiceData(
                         InvoiceData.TYPE_SALE_RETURN,
@@ -1886,8 +1931,13 @@ public class ProductionStock {
                         customer,
                         "", // Empty address field as requested
                         printItems,
-                        0.0 // previous balance
+                        previousBalance // Use calculated previous balance
                     );
+                    
+                    // Set all balance details for return
+                    invoiceData.setBalanceDetails(previousBalance, totalBalance, netBalance);
+                    invoiceData.setPaidAmount(0.0); // No payment in returns
+                    invoiceData.setDiscountAmount(0.0); // No discount in returns
                     
                     // Add metadata
                     invoiceData.setMetadata("contact", contactNumber);

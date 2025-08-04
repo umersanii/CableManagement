@@ -629,6 +629,7 @@ public class SQLiteDatabase implements db {
                     "contact_number TEXT," +
                     "address TEXT," +
                     "tehsil_id INTEGER NOT NULL," +
+                    "balance DECIMAL(10,2) DEFAULT 0.00," +
                     "FOREIGN KEY (tehsil_id) REFERENCES Tehsil(tehsil_id)" +
                     ")",
 
@@ -639,6 +640,7 @@ public class SQLiteDatabase implements db {
                     "contact_number TEXT," +
                     "address TEXT," +
                     "tehsil_id INTEGER NOT NULL," +
+                    "balance DECIMAL(10,2) DEFAULT 0.00," +
                     "FOREIGN KEY (tehsil_id) REFERENCES Tehsil(tehsil_id)" +
                     ")",
 
@@ -1495,7 +1497,7 @@ public class SQLiteDatabase implements db {
 
     public List<Customer> getAllCustomers() {
         List<Customer> customers = new ArrayList<>();
-        String query = "SELECT c.customer_name, c.contact_number, t.tehsil_name " +
+        String query = "SELECT c.customer_name, c.contact_number, c.balance, t.tehsil_name " +
                     "FROM Customer c " +
                     "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
                     "ORDER BY c.customer_name";
@@ -1506,7 +1508,11 @@ public class SQLiteDatabase implements db {
                 String contact = rs.getString("contact_number");
                 String tehsil = rs.getString("tehsil_name");
                 if (tehsil == null) tehsil = "";
-                customers.add(new Customer(name, contact, tehsil));
+                
+                // Calculate current balance based on invoice history
+                double currentBalance = getCustomerCurrentBalance(name);
+                
+                customers.add(new Customer(name, contact, tehsil, currentBalance));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -1517,7 +1523,7 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean insertCustomer(String name, String contact) {
         String getTehsilQuery = "SELECT tehsil_id FROM Tehsil LIMIT 1";
-        String insertQuery = "INSERT INTO Customer (customer_name, contact_number, tehsil_id) VALUES (?, ?, ?)";
+        String insertQuery = "INSERT INTO Customer (customer_name, contact_number, tehsil_id, balance) VALUES (?, ?, ?, 0.00)";
         
         try (Statement getStmt = connection.createStatement();
              ResultSet rs = getStmt.executeQuery(getTehsilQuery)) {
@@ -1542,7 +1548,7 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean insertCustomer(String name, String contact, String tehsilName) {
         String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
-        String insertQuery = "INSERT INTO Customer (customer_name, contact_number, tehsil_id) VALUES (?, ?, ?)";
+        String insertQuery = "INSERT INTO Customer (customer_name, contact_number, tehsil_id, balance) VALUES (?, ?, ?, 0.00)";
         
         try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
             getTehsilStmt.setString(1, tehsilName);
@@ -1555,6 +1561,34 @@ public class SQLiteDatabase implements db {
                         insertStmt.setString(1, name);
                         insertStmt.setString(2, contact);
                         insertStmt.setInt(3, tehsilId);
+                        
+                        return insertStmt.executeUpdate() > 0;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean insertCustomer(String name, String contact, String tehsilName, double balance) {
+        String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
+        String insertQuery = "INSERT INTO Customer (customer_name, contact_number, tehsil_id, balance) VALUES (?, ?, ?, ?)";
+        
+        try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
+            getTehsilStmt.setString(1, tehsilName);
+            
+            try (ResultSet rs = getTehsilStmt.executeQuery()) {
+                if (rs.next()) {
+                    int tehsilId = rs.getInt("tehsil_id");
+                    
+                    try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+                        insertStmt.setString(1, name);
+                        insertStmt.setString(2, contact);
+                        insertStmt.setInt(3, tehsilId);
+                        insertStmt.setDouble(4, balance);
                         
                         return insertStmt.executeUpdate() > 0;
                     }
@@ -1587,7 +1621,7 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Supplier> getAllSuppliers() {
         List<Supplier> suppliers = new ArrayList<>();
-        String query = "SELECT s.supplier_name, s.contact_number, t.tehsil_name " +
+        String query = "SELECT s.supplier_name, s.contact_number, s.balance, t.tehsil_name " +
                     "FROM Supplier s " +
                     "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
                     "ORDER BY s.supplier_name";
@@ -1600,7 +1634,11 @@ public class SQLiteDatabase implements db {
                 String contact = rs.getString("contact_number");
                 String tehsil = rs.getString("tehsil_name");
                 if (tehsil == null) tehsil = "";
-                suppliers.add(new Supplier(name, contact, tehsil));
+                
+                // Calculate current balance based on invoice history
+                double currentBalance = getSupplierCurrentBalance(name);
+                
+                suppliers.add(new Supplier(name, contact, tehsil, currentBalance));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -1611,7 +1649,7 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean insertSupplier(String name, String contact) {
         String getTehsilQuery = "SELECT tehsil_id FROM Tehsil LIMIT 1";
-        String insertQuery = "INSERT INTO Supplier (supplier_name, contact_number, tehsil_id) VALUES (?, ?, ?)";
+        String insertQuery = "INSERT INTO Supplier (supplier_name, contact_number, tehsil_id, balance) VALUES (?, ?, ?, 0.00)";
         
         try (Statement getStmt = connection.createStatement();
             ResultSet rs = getStmt.executeQuery(getTehsilQuery)) {
@@ -1636,7 +1674,7 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean insertSupplier(String name, String contact, String tehsilName) {
         String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
-        String insertQuery = "INSERT INTO Supplier (supplier_name, contact_number, tehsil_id) VALUES (?, ?, ?)";
+        String insertQuery = "INSERT INTO Supplier (supplier_name, contact_number, tehsil_id, balance) VALUES (?, ?, ?, 0.00)";
         
         try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
             getTehsilStmt.setString(1, tehsilName);
@@ -1649,6 +1687,34 @@ public class SQLiteDatabase implements db {
                         insertStmt.setString(1, name);
                         insertStmt.setString(2, contact);
                         insertStmt.setInt(3, tehsilId);
+                        
+                        return insertStmt.executeUpdate() > 0;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean insertSupplier(String name, String contact, String tehsilName, double balance) {
+        String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
+        String insertQuery = "INSERT INTO Supplier (supplier_name, contact_number, tehsil_id, balance) VALUES (?, ?, ?, ?)";
+        
+        try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
+            getTehsilStmt.setString(1, tehsilName);
+            
+            try (ResultSet rs = getTehsilStmt.executeQuery()) {
+                if (rs.next()) {
+                    int tehsilId = rs.getInt("tehsil_id");
+                    
+                    try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+                        insertStmt.setString(1, name);
+                        insertStmt.setString(2, contact);
+                        insertStmt.setInt(3, tehsilId);
+                        insertStmt.setDouble(4, balance);
                         
                         return insertStmt.executeUpdate() > 0;
                     }
@@ -1675,6 +1741,451 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return false;
+    }
+
+    @Override
+    public boolean updateCustomerBalance(String customerName, double amount) {
+        String query = "UPDATE Customer SET balance = balance + ? WHERE customer_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDouble(1, amount);
+            pstmt.setString(2, customerName);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean updateSupplierBalance(String supplierName, double amount) {
+        String query = "UPDATE Supplier SET balance = balance + ? WHERE supplier_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDouble(1, amount);
+            pstmt.setString(2, supplierName);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public double getCustomerBalance(String customerName) {
+        String query = "SELECT balance FROM Customer WHERE customer_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, customerName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("balance");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0.0;
+    }
+
+    @Override
+    public double getSupplierBalance(String supplierName) {
+        String query = "SELECT balance FROM Supplier WHERE supplier_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, supplierName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("balance");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0.0;
+    }
+
+    @Override
+    public double getCustomerCurrentBalance(String customerName) {
+        double initialBalance = getCustomerBalance(customerName); // Initial balance from Customer table
+        double invoiceBalance = 0.0;
+        double returnBalance = 0.0;
+        
+        System.out.println("DEBUG: Calculating balance for customer: " + customerName);
+        System.out.println("DEBUG: Initial balance: " + initialBalance);
+        
+        // Calculate total from sales invoices (amount owed by customer)
+        // This should be total_amount - paid_amount for unpaid invoices
+        String invoiceQuery = "SELECT " +
+                            "SUM(si.total_amount - si.discount_amount - si.paid_amount) as unpaid_amount, " +
+                            "COUNT(*) as invoice_count " +
+                            "FROM Sales_Invoice si " +
+                            "JOIN Customer c ON si.customer_id = c.customer_id " +
+                            "WHERE c.customer_name = ? AND (si.total_amount - si.discount_amount - si.paid_amount) > 0";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(invoiceQuery)) {
+            pstmt.setString(1, customerName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    invoiceBalance = rs.getDouble("unpaid_amount");
+                    int invoiceCount = rs.getInt("invoice_count");
+                    System.out.println("DEBUG: Unpaid invoice amount: " + invoiceBalance + " (from " + invoiceCount + " invoices)");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // Calculate total from sales return invoices (amount to be refunded to customer)
+        String returnQuery = "SELECT SUM(sri.total_return_amount) as return_amount, COUNT(*) as return_count " +
+                           "FROM Sales_Return_Invoice sri " +
+                           "JOIN Customer c ON sri.customer_id = c.customer_id " +
+                           "WHERE c.customer_name = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(returnQuery)) {
+            pstmt.setString(1, customerName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    returnBalance = rs.getDouble("return_amount");
+                    int returnCount = rs.getInt("return_count");
+                    System.out.println("DEBUG: Return amount: " + returnBalance + " (from " + returnCount + " returns)");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // Current balance = Initial balance + Invoice unpaid amount - Return amount
+        double currentBalance = initialBalance + invoiceBalance - returnBalance;
+        System.out.println("DEBUG: Final calculated balance: " + currentBalance + 
+                          " (Initial: " + initialBalance + " + Unpaid: " + invoiceBalance + " - Returns: " + returnBalance + ")");
+        
+        return currentBalance;
+    }
+
+    @Override
+    public double getSupplierCurrentBalance(String supplierName) {
+        double initialBalance = getSupplierBalance(supplierName); // Initial balance from Supplier table
+        double purchaseBalance = 0.0;
+        double returnBalance = 0.0;
+        
+        // Calculate total from raw purchase invoices (amount owed to supplier)
+        String purchaseQuery = "SELECT SUM(rpi.total_amount - rpi.paid_amount) as unpaid_amount " +
+                             "FROM Raw_Purchase_Invoice rpi " +
+                             "JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
+                             "WHERE s.supplier_name = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(purchaseQuery)) {
+            pstmt.setString(1, supplierName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    purchaseBalance = rs.getDouble("unpaid_amount");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // Calculate total from raw purchase return invoices (amount to be deducted from what we owe)
+        String returnQuery = "SELECT SUM(rpri.total_return_amount) as return_amount " +
+                           "FROM Raw_Purchase_Return_Invoice rpri " +
+                           "JOIN Supplier s ON rpri.supplier_id = s.supplier_id " +
+                           "WHERE s.supplier_name = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(returnQuery)) {
+            pstmt.setString(1, supplierName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    returnBalance = rs.getDouble("return_amount");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // Current balance = Initial balance + Purchase unpaid amount - Return amount
+        return initialBalance + purchaseBalance - returnBalance;
+    }
+
+    /**
+     * Get customer's balance BEFORE a specific invoice (for PDF generation)
+     * @param customerName Customer name
+     * @param excludeInvoiceNumber Invoice to exclude from calculation 
+     * @return Previous balance before the specified invoice
+     */
+    @Override
+    public double getCustomerPreviousBalance(String customerName, String excludeInvoiceNumber) {
+        double initialBalance = getCustomerBalance(customerName); // Initial balance from Customer table
+        double invoiceBalance = 0.0;
+        double returnBalance = 0.0;
+        
+        System.out.println("DEBUG: Calculating previous balance for customer: " + customerName + ", excluding invoice: " + excludeInvoiceNumber);
+        
+        // Calculate total from sales invoices EXCLUDING the current invoice
+        String invoiceQuery = "SELECT SUM(si.total_amount - si.discount_amount - si.paid_amount) as unpaid_amount " +
+                            "FROM Sales_Invoice si " +
+                            "JOIN Customer c ON si.customer_id = c.customer_id " +
+                            "WHERE c.customer_name = ? AND si.sales_invoice_number != ? " +
+                            "AND (si.total_amount - si.discount_amount - si.paid_amount) > 0";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(invoiceQuery)) {
+            pstmt.setString(1, customerName);
+            pstmt.setString(2, excludeInvoiceNumber);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    invoiceBalance = rs.getDouble("unpaid_amount");
+                    System.out.println("DEBUG: Previous unpaid invoice amount: " + invoiceBalance);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // Calculate total from sales return invoices EXCLUDING the current invoice
+        String returnQuery = "SELECT SUM(sri.total_return_amount) as return_amount " +
+                           "FROM Sales_Return_Invoice sri " +
+                           "JOIN Customer c ON sri.customer_id = c.customer_id " +
+                           "WHERE c.customer_name = ? AND sri.return_invoice_number != ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(returnQuery)) {
+            pstmt.setString(1, customerName);
+            pstmt.setString(2, excludeInvoiceNumber);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    returnBalance = rs.getDouble("return_amount");
+                    System.out.println("DEBUG: Return amount (excluding current): " + returnBalance);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // Previous balance = Initial balance + Previous unpaid amount - Return amount
+        double previousBalance = initialBalance + invoiceBalance - returnBalance;
+        System.out.println("DEBUG: Previous balance calculated: " + previousBalance + 
+                          " (Initial: " + initialBalance + " + Previous Unpaid: " + invoiceBalance + " - Returns: " + returnBalance + ")");
+        
+        return previousBalance;
+    }
+
+    /**
+     * Get supplier's balance BEFORE a specific invoice (for PDF generation)
+     * @param supplierName Supplier name
+     * @param excludeInvoiceNumber Invoice to exclude from calculation 
+     * @return Previous balance before the specified invoice
+     */
+    @Override
+    public double getSupplierPreviousBalance(String supplierName, String excludeInvoiceNumber) {
+        double initialBalance = getSupplierBalance(supplierName); // Initial balance from Supplier table
+        double purchaseBalance = 0.0;
+        double returnBalance = 0.0;
+        
+        // Calculate total from raw purchase invoices EXCLUDING the current invoice
+        String purchaseQuery = "SELECT SUM(rpi.total_amount - rpi.paid_amount) as unpaid_amount " +
+                             "FROM Raw_Purchase_Invoice rpi " +
+                             "JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
+                             "WHERE s.supplier_name = ? AND rpi.invoice_number != ? " +
+                             "AND (rpi.total_amount - rpi.paid_amount) > 0";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(purchaseQuery)) {
+            pstmt.setString(1, supplierName);
+            pstmt.setString(2, excludeInvoiceNumber);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    purchaseBalance = rs.getDouble("unpaid_amount");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // Calculate total from raw purchase return invoices EXCLUDING the current invoice
+        String returnQuery = "SELECT SUM(rpri.total_return_amount) as return_amount " +
+                           "FROM Raw_Purchase_Return_Invoice rpri " +
+                           "JOIN Supplier s ON rpri.supplier_id = s.supplier_id " +
+                           "WHERE s.supplier_name = ? AND rpri.return_invoice_number != ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(returnQuery)) {
+            pstmt.setString(1, supplierName);
+            pstmt.setString(2, excludeInvoiceNumber);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    returnBalance = rs.getDouble("return_amount");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // Previous balance = Initial balance + Previous unpaid amount - Return amount
+        return initialBalance + purchaseBalance - returnBalance;
+    }
+
+    /**
+     * Get invoice balance details for PDF generation
+     * @param customerName Customer name
+     * @param invoiceNumber Current invoice number
+     * @param currentInvoiceTotal Current invoice total amount
+     * @param currentInvoicePaid Current invoice paid amount
+     * @return Object array with [previousBalance, totalBalance, netBalance]
+     */
+    @Override
+    public Object[] getCustomerInvoiceBalanceDetails(String customerName, String invoiceNumber, 
+                                                   double currentInvoiceTotal, double currentInvoicePaid) {
+        double previousBalance = getCustomerPreviousBalance(customerName, invoiceNumber);
+        double totalBalance = previousBalance + currentInvoiceTotal;
+        double netBalance = totalBalance - currentInvoicePaid;
+        
+        System.out.println("DEBUG: Balance details for " + customerName + " invoice " + invoiceNumber + ":");
+        System.out.println("  Previous Balance: " + previousBalance);
+        System.out.println("  Current Invoice Total: " + currentInvoiceTotal);
+        System.out.println("  Total Balance: " + totalBalance);
+        System.out.println("  Current Invoice Paid: " + currentInvoicePaid);
+        System.out.println("  Net Balance: " + netBalance);
+        
+        return new Object[]{previousBalance, totalBalance, netBalance};
+    }
+
+    /**
+     * Get supplier invoice balance details for PDF generation
+     * @param supplierName Supplier name
+     * @param invoiceNumber Current invoice number
+     * @param currentInvoiceTotal Current invoice total amount
+     * @param currentInvoicePaid Current invoice paid amount
+     * @return Object array with [previousBalance, totalBalance, netBalance]
+     */
+    @Override
+    public Object[] getSupplierInvoiceBalanceDetails(String supplierName, String invoiceNumber, 
+                                                   double currentInvoiceTotal, double currentInvoicePaid) {
+        double previousBalance = getSupplierPreviousBalance(supplierName, invoiceNumber);
+        double totalBalance = previousBalance + currentInvoiceTotal;
+        double netBalance = totalBalance - currentInvoicePaid;
+        
+        return new Object[]{previousBalance, totalBalance, netBalance};
+    }
+
+    @Override
+    public Customer getCustomerWithCurrentBalance(String customerName) {
+        String query = "SELECT c.customer_name, c.contact_number, t.tehsil_name " +
+                    "FROM Customer c " +
+                    "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                    "WHERE c.customer_name = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, customerName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String name = rs.getString("customer_name");
+                    String contact = rs.getString("contact_number");
+                    String tehsil = rs.getString("tehsil_name");
+                    if (tehsil == null) tehsil = "";
+                    
+                    // Get current balance including invoice history
+                    double currentBalance = getCustomerCurrentBalance(name);
+                    
+                    return new Customer(name, contact, tehsil, currentBalance);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    @Override
+    public Supplier getSupplierWithCurrentBalance(String supplierName) {
+        String query = "SELECT s.supplier_name, s.contact_number, t.tehsil_name " +
+                    "FROM Supplier s " +
+                    "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                    "WHERE s.supplier_name = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, supplierName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String name = rs.getString("supplier_name");
+                    String contact = rs.getString("contact_number");
+                    String tehsil = rs.getString("tehsil_name");
+                    if (tehsil == null) tehsil = "";
+                    
+                    // Get current balance including invoice history
+                    double currentBalance = getSupplierCurrentBalance(name);
+                    
+                    return new Supplier(name, contact, tehsil, currentBalance);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    @Override
+    public List<Object[]> getCustomerBalanceSummary() {
+        List<Object[]> summary = new ArrayList<>();
+        String query = "SELECT c.customer_name, c.contact_number, c.balance as initial_balance, t.tehsil_name " +
+                    "FROM Customer c " +
+                    "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                    "ORDER BY c.customer_name";
+        
+        try (Statement stmt = connection.createStatement();
+            ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                String customerName = rs.getString("customer_name");
+                String contact = rs.getString("contact_number");
+                double initialBalance = rs.getDouble("initial_balance");
+                String tehsil = rs.getString("tehsil_name");
+                if (tehsil == null) tehsil = "";
+                
+                double currentBalance = getCustomerCurrentBalance(customerName);
+                
+                Object[] row = {
+                    customerName,
+                    contact,
+                    tehsil,
+                    initialBalance,
+                    currentBalance,
+                    (currentBalance - initialBalance) // Net change from invoices
+                };
+                summary.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return summary;
+    }
+
+    @Override
+    public List<Object[]> getSupplierBalanceSummary() {
+        List<Object[]> summary = new ArrayList<>();
+        String query = "SELECT s.supplier_name, s.contact_number, s.balance as initial_balance, t.tehsil_name " +
+                    "FROM Supplier s " +
+                    "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                    "ORDER BY s.supplier_name";
+        
+        try (Statement stmt = connection.createStatement();
+            ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                String supplierName = rs.getString("supplier_name");
+                String contact = rs.getString("contact_number");
+                double initialBalance = rs.getDouble("initial_balance");
+                String tehsil = rs.getString("tehsil_name");
+                if (tehsil == null) tehsil = "";
+                
+                double currentBalance = getSupplierCurrentBalance(supplierName);
+                
+                Object[] row = {
+                    supplierName,
+                    contact,
+                    tehsil,
+                    initialBalance,
+                    currentBalance,
+                    (currentBalance - initialBalance) // Net change from invoices
+                };
+                summary.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return summary;
     }
 
     @Override

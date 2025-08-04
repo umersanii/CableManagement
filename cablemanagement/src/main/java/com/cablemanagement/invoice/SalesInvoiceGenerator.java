@@ -144,16 +144,29 @@ public class SalesInvoiceGenerator {
             summaryTable.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
             double total = subtotal - totalDiscount;
-            double grandTotal = total + data.getPreviousBalance();
 
             // Summary rows
             addSummaryRow(summaryTable, "Subtotal:", String.format("%.2f", subtotal), regularFont, boldFont);
             addSummaryRow(summaryTable, "Total Discount:", String.format("%.2f", totalDiscount), regularFont, boldFont);
             addSummaryRow(summaryTable, "Net Amount:", String.format("%.2f", total), regularFont, boldFont);
             
+            // Balance information
             if (data.getPreviousBalance() != 0) {
                 addSummaryRow(summaryTable, "Previous Balance:", String.format("%.2f", data.getPreviousBalance()), regularFont, boldFont);
-                addSummaryRow(summaryTable, "Grand Total:", String.format("%.2f", grandTotal), boldFont, boldFont);
+            }
+            
+            // Total Balance = Previous Balance + Current Invoice Net Amount
+            double totalBalance = data.getPreviousBalance() + total;
+            addSummaryRow(summaryTable, "Total Balance:", String.format("%.2f", totalBalance), boldFont, boldFont);
+            
+            // Net Balance = Total Balance - Paid Amount (if any paid amount is recorded)
+            if (data.getPaidAmount() > 0) {
+                addSummaryRow(summaryTable, "Paid Amount:", String.format("%.2f", data.getPaidAmount()), regularFont, boldFont);
+                double netBalance = totalBalance - data.getPaidAmount();
+                addSummaryRow(summaryTable, "Net Balance:", String.format("%.2f", netBalance), boldFont, boldFont);
+            } else {
+                // If nothing paid, net balance equals total balance
+                addSummaryRow(summaryTable, "Net Balance:", String.format("%.2f", totalBalance), boldFont, boldFont);
             }
 
             document.add(summaryTable);
@@ -312,6 +325,8 @@ public class SalesInvoiceGenerator {
                     itemName = "Returned Item - " + itemName.substring(itemName.indexOf(" (Return Invoice: ") + 18).replace(")", "");
                 }
                 
+                // For return invoices, the unit price is already the net price (after discount)
+                // No need to calculate discount again since it was already applied in the original sale
                 double returnAmount = item.getUnitPrice() * item.getQuantity();
                 totalReturnAmount += returnAmount;
 
@@ -319,7 +334,7 @@ public class SalesInvoiceGenerator {
                 table.addCell(new Phrase(String.valueOf(i + 1), regularFont));
                 table.addCell(new Phrase(itemName, regularFont));
                 table.addCell(new Phrase(String.valueOf(item.getQuantity()), regularFont));
-                table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice()), regularFont));
+                table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice()), regularFont)); // Already net unit price
                 table.addCell(new Phrase(String.format("%.2f", returnAmount), regularFont));
             }
 
@@ -331,7 +346,18 @@ public class SalesInvoiceGenerator {
             summaryTable.setWidthPercentage(50);
             summaryTable.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
+            // For return invoices, we need to show balance impact
             addSummaryRow(summaryTable, "Total Return Amount:", String.format("%.2f", totalReturnAmount), boldFont, boldFont);
+            
+            // Show balance information if available
+            if (data.getPreviousBalance() != 0) {
+                addSummaryRow(summaryTable, "Previous Balance:", String.format("%.2f", data.getPreviousBalance()), regularFont, boldFont);
+                
+                // Net Balance = Previous Balance - Return Amount
+                double netBalance = data.getPreviousBalance() - totalReturnAmount;
+                addSummaryRow(summaryTable, "New Balance:", String.format("%.2f", netBalance), boldFont, boldFont);
+            }
+            
             addSummaryRow(summaryTable, "Refund Method:", "Store Credit", regularFont, boldFont);
             addSummaryRow(summaryTable, "Processing Fee:", "0.00", regularFont, boldFont);
             addSummaryRow(summaryTable, "Net Refund:", String.format("%.2f", totalReturnAmount), boldFont, boldFont);

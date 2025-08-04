@@ -490,7 +490,13 @@ public class RawStock {
                 double totalAfterDiscount = totalBeforeDiscount - invoiceDiscount;
                 double balance = totalAfterDiscount - invoicePaidAmount;
                 
-                // We'll use metadata to set tehsil and contact instead of formatting them here
+                // Get supplier balance details for PDF
+                Object[] balanceDetails = database.getSupplierInvoiceBalanceDetails(
+                    capturedSupplierName, invoiceNumberField.getText(), totalAfterDiscount, invoicePaidAmount
+                );
+                double previousBalance = (Double) balanceDetails[0];
+                double totalBalance = (Double) balanceDetails[1];
+                double netBalance = (Double) balanceDetails[2];
 
                 // Create invoice data object using factory method
                 InvoiceData invoiceData = InvoiceData.createPurchaseInvoice(
@@ -499,14 +505,19 @@ public class RawStock {
                     capturedSupplierName,
                     "",  // Empty address as we're using metadata instead
                     printItems,
-                    balance  // Add remaining balance
+                    previousBalance  // Use calculated previous balance
                 );
 
+                // Set all balance details
+                invoiceData.setBalanceDetails(previousBalance, totalBalance, netBalance);
+                invoiceData.setDiscountAmount(invoiceDiscount);
+                invoiceData.setPaidAmount(invoicePaidAmount);
+                
                 // Set additional details including tehsil and contact as metadata
                 invoiceData.setMetadata("tehsil", supplierTehsil);
                 invoiceData.setMetadata("contact", supplierContact);
-                invoiceData.setDiscountAmount(invoiceDiscount);
-                invoiceData.setPaidAmount(invoicePaidAmount);
+                // Since getCurrentOperator is not available, we can set as "System" or leave it null
+                invoiceData.setOperator("System");
                 // Since getCurrentOperator is not available, we can set as "System" or leave it null
                 invoiceData.setOperator("System");
 
@@ -951,6 +962,22 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                     String supplierContact = (supplierDetails != null && supplierDetails.length > 4 && supplierDetails[4] != null) ? 
                         supplierDetails[4].toString() : "";
                     
+                    // Get supplier balance details for PDF (for return, we need to calculate return impact)
+                    Object[] balanceDetails = database.getSupplierInvoiceBalanceDetails(
+                        supplierName, returnInvoiceNumber, 0.0, 0.0  // Return doesn't add to balance, so amounts are 0
+                    );
+                    double previousBalance = (Double) balanceDetails[0];
+                    
+                    // Calculate return impact on balance from print items
+                    double returnImpactAmount = 0.0;
+                    for (Item item : printItems) {
+                        returnImpactAmount += item.getUnitPrice() * item.getQuantity();
+                    }
+                    
+                    // For purchase return invoices: Total Balance = Previous Balance - Return Amount (we owe less to supplier)
+                    double totalBalance = previousBalance - returnImpactAmount;
+                    double netBalance = totalBalance; // No payment involved in returns, net balance equals total balance
+                    
                     // Create invoice data with proper title
                     InvoiceData invoiceData = InvoiceData.createReturnPurchaseInvoice(
                         returnInvoiceNumber,
@@ -958,8 +985,13 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                         supplierName,
                         "", // Empty address as we'll use metadata
                         printItems,
-                        0.0
+                        previousBalance // Use calculated previous balance
                     );
+                    
+                    // Set all balance details for return
+                    invoiceData.setBalanceDetails(previousBalance, totalBalance, netBalance);
+                    invoiceData.setPaidAmount(0.0); // No payment in returns
+                    invoiceData.setDiscountAmount(0.0); // No discount in returns
                     
                     // Add supplier details as metadata
                     invoiceData.setMetadata("tehsil", supplierTehsil);

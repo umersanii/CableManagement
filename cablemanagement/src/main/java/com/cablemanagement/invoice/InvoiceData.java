@@ -23,6 +23,8 @@ public class InvoiceData {
     private String operator;
     private List<Item> items;
     private double previousBalance;
+    private double totalBalance;  // previousBalance + current invoice total
+    private double netBalance;    // totalBalance - paid amount
     private double discountAmount;
     private double paidAmount;
     
@@ -123,6 +125,38 @@ public class InvoiceData {
 
     public double getPreviousBalance() {
         return previousBalance;
+    }
+
+    public void setPreviousBalance(double previousBalance) {
+        this.previousBalance = previousBalance;
+    }
+
+    public double getTotalBalance() {
+        return totalBalance;
+    }
+
+    public void setTotalBalance(double totalBalance) {
+        this.totalBalance = totalBalance;
+    }
+
+    public double getNetBalance() {
+        return netBalance;
+    }
+
+    public void setNetBalance(double netBalance) {
+        this.netBalance = netBalance;
+    }
+
+    /**
+     * Set all balance values at once
+     * @param previousBalance Balance before this invoice
+     * @param totalBalance Previous balance + current invoice total
+     * @param netBalance Total balance - paid amount
+     */
+    public void setBalanceDetails(double previousBalance, double totalBalance, double netBalance) {
+        this.previousBalance = previousBalance;
+        this.totalBalance = totalBalance;
+        this.netBalance = netBalance;
     }
 
     public void setDiscountAmount(double discountAmount) {

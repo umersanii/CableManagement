@@ -212,7 +212,11 @@ public class InvoiceGenerator {
 
             // Summary Table - handling different for raw stock vs other invoice types
             double totalDiscount = items.stream().mapToDouble(i -> i.getQuantity() * i.getUnitPrice() * i.getDiscountPercent() / 100.0).sum();
-            double totalBalance = total + data.getPreviousBalance();
+            
+            // Use the balance values from InvoiceData if they are set, otherwise calculate them
+            double totalBalance = data.getTotalBalance() != 0 ? data.getTotalBalance() : (total + data.getPreviousBalance());
+            double netBalance = data.getNetBalance() != 0 ? data.getNetBalance() : (totalBalance - data.getPaidAmount());
+            double paidAmount = data.getPaidAmount();
             int totalQuantity = items.stream().mapToInt(Item::getQuantity).sum();
 
             PdfPTable summaryHeadingTable = new PdfPTable(1);
@@ -283,10 +287,16 @@ public class InvoiceGenerator {
                 summary.addCell(new Phrase("Total Balance:", regularFont));
                 summary.addCell(new Phrase(String.format("%.2f", totalBalance), regularFont));
                 
-                summary.addCell(new Phrase("Paid:", regularFont));
-                summary.addCell(new Phrase("0.00", regularFont));
+                // Only show paid amount if it's greater than 0
+                if (paidAmount > 0) {
+                    summary.addCell(new Phrase("Paid:", regularFont));
+                    summary.addCell(new Phrase(String.format("%.2f", paidAmount), regularFont));
+                } else {
+                    summary.addCell(new Phrase("Payment Status:", regularFont));
+                    summary.addCell(new Phrase("Unpaid", regularFont));
+                }
                 summary.addCell(new Phrase("Net Balance:", regularFont));
-                summary.addCell(new Phrase(String.format("%.2f", totalBalance), regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", netBalance), regularFont));
             }
             
             document.add(summary);

@@ -862,10 +862,16 @@ public class RegisterContent {
         // Input fields
         TextField nameField = new TextField();
         TextField contactField = new TextField();
+        TextField balanceField = new TextField();
         ComboBox<String> tehsilBox = new ComboBox<>();
         nameField.getStyleClass().add("form-input");
         contactField.getStyleClass().add("form-input");
+        balanceField.getStyleClass().add("form-input");
         tehsilBox.getStyleClass().add("form-input");
+
+        // Set default balance value
+        balanceField.setText("0.00");
+        balanceField.setPromptText("Enter balance (default: 0.00)");
 
         // Load all tehsils from database
         if (config.database != null && config.database.isConnected()) {
@@ -874,9 +880,11 @@ public class RegisterContent {
 
         Label nameLabel = new Label("Customer Name:");
         Label contactLabel = new Label("Contact:");
+        Label balanceLabel = new Label("Balance:");
         Label tehsilLabel = new Label("Tehsil:");
         nameLabel.getStyleClass().add("form-label");
         contactLabel.getStyleClass().add("form-label");
+        balanceLabel.getStyleClass().add("form-label");
         tehsilLabel.getStyleClass().add("form-label");
 
         HBox nameRow = new HBox(10, nameLabel, nameField);
@@ -886,6 +894,10 @@ public class RegisterContent {
         HBox contactRow = new HBox(10, contactLabel, contactField);
         contactRow.setAlignment(Pos.CENTER_LEFT);
         contactRow.getStyleClass().add("form-row");
+
+        HBox balanceRow = new HBox(10, balanceLabel, balanceField);
+        balanceRow.setAlignment(Pos.CENTER_LEFT);
+        balanceRow.getStyleClass().add("form-row");
 
         HBox tehsilRow = new HBox(10, tehsilLabel, tehsilBox);
         tehsilRow.setAlignment(Pos.CENTER_LEFT);
@@ -919,7 +931,12 @@ public class RegisterContent {
         TableColumn<Customer, String> tehsilCol = new TableColumn<>("Tehsil");
         tehsilCol.setCellValueFactory(data -> data.getValue().tehsilProperty());
 
-        table.getColumns().addAll(nameCol, contactCol, tehsilCol);
+        TableColumn<Customer, String> balanceCol = new TableColumn<>("Balance");
+        balanceCol.setCellValueFactory(data -> 
+            javafx.beans.binding.Bindings.format("%.2f", data.getValue().balanceProperty())
+        );
+
+        table.getColumns().addAll(nameCol, contactCol, tehsilCol, balanceCol);
 
         // Load existing customers from database
         if (config.database != null && config.database.isConnected()) {
@@ -930,25 +947,40 @@ public class RegisterContent {
         submitBtn.setOnAction(e -> {
             String name = nameField.getText().trim();
             String contact = contactField.getText().trim();
+            String balanceText = balanceField.getText().trim();
             String tehsil = tehsilBox.getValue();
             
             if (!name.isEmpty()) {
                 if (config.database != null && config.database.isConnected()) {
                     boolean success = false;
                     Customer customer = null;
+                    double balance = 0.0;
+                    
+                    // Parse balance input
+                    try {
+                        if (!balanceText.isEmpty()) {
+                            balance = Double.parseDouble(balanceText);
+                        }
+                    } catch (NumberFormatException ex) {
+                        showAlert("Error", "Invalid balance amount!");
+                        return;
+                    }
                     
                     if (tehsil != null && !tehsil.trim().isEmpty()) {
-                        success = config.database.insertCustomer(name, contact, tehsil);
-                        customer = new Customer(name, contact, tehsil);
+                        success = config.database.insertCustomer(name, contact, tehsil, balance);
+                        customer = new Customer(name, contact, tehsil, balance);
                     } else {
-                        success = config.database.insertCustomer(name, contact);
-                        customer = new Customer(name, contact, "");
+                        // For customers without tehsil, we still need a way to add balance
+                        // We'll add a new method for this case or modify existing logic
+                        showAlert("Error", "Please select a tehsil!");
+                        return;
                     }
                     
                     if (success) {
                         table.getItems().add(customer);
                         nameField.clear();
                         contactField.clear();
+                        balanceField.setText("0.00");
                         tehsilBox.setValue(null);
                         showAlert("Success", "Customer added successfully!");
                     } else {
@@ -985,6 +1017,7 @@ public class RegisterContent {
             heading,
             nameRow,
             contactRow,
+            balanceRow,
             tehsilRow,
             buttonRow,
             tableHeading,
@@ -1005,10 +1038,16 @@ public class RegisterContent {
         // Input fields
         TextField nameField = new TextField();
         TextField contactField = new TextField();
+        TextField balanceField = new TextField();
         ComboBox<String> tehsilBox = new ComboBox<>();
         nameField.getStyleClass().add("form-input");
         contactField.getStyleClass().add("form-input");
+        balanceField.getStyleClass().add("form-input");
         tehsilBox.getStyleClass().add("form-input");
+
+        // Set default balance value
+        balanceField.setText("0.00");
+        balanceField.setPromptText("Enter balance (default: 0.00)");
 
         // Load all tehsils from database
         if (config.database != null && config.database.isConnected()) {
@@ -1017,9 +1056,11 @@ public class RegisterContent {
 
         Label nameLabel = new Label("Supplier Name:");
         Label contactLabel = new Label("Contact:");
+        Label balanceLabel = new Label("Balance:");
         Label tehsilLabel = new Label("Tehsil:");
         nameLabel.getStyleClass().add("form-label");
         contactLabel.getStyleClass().add("form-label");
+        balanceLabel.getStyleClass().add("form-label");
         tehsilLabel.getStyleClass().add("form-label");
 
         HBox nameRow = new HBox(10, nameLabel, nameField);
@@ -1030,11 +1071,13 @@ public class RegisterContent {
         contactRow.setAlignment(Pos.CENTER_LEFT);
         contactRow.getStyleClass().add("form-row");
 
+        HBox balanceRow = new HBox(10, balanceLabel, balanceField);
+        balanceRow.setAlignment(Pos.CENTER_LEFT);
+        balanceRow.getStyleClass().add("form-row");
+
         HBox tehsilRow = new HBox(10, tehsilLabel, tehsilBox);
         tehsilRow.setAlignment(Pos.CENTER_LEFT);
         tehsilRow.getStyleClass().add("form-row");
-        contactRow.setAlignment(Pos.CENTER_LEFT);
-        contactRow.getStyleClass().add("form-row");
 
         Button submitBtn = new Button("Submit Supplier");
         submitBtn.getStyleClass().add("form-submit");
@@ -1064,7 +1107,12 @@ public class RegisterContent {
         TableColumn<Supplier, String> tehsilCol = new TableColumn<>("Tehsil");
         tehsilCol.setCellValueFactory(data -> data.getValue().tehsilProperty());
 
-        table.getColumns().addAll(nameCol, contactCol, tehsilCol);
+        TableColumn<Supplier, String> balanceCol = new TableColumn<>("Balance");
+        balanceCol.setCellValueFactory(data -> 
+            javafx.beans.binding.Bindings.format("%.2f", data.getValue().balanceProperty())
+        );
+
+        table.getColumns().addAll(nameCol, contactCol, tehsilCol, balanceCol);
 
         // Load existing suppliers from database
         if (config.database != null && config.database.isConnected()) {
@@ -1075,25 +1123,39 @@ public class RegisterContent {
         submitBtn.setOnAction(e -> {
             String name = nameField.getText().trim();
             String contact = contactField.getText().trim();
+            String balanceText = balanceField.getText().trim();
             String tehsil = tehsilBox.getValue();
             
             if (!name.isEmpty()) {
                 if (config.database != null && config.database.isConnected()) {
                     boolean success = false;
                     Supplier supplier = null;
+                    double balance = 0.0;
+                    
+                    // Parse balance input
+                    try {
+                        if (!balanceText.isEmpty()) {
+                            balance = Double.parseDouble(balanceText);
+                        }
+                    } catch (NumberFormatException ex) {
+                        showAlert("Error", "Invalid balance amount!");
+                        return;
+                    }
                     
                     if (tehsil != null && !tehsil.trim().isEmpty()) {
-                        success = config.database.insertSupplier(name, contact, tehsil);
-                        supplier = new Supplier(name, contact, tehsil);
+                        success = config.database.insertSupplier(name, contact, tehsil, balance);
+                        supplier = new Supplier(name, contact, tehsil, balance);
                     } else {
-                        success = config.database.insertSupplier(name, contact);
-                        supplier = new Supplier(name, contact, "");
+                        // For suppliers without tehsil, we need to handle this case
+                        showAlert("Error", "Please select a tehsil!");
+                        return;
                     }
                     
                     if (success) {
                         table.getItems().add(supplier);
                         nameField.clear();
                         contactField.clear();
+                        balanceField.setText("0.00");
                         tehsilBox.setValue(null);
                         showAlert("Success", "Supplier added successfully!");
                     } else {
@@ -1130,6 +1192,7 @@ public class RegisterContent {
             heading,
             nameRow,
             contactRow,
+            balanceRow,
             tehsilRow,
             buttonRow,
             tableHeading,

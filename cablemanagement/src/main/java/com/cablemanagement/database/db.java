@@ -142,7 +142,38 @@ public interface db {
     
     boolean insertCustomer(String name, String contact, String tehsil);
 
+    boolean insertCustomer(String name, String contact, String tehsil, double balance);
+
     boolean customerExists(String name);
+
+    boolean updateCustomerBalance(String customerName, double amount);
+
+    double getCustomerBalance(String customerName);
+
+    double getCustomerCurrentBalance(String customerName);
+
+    /**
+     * Get customer's balance BEFORE a specific invoice (for PDF generation)
+     * @param customerName Customer name
+     * @param excludeInvoiceNumber Invoice to exclude from calculation 
+     * @return Previous balance before the specified invoice
+     */
+    double getCustomerPreviousBalance(String customerName, String excludeInvoiceNumber);
+
+    /**
+     * Get invoice balance details for PDF generation
+     * @param customerName Customer name
+     * @param invoiceNumber Current invoice number
+     * @param currentInvoiceTotal Current invoice total amount
+     * @param currentInvoicePaid Current invoice paid amount
+     * @return Object array with [previousBalance, totalBalance, netBalance]
+     */
+    Object[] getCustomerInvoiceBalanceDetails(String customerName, String invoiceNumber, 
+                                           double currentInvoiceTotal, double currentInvoicePaid);
+
+    Customer getCustomerWithCurrentBalance(String customerName);
+
+    List<Object[]> getCustomerBalanceSummary();
 
     // --------------------------
     // Supplier Operations
@@ -153,7 +184,38 @@ public interface db {
     
     boolean insertSupplier(String name, String contact, String tehsil);
 
+    boolean insertSupplier(String name, String contact, String tehsil, double balance);
+
     boolean supplierExists(String name) ;
+
+    boolean updateSupplierBalance(String supplierName, double amount);
+
+    double getSupplierBalance(String supplierName);
+
+    double getSupplierCurrentBalance(String supplierName);
+
+    /**
+     * Get supplier's balance BEFORE a specific invoice (for PDF generation)
+     * @param supplierName Supplier name
+     * @param excludeInvoiceNumber Invoice to exclude from calculation 
+     * @return Previous balance before the specified invoice
+     */
+    double getSupplierPreviousBalance(String supplierName, String excludeInvoiceNumber);
+
+    /**
+     * Get supplier invoice balance details for PDF generation
+     * @param supplierName Supplier name
+     * @param invoiceNumber Current invoice number
+     * @param currentInvoiceTotal Current invoice total amount
+     * @param currentInvoicePaid Current invoice paid amount
+     * @return Object array with [previousBalance, totalBalance, netBalance]
+     */
+    Object[] getSupplierInvoiceBalanceDetails(String supplierName, String invoiceNumber, 
+                                           double currentInvoiceTotal, double currentInvoicePaid);
+
+    Supplier getSupplierWithCurrentBalance(String supplierName);
+
+    List<Object[]> getSupplierBalanceSummary();
 
     // --------------------------
     // Unit Operations
