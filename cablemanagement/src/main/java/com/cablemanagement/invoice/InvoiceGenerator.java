@@ -17,6 +17,35 @@ import javax.print.attribute.standard.OrientationRequested;
 import javax.print.event.PrintJobEvent;
 import javax.print.event.PrintJobListener;
 
+/**
+ * Footer event handler to add the footer at the bottom of every page
+ */
+class FooterEvent extends PdfPageEventHelper {
+    @Override
+    public void onEndPage(PdfWriter writer, Document document) {
+        try {
+            // Create the font for the footer
+            Font footerFont = FontFactory.getFont(FontFactory.HELVETICA, 8, BaseColor.GRAY);
+            
+            // Create a footer phrase with heart symbol and CODOC attribution
+            // Using a simple ASCII heart "<3" that will display in any font
+            Phrase footer = new Phrase("Made with <3 by CODOC", footerFont);
+            
+            // Get the direct content
+            PdfContentByte cb = writer.getDirectContent();
+            
+            // Position at the bottom of the page, centered horizontally
+            float x = (document.right() - document.left()) / 2 + document.leftMargin();
+            float y = document.bottom() - 15; // 15 points from the bottom edge
+            
+            // Add the text at the specified position
+            ColumnText.showTextAligned(cb, Element.ALIGN_CENTER, footer, x, y, 0);
+        } catch (Exception e) {
+            System.err.println("Error adding footer: " + e.getMessage());
+        }
+    }
+}
+
 public class InvoiceGenerator {
     
     /**
@@ -52,7 +81,10 @@ public class InvoiceGenerator {
     public static void generatePDF(InvoiceData data, String filename) {
         try {
             Document document = new Document(PageSize.A4, 50, 50, 50, 50);
-            PdfWriter.getInstance(document, new FileOutputStream(filename));
+            
+            // Create PDF writer with footer event handler for bottom page footer
+            PdfWriter writer = PdfWriter.getInstance(document, new FileOutputStream(filename));
+            writer.setPageEvent(new FooterEvent());
             document.open();
 
             // Fonts
@@ -266,35 +298,63 @@ public class InvoiceGenerator {
                 }
                 summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
             } else {
-                // Regular summary table for purchase/sales invoices
-                summary = new PdfPTable(4);
+                // Regular summary table for purchase/sales invoices in single column layout
+                summary = new PdfPTable(2);
                 summary.setWidthPercentage(100);
-                summary.setWidths(new float[]{3f, 3f, 3f, 3f});
+                summary.setWidths(new float[]{1f, 1f});
                 summary.setSpacingBefore(10f);
                 
+                // Add items in the specified order: bill, discount, current net bill, previous balance,
+                // total balance, other discount, paid, net balance
+                
+                // Total quantity in the first row
+                summary.addCell(new Phrase("Total Quantity:", regularFont));
+                summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
+                
+                // Bill (gross total)
                 summary.addCell(new Phrase("Bill:", regularFont));
                 summary.addCell(new Phrase(String.format("%.2f", total + totalDiscount), regularFont));
+                
+                // Discount
                 summary.addCell(new Phrase("Discount:", regularFont));
                 summary.addCell(new Phrase(String.format("%.2f", totalDiscount), regularFont));
                 
+                // Current Net Bill
                 summary.addCell(new Phrase("Current Net Bill:", regularFont));
                 summary.addCell(new Phrase(String.format("%.2f", total), regularFont));
+                
+                // Previous Balance
                 summary.addCell(new Phrase("Previous Balance:", regularFont));
                 summary.addCell(new Phrase(String.format("%.2f", data.getPreviousBalance()), regularFont));
                 
-                summary.addCell(new Phrase("Total Quantity:", regularFont));
-                summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
+                // Total Balance
                 summary.addCell(new Phrase("Total Balance:", regularFont));
                 summary.addCell(new Phrase(String.format("%.2f", totalBalance), regularFont));
                 
-                // Only show paid amount if it's greater than 0
+                // Other discount (if available in metadata)
+                if (data.hasMetadata("otherDiscount")) {
+                    double otherDiscount = 0.0;
+                    try {
+                        otherDiscount = Double.parseDouble(data.getMetadata("otherDiscount").toString());
+                    } catch (Exception e) {
+                        // If parsing fails, default to 0
+                    }
+                    
+                    if (otherDiscount > 0) {
+                        summary.addCell(new Phrase("Other Discount:", regularFont));
+                        summary.addCell(new Phrase(String.format("%.2f", otherDiscount), regularFont));
+                    }
+                }
+                
+                // Paid amount
+                summary.addCell(new Phrase("Paid:", regularFont));
                 if (paidAmount > 0) {
-                    summary.addCell(new Phrase("Paid:", regularFont));
                     summary.addCell(new Phrase(String.format("%.2f", paidAmount), regularFont));
                 } else {
-                    summary.addCell(new Phrase("Payment Status:", regularFont));
                     summary.addCell(new Phrase("Unpaid", regularFont));
                 }
+                
+                // Net Balance
                 summary.addCell(new Phrase("Net Balance:", regularFont));
                 summary.addCell(new Phrase(String.format("%.2f", netBalance), regularFont));
             }
