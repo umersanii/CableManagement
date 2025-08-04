@@ -872,6 +872,13 @@ public class ProductionStock {
                     double quantity = Double.parseDouble(quantityText);
                     double unitPrice = Double.parseDouble(priceText);
                     
+                    // Validate discount is not greater than unit price
+                    if (discountPerUnit > unitPrice) {
+                        showAlert("Invalid Discount", "Discount per unit cannot exceed unit price");
+                        discountPerUnit = unitPrice;
+                        discountPerUnitField.setText(String.valueOf(unitPrice));
+                    }
+                    
                     // Calculate total discount amount
                     double totalDiscount = discountPerUnit * quantity;
                     totalDiscountField.setText(formatNumber(totalDiscount));
@@ -881,7 +888,7 @@ public class ProductionStock {
                         double percentage = (discountPerUnit / unitPrice) * 100.0;
                         discountPercentageField.setText(formatNumber(percentage) + "%");
                     } else {
-                        discountPercentageField.setText("");
+                        discountPercentageField.setText("0.0%");
                     }
                 } else {
                     totalDiscountField.setText("");
@@ -1183,7 +1190,6 @@ public class ProductionStock {
             String priceText = priceField.getText().trim();
             String stockText = stockAvailableField.getText().trim();
             String discountPerUnitText = discountPerUnitField.getText().trim();
-            String totalDiscountText = totalDiscountField.getText().trim();
             
             // Validation
             if (selectedDisplay == null) {
@@ -1206,7 +1212,6 @@ public class ProductionStock {
                 double price = Double.parseDouble(priceText);
                 int availableStock = stockText.isEmpty() ? 0 : Integer.parseInt(stockText);
                 double discountPerUnit = discountPerUnitText.isEmpty() ? 0.0 : Double.parseDouble(discountPerUnitText);
-                double totalDiscount = totalDiscountText.isEmpty() ? 0.0 : Double.parseDouble(totalDiscountText);
                 
                 // Calculate discount percentage for storage
                 double discountPercentage = 0.0;
@@ -1253,14 +1258,20 @@ public class ProductionStock {
                                 String.format("Total quantity (%.1f) would exceed available stock (%d)", newQty, availableStock));
                             return;
                         }
+                        
+                        // Keep the same discount percentage but recalculate for new quantity
                         item.setQuantity(newQty);
+                        // The updateTotalPrice method will recalculate the correct discount amount
+                        
                         productExists = true;
                         break;
                     }
                 }
                 
                 if (!productExists) {
-                    SalesInvoiceItemUI newItem = new SalesInvoiceItemUI(productName, qty, price, discountPercentage, totalDiscount);
+                    // Create new item with calculated discount percentage - the total discount will be 
+                    // calculated automatically in the updateTotalPrice method
+                    SalesInvoiceItemUI newItem = new SalesInvoiceItemUI(productName, qty, price, discountPercentage, 0.0);
                     invoiceItems.add(newItem);
                 }
                 
@@ -3259,8 +3270,14 @@ public class ProductionStock {
 
         private void updateTotalPrice() {
             double basePrice = this.quantity.get() * this.unitPrice.get();
-            // discountAmount now contains the total discount for all quantity
-            double finalPrice = basePrice - this.discountAmount.get();
+            
+            // Update discount amount based on percentage and quantity
+            double discountPerUnit = (this.discountPercentage.get() / 100.0) * this.unitPrice.get();
+            double totalDiscount = discountPerUnit * this.quantity.get();
+            this.discountAmount.set(totalDiscount);
+            
+            // Calculate final price after discount
+            double finalPrice = basePrice - totalDiscount;
             this.totalPrice.set(Math.max(0, finalPrice)); // Ensure price is not negative
         }
     }

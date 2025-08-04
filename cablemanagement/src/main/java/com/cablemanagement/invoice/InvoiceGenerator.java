@@ -210,11 +210,11 @@ public class InvoiceGenerator {
             document.add(Chunk.NEWLINE);
 
             // Item Table
-            PdfPTable table = new PdfPTable(6);
+            PdfPTable table = new PdfPTable(7);
             table.setWidthPercentage(100);
-            table.setWidths(new float[]{1, 4, 2, 3, 2, 3});
+            table.setWidths(new float[]{1, 4, 1.5f, 2, 2, 2, 2.5f});
 
-            String[] headers = {"#", "Item", "Qty", "Unit Price", "Discount %", "Net Price"};
+            String[] headers = {"#", "Item", "Qty", "Unit Price", "Total Price", "Discount %", "Net Price"};
             for (String h : headers) {
                 PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
                 cell.setBackgroundColor(BaseColor.LIGHT_GRAY);
@@ -235,6 +235,7 @@ public class InvoiceGenerator {
                 table.addCell(new Phrase(item.getName(), regularFont));
                 table.addCell(new Phrase(String.valueOf(item.getQuantity()), regularFont));
                 table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice()), regularFont));
+                table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice() * item.getQuantity()), regularFont));
                 table.addCell(new Phrase(String.format("%.1f%%", item.getDiscountPercent()), regularFont));
                 table.addCell(new Phrase(String.format("%.2f", net), regularFont));
             }
@@ -249,7 +250,6 @@ public class InvoiceGenerator {
             double totalBalance = data.getTotalBalance() != 0 ? data.getTotalBalance() : (total + data.getPreviousBalance());
             double netBalance = data.getNetBalance() != 0 ? data.getNetBalance() : (totalBalance - data.getPaidAmount());
             double paidAmount = data.getPaidAmount();
-            int totalQuantity = items.stream().mapToInt(Item::getQuantity).sum();
 
             PdfPTable summaryHeadingTable = new PdfPTable(1);
             summaryHeadingTable.setWidthPercentage(100);
@@ -276,9 +276,6 @@ public class InvoiceGenerator {
                 // Get total amount from metadata if available, otherwise calculate
                 Object totalAmountObj = data.hasMetadata("totalAmount") ? data.getMetadata("totalAmount") : total;
                 double totalAmount = totalAmountObj instanceof Number ? ((Number)totalAmountObj).doubleValue() : total;
-
-                summary.addCell(new Phrase("Total Quantity:", regularFont));
-                summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
                 
                 summary.addCell(new Phrase("Total Usage Amount:", regularFont));
                 summary.addCell(new Phrase(String.format("%.2f", totalAmount), regularFont));
@@ -290,13 +287,7 @@ public class InvoiceGenerator {
                 summary.setWidths(new float[]{5f, 5f});
                 summary.setSpacingBefore(10f);
                 
-                // Different label based on whether it's a production or return production invoice
-                if (data.getType().toLowerCase().equals(InvoiceData.TYPE_PRODUCTION_RETURN)) {
-                    summary.addCell(new Phrase("Total Return Quantity:", regularFont));
-                } else {
-                    summary.addCell(new Phrase("Total Production Quantity:", regularFont));
-                }
-                summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
+                // Production invoices don't need quantity summary since it's shown per item
             } else {
                 // Regular summary table for purchase/sales invoices in single column layout
                 summary = new PdfPTable(2);
@@ -306,10 +297,6 @@ public class InvoiceGenerator {
                 
                 // Add items in the specified order: bill, discount, current net bill, previous balance,
                 // total balance, other discount, paid, net balance
-                
-                // Total quantity in the first row
-                summary.addCell(new Phrase("Total Quantity:", regularFont));
-                summary.addCell(new Phrase(String.valueOf(totalQuantity), regularFont));
                 
                 // Bill (gross total)
                 summary.addCell(new Phrase("Bill:", regularFont));
