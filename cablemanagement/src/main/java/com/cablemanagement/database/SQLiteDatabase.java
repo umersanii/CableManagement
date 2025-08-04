@@ -718,12 +718,14 @@ public class SQLiteDatabase implements db {
                     "stock_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "item_name TEXT NOT NULL," +
                     "brand_id INTEGER NOT NULL," +
+                    "unit_id INTEGER NOT NULL," +
                     "quantity INTEGER NOT NULL," +
                     "unit_price REAL NOT NULL," +
                     "total_cost REAL NOT NULL," +
                     "supplier_id INTEGER," +
                     "purchase_date TEXT DEFAULT CURRENT_TIMESTAMP," +
                     "FOREIGN KEY (brand_id) REFERENCES Brand(brand_id)," +
+                    "FOREIGN KEY (unit_id) REFERENCES Unit(unit_id)," +
                     "FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id)" +
                     ")",
 
@@ -798,12 +800,14 @@ public class SQLiteDatabase implements db {
                     "production_id INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "product_name TEXT NOT NULL," +
                     "brand_id INTEGER NOT NULL," +
+                    "unit_id INTEGER NOT NULL," +
                     "quantity INTEGER NOT NULL," +
                     "unit_cost REAL NOT NULL," +
                     "total_cost REAL NOT NULL," +
                     "production_date TEXT DEFAULT CURRENT_TIMESTAMP," +
                     "sale_price REAL DEFAULT 0.0," +
-                    "FOREIGN KEY (brand_id) REFERENCES Brand(brand_id)" +
+                    "FOREIGN KEY (brand_id) REFERENCES Brand(brand_id)," +
+                    "FOREIGN KEY (unit_id) REFERENCES Unit(unit_id)" +
                     ")",
 
                     // Unit table
@@ -958,8 +962,11 @@ public class SQLiteDatabase implements db {
             // Update existing schema for new features
             updateSchemaForDiscountSupport(stmt);
             
-            // Insert some default data if tables are empty
-            // insertDefaultData(stmt);
+            // Update existing schema for Unit integration
+            updateSchemaForUnitIntegration(stmt);
+            
+            // Insert default units if needed
+            insertDefaultUnits(stmt);
             
             stmt.close();
             System.out.println("Database initialized successfully with all required tables.");
@@ -1094,6 +1101,72 @@ public class SQLiteDatabase implements db {
         } catch (SQLException e) {
             System.err.println("Error updating schema for discount support: " + e.getMessage());
             // Don't re-throw as this might be a new database where columns already exist
+        }
+    }
+
+    private void updateSchemaForUnitIntegration(Statement stmt) throws SQLException {
+        try {
+            // Check if unit_id columns already exist in Raw_Stock table
+            ResultSet rs = stmt.executeQuery("PRAGMA table_info(Raw_Stock)");
+            boolean rawStockHasUnitId = false;
+            
+            while (rs.next()) {
+                String columnName = rs.getString("name");
+                if ("unit_id".equals(columnName)) {
+                    rawStockHasUnitId = true;
+                    break;
+                }
+            }
+            rs.close();
+            
+            // Check if unit_id columns already exist in ProductionStock table
+            rs = stmt.executeQuery("PRAGMA table_info(ProductionStock)");
+            boolean productionStockHasUnitId = false;
+            
+            while (rs.next()) {
+                String columnName = rs.getString("name");
+                if ("unit_id".equals(columnName)) {
+                    productionStockHasUnitId = true;
+                    break;
+                }
+            }
+            rs.close();
+            
+            // Add unit_id column to Raw_Stock if it doesn't exist
+            if (!rawStockHasUnitId) {
+                stmt.execute("ALTER TABLE Raw_Stock ADD COLUMN unit_id INTEGER");
+                // Set default unit_id to 1 (assuming "Piece" will be the first unit)
+                stmt.execute("UPDATE Raw_Stock SET unit_id = 1 WHERE unit_id IS NULL");
+                System.out.println("Added unit_id column to Raw_Stock table");
+            }
+            
+            // Add unit_id column to ProductionStock if it doesn't exist
+            if (!productionStockHasUnitId) {
+                stmt.execute("ALTER TABLE ProductionStock ADD COLUMN unit_id INTEGER");
+                // Set default unit_id to 1 (assuming "Piece" will be the first unit)
+                stmt.execute("UPDATE ProductionStock SET unit_id = 1 WHERE unit_id IS NULL");
+                System.out.println("Added unit_id column to ProductionStock table");
+            }
+            
+        } catch (SQLException e) {
+            System.err.println("Error updating schema for unit integration: " + e.getMessage());
+            // Don't re-throw as this might be a new database where columns already exist
+        }
+    }
+
+    private void insertDefaultUnits(Statement stmt) throws SQLException {
+        try {
+            // Check if Unit table is empty and insert default data
+            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM Unit");
+            rs.next();
+            if (rs.getInt(1) == 0) {
+                stmt.execute("INSERT INTO Unit (unit_name) VALUES " +
+                            "('Piece'), ('Meter'), ('Roll'), ('Kg'), ('Gram'), ('Box'), ('Liter'), ('Foot'), ('Yard'), ('Dozen')");
+                System.out.println("Default units added to Unit table");
+            }
+            rs.close();
+        } catch (SQLException e) {
+            System.err.println("Error inserting default units: " + e.getMessage());
         }
     }
 
@@ -2205,6 +2278,76 @@ public class SQLiteDatabase implements db {
         return units;
     }
 
+    /**
+     * Get unit_id by unit name
+     */
+    public int getUnitIdByName(String unitName) {
+        if (unitName == null || unitName.trim().isEmpty()) {
+            return 1; // Default to first unit (Piece)
+        }
+        
+        String query = "SELECT unit_id FROM Unit WHERE unit_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, unitName.trim());
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("unit_id");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // If unit not found, try to insert it and return the ID
+        return insertUnitAndGetId(unitName.trim());
+    }
+    
+    /**
+     * Insert new unit and return its ID
+     */
+    private int insertUnitAndGetId(String unitName) {
+        String query = "INSERT INTO Unit (unit_name) VALUES (?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, unitName);
+            int rowsAffected = pstmt.executeUpdate();
+            
+            if (rowsAffected > 0) {
+                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        int unitId = generatedKeys.getInt(1);
+                        System.out.println("Auto-created new unit: " + unitName + " with ID: " + unitId);
+                        return unitId;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error inserting unit " + unitName + ": " + e.getMessage());
+        }
+        
+        return 1; // Default to first unit if all else fails
+    }
+
+    /**
+     * Get unit name by unit_id
+     */
+    public String getUnitNameById(int unitId) {
+        String query = "SELECT unit_name FROM Unit WHERE unit_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, unitId);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("unit_name");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        return "Piece"; // Default unit name
+    }
+
     @Override
     public boolean insertUnit(String unitName) {
         String query = "INSERT INTO Unit (unit_name) VALUES (?)";
@@ -2312,10 +2455,11 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllRawStocks() {
         List<Object[]> rawStocks = new ArrayList<>();
-        String query = "SELECT rs.stock_id, rs.item_name, b.brand_name, " +
+        String query = "SELECT rs.stock_id, rs.item_name, b.brand_name, u.unit_name, " +
                       "rs.quantity, rs.unit_price, rs.total_cost " +
                       "FROM Raw_Stock rs " +
                       "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                      "LEFT JOIN Unit u ON rs.unit_id = u.unit_id " +
                       "ORDER BY rs.item_name";
         
         try (Statement stmt = connection.createStatement();
@@ -2326,6 +2470,7 @@ public class SQLiteDatabase implements db {
                     rs.getInt("stock_id"),
                     rs.getString("item_name"),
                     rs.getString("brand_name"),
+                    rs.getString("unit_name") != null ? rs.getString("unit_name") : "N/A",
                     (double) rs.getInt("quantity"),  // Convert int to double for consistency
                     rs.getDouble("unit_price"),
                     rs.getDouble("total_cost")
@@ -2345,22 +2490,28 @@ public class SQLiteDatabase implements db {
             System.err.println("Invalid item name for insertRawStock: null or empty");
             return false;
         }
+        
+        // Get unit_id from unit name
+        int unitId = getUnitIdByName(unit);
+        
         double totalCost = openingQty * purchasePrice;
         int quantity = (int) Math.round(openingQty);
         
-        String query = "INSERT INTO Raw_Stock (item_name, brand_id, quantity, unit_price, total_cost, supplier_id) " +
-                    "SELECT ?, b.brand_id, ?, ?, ?, ? FROM Brand b WHERE b.brand_name = ?";
+        String query = "INSERT INTO Raw_Stock (item_name, brand_id, unit_id, quantity, unit_price, total_cost, supplier_id) " +
+                    "SELECT ?, b.brand_id, ?, ?, ?, ?, ? FROM Brand b WHERE b.brand_name = ?";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setString(1, name);
-            pstmt.setInt(2, quantity);
-            pstmt.setDouble(3, purchasePrice);
-            pstmt.setDouble(4, totalCost);
-            pstmt.setInt(5, 1); // Use supplier_id = 1 (matches 'rewf')
-            pstmt.setString(6, brand);
+            pstmt.setInt(2, unitId);
+            pstmt.setInt(3, quantity);
+            pstmt.setDouble(4, purchasePrice);
+            pstmt.setDouble(5, totalCost);
+            pstmt.setInt(6, 1); // Use supplier_id = 1 (matches 'rewf')
+            pstmt.setString(7, brand);
             
             System.out.println("Attempting to insert Raw_Stock: item_name=" + name + ", brand=" + brand + 
-                            ", quantity=" + quantity + ", unit_price=" + purchasePrice + ", supplier_id=1");
+                            ", unit=" + unit + " (unit_id=" + unitId + "), quantity=" + quantity + 
+                            ", unit_price=" + purchasePrice + ", supplier_id=1");
             
             int rowsAffected = pstmt.executeUpdate();
             if (rowsAffected == 0) {
@@ -2462,8 +2613,9 @@ public class SQLiteDatabase implements db {
     public List<Object[]> getAllRawStocksForDropdown() {
         List<Object[]> rawStocks = new ArrayList<>();
         String query = "SELECT rs.stock_id, rs.item_name, 'General' as category_name, b.brand_name, " +
-                      "'Piece' as unit_name, rs.unit_price FROM Raw_Stock rs " +
+                      "u.unit_name, rs.unit_price FROM Raw_Stock rs " +
                       "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                      "LEFT JOIN Unit u ON rs.unit_id = u.unit_id " +
                       "ORDER BY rs.item_name";
         
         try (Statement stmt = connection.createStatement();
@@ -2475,7 +2627,7 @@ public class SQLiteDatabase implements db {
                     rs.getString("item_name"),
                     rs.getString("category_name"),
                     rs.getString("brand_name"),
-                    rs.getString("unit_name"),
+                    rs.getString("unit_name") != null ? rs.getString("unit_name") : "Piece",
                     rs.getDouble("unit_price")
                 };
                 rawStocks.add(row);
@@ -3383,9 +3535,10 @@ public class SQLiteDatabase implements db {
     public List<Object[]> getAllProductionStocks() {
         List<Object[]> productionStocks = new ArrayList<>();
         String query = "SELECT ps.production_id, ps.product_name, " +
-                      "b.brand_name, ps.quantity, ps.unit_cost, ps.sale_price, ps.total_cost, ps.production_date " +
+                      "b.brand_name, u.unit_name, ps.quantity, ps.unit_cost, ps.sale_price, ps.total_cost, ps.production_date " +
                       "FROM ProductionStock ps " +
                       "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                      "LEFT JOIN Unit u ON ps.unit_id = u.unit_id " +
                       "ORDER BY ps.product_name";
         
         try (Statement stmt = connection.createStatement();
@@ -3398,11 +3551,12 @@ public class SQLiteDatabase implements db {
                     "", // Empty string for product_description (not available) // 2
                     rs.getString("brand_name"),        // 3
                     "", // Empty string for brand_description (not available) // 4
-                    rs.getInt("quantity"),             // 5
-                    rs.getDouble("unit_cost"),         // 6
-                    rs.getDouble("sale_price"),        // 7
-                    rs.getDouble("total_cost"),        // 8
-                    rs.getString("production_date")    // 9
+                    rs.getString("unit_name") != null ? rs.getString("unit_name") : "N/A", // 5 - Unit name
+                    rs.getInt("quantity"),             // 6
+                    rs.getDouble("unit_cost"),         // 7
+                    rs.getDouble("sale_price"),        // 8
+                    rs.getDouble("total_cost"),        // 9
+                    rs.getString("production_date")    // 10
                 };
                 productionStocks.add(row);
             }
@@ -3417,9 +3571,10 @@ public class SQLiteDatabase implements db {
     public List<Object[]> getAllProductionStocksForDropdown() {
         List<Object[]> productionStocks = new ArrayList<>();
         String query = "SELECT ps.production_id, ps.product_name, b.brand_name, " +
-                      "'N/A' as unit_name, ps.unit_cost, ps.quantity " +
+                      "u.unit_name, ps.unit_cost, ps.quantity " +
                       "FROM ProductionStock ps " +
                       "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                      "LEFT JOIN Unit u ON ps.unit_id = u.unit_id " +
                       "WHERE ps.quantity > 0 " +
                       "ORDER BY ps.product_name";
         
@@ -3432,7 +3587,7 @@ public class SQLiteDatabase implements db {
                     rs.getString("product_name"),
                     "N/A", // category_name (not available in ProductionStock table)
                     rs.getString("brand_name"),
-                    rs.getString("unit_name"),
+                    rs.getString("unit_name") != null ? rs.getString("unit_name") : "N/A",
                     rs.getDouble("unit_cost"),
                     rs.getDouble("quantity")
                 };
@@ -3614,8 +3769,11 @@ public class SQLiteDatabase implements db {
         // In a real implementation, you'd want separate parameters for unit_cost and sale_price
         double unitCost = salePrice * 0.8; // Assume cost is 80% of sale price
         
-        String query = "INSERT INTO ProductionStock (product_name, brand_id, quantity, unit_cost, total_cost, sale_price) " +
-                      "VALUES (?, (SELECT brand_id FROM Brand WHERE brand_name = ? LIMIT 1), ?, ?, ?, ?)";
+        // Get unit_id from unit name
+        int unitId = getUnitIdByName(unit);
+        
+        String query = "INSERT INTO ProductionStock (product_name, brand_id, unit_id, quantity, unit_cost, total_cost, sale_price) " +
+                      "VALUES (?, (SELECT brand_id FROM Brand WHERE brand_name = ? LIMIT 1), ?, ?, ?, ?, ?)";
         
         try {
             connection.setAutoCommit(false); // Start transaction
@@ -3628,16 +3786,20 @@ public class SQLiteDatabase implements db {
             
             pstmt.setString(1, name);
             pstmt.setString(2, brand);
-            pstmt.setInt(3, (int) openingQty);
-            pstmt.setDouble(4, unitCost);
-            pstmt.setDouble(5, totalCost);
-            pstmt.setDouble(6, salePrice);
+            pstmt.setInt(3, unitId);
+            pstmt.setInt(4, (int) openingQty);
+            pstmt.setDouble(5, unitCost);
+            pstmt.setDouble(6, totalCost);
+            pstmt.setDouble(7, salePrice);
             
             int result = pstmt.executeUpdate();
             pstmt.close();
             
             connection.commit(); // Commit transaction
             connection.setAutoCommit(true); // Reset auto-commit
+            
+            System.out.println("DEBUG: Inserted ProductionStock - Name: " + name + 
+                             ", Unit: " + unit + " (unit_id=" + unitId + "), Unit Cost: " + unitCost + ", Sale Price: " + salePrice);
             
             return result > 0;
         } catch (SQLException e) {
@@ -3655,8 +3817,11 @@ public class SQLiteDatabase implements db {
     // New overloaded method with separate unit cost and sale price parameters
     public boolean insertProductionStock(String name, String category, String brand, String unit, 
                                        double openingQty, double unitCost, double salePrice, double reorderLevel) {
-        String query = "INSERT INTO ProductionStock (product_name, brand_id, quantity, unit_cost, total_cost, sale_price) " +
-                      "VALUES (?, (SELECT brand_id FROM Brand WHERE brand_name = ? LIMIT 1), ?, ?, ?, ?)";
+        // Get unit_id from unit name
+        int unitId = getUnitIdByName(unit);
+        
+        String query = "INSERT INTO ProductionStock (product_name, brand_id, unit_id, quantity, unit_cost, total_cost, sale_price) " +
+                      "VALUES (?, (SELECT brand_id FROM Brand WHERE brand_name = ? LIMIT 1), ?, ?, ?, ?, ?)";
         
         try {
             connection.setAutoCommit(false); // Start transaction
@@ -3669,10 +3834,11 @@ public class SQLiteDatabase implements db {
             
             pstmt.setString(1, name);
             pstmt.setString(2, brand);
-            pstmt.setInt(3, (int) openingQty);
-            pstmt.setDouble(4, unitCost);      // Use the actual unit cost passed
-            pstmt.setDouble(5, totalCost);
-            pstmt.setDouble(6, salePrice);     // Use the actual sale price passed
+            pstmt.setInt(3, unitId);
+            pstmt.setInt(4, (int) openingQty);
+            pstmt.setDouble(5, unitCost);      // Use the actual unit cost passed
+            pstmt.setDouble(6, totalCost);
+            pstmt.setDouble(7, salePrice);     // Use the actual sale price passed
             
             int result = pstmt.executeUpdate();
             pstmt.close();
@@ -3681,7 +3847,7 @@ public class SQLiteDatabase implements db {
             connection.setAutoCommit(true); // Reset auto-commit
             
             System.out.println("DEBUG: Inserted ProductionStock - Name: " + name + 
-                             ", Unit Cost: " + unitCost + ", Sale Price: " + salePrice);
+                             ", Unit: " + unit + " (unit_id=" + unitId + "), Unit Cost: " + unitCost + ", Sale Price: " + salePrice);
             
             return result > 0;
         } catch (SQLException e) {
