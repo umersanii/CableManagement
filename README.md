@@ -9,9 +9,12 @@
 
 
 
- ## SALES INVOICE
+ ## INVOICE
 
 - The Discount isn't working properly
+- Invoice Summary Formatting
+- Total Price per row (column)
 
 ## BANK
+
 - Date filter isn't working
