@@ -185,7 +185,7 @@ public class RawStock {
         
         TableColumn<RawStockRecord, String> unitCol = new TableColumn<>("Unit");
         unitCol.setCellValueFactory(new PropertyValueFactory<>("unit"));
-        unitCol.setPrefWidth(60);
+        unitCol.setPrefWidth(80);
         
         TableColumn<RawStockRecord, Double> qtyCol = new TableColumn<>("Quantity");
         qtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
@@ -641,10 +641,13 @@ private static ScrollPane createRawStockReturnPurchaseInvoiceForm() {
                 List<Object[]> items = database.getInvoiceItemsByID(invoiceId);
                 ObservableList<RawStockPurchaseItem> itemsList = FXCollections.observableArrayList();
                 for (Object[] item : items) {
-                    itemsList.add(new RawStockPurchaseItem(
+                    RawStockPurchaseItem purchaseItem = new RawStockPurchaseItem(
                         (Integer) item[0], (String) item[1], (String) item[2],
                         (Double) item[3], (Double) item[4]
-                    ));
+                    );
+                    // Set the unit name from the database
+                    purchaseItem.setUnitName((String) item[5]);
+                    itemsList.add(purchaseItem);
                 }
                 availableItemsTable.setItems(itemsList);
                 break;
@@ -1594,7 +1597,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
 
         TableColumn<RawStockPurchaseItem, String> unitCol = new TableColumn<>("Unit");
         unitCol.setCellValueFactory(new PropertyValueFactory<>("unitName"));
-        unitCol.setPrefWidth(60);
+        unitCol.setPrefWidth(80);
 
         TableColumn<RawStockPurchaseItem, Double> qtyCol = new TableColumn<>("Quantity");
         qtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
@@ -1681,12 +1684,16 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 }
 
                 RawStockPurchaseItem item = new RawStockPurchaseItem(
-                    (Integer) selectedStock[0],
-                    (String) selectedStock[1],
-                    (String) selectedStock[2],
-                    quantity,
-                    unitPrice
+                    (Integer) selectedStock[0],  // rawStockId
+                    (String) selectedStock[1],   // rawStockName
+                    (String) selectedStock[3],   // brandName
+                    quantity,                    // quantity
+                    unitPrice                    // unitPrice
                 );
+                
+                // Set the missing fields
+                item.setCategoryName((String) selectedStock[2]); // categoryName
+                item.setUnitName((String) selectedStock[4]);     // unitName
 
                 itemsTable.getItems().add(item);
                 updateTotalLabel(itemsTable, null, totalLabel);
@@ -2044,7 +2051,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         
         TableColumn<RawStockUseItem, String> unitCol = new TableColumn<>("Unit");
         unitCol.setCellValueFactory(new PropertyValueFactory<>("unitName"));
-        unitCol.setPrefWidth(60); // Reduced from 80
+        unitCol.setPrefWidth(80); // Increased from 60
         
         TableColumn<RawStockUseItem, Double> costCol = new TableColumn<>("Unit Cost");
         costCol.setCellValueFactory(new PropertyValueFactory<>("unitCost"));
@@ -2101,7 +2108,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         
         TableColumn<RawStockUseItem, String> unitCol = new TableColumn<>("Unit");
         unitCol.setCellValueFactory(new PropertyValueFactory<>("unitName"));
-        unitCol.setPrefWidth(60); // Reduced from 80
+        unitCol.setPrefWidth(80); // Increased from 60
         
         TableColumn<RawStockUseItem, Double> costCol = new TableColumn<>("Unit Cost");
         costCol.setCellValueFactory(new PropertyValueFactory<>("unitCost"));
