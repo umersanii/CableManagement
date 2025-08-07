@@ -12,6 +12,7 @@ import com.cablemanagement.views.pages.BooksContent;
 import com.cablemanagement.views.pages.BankManagementContent;
 import com.cablemanagement.views.pages.EmployeeManagementContent;
 import com.cablemanagement.views.pages.SalesmanContent;
+import com.cablemanagement.views.pages.AccountsContent;
 
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
@@ -46,7 +47,7 @@ public class home_page {
 
         // Standard Emoji + Arial Font
         Button homeBtn = createSidebarButton("🏠 Home");
-        Button settingsBtn = createSidebarButton("⚙️ Settings");
+        Button accountsBtn = createSidebarButton("💰 Accounts");
         Button registerBtn = createSidebarButton("✎ Register");
         Button rawStockBtn = createSidebarButton("📦 Raw Stock");
         Button productionStockBtn = createSidebarButton("🏭 Production");
@@ -56,6 +57,7 @@ public class home_page {
         Button salesmanBtn = createSidebarButton("☺ Salesman");
         Button employeeMgmtBtn = createSidebarButton("☺ Employees");
         Button reportsBtn = createSidebarButton("📊 Reports");
+        Button settingsBtn = createSidebarButton("⚙️ Settings");
 
         Button collapseBtn = new Button("⏪");
         collapseBtn.setFont(Font.font("Arial", 14));
@@ -63,10 +65,10 @@ public class home_page {
         collapseBtn.getStyleClass().add("collapse-button");
 
         sidebarContent.getChildren().addAll(
-            homeBtn, settingsBtn, registerBtn,
+            homeBtn, accountsBtn, registerBtn,
             rawStockBtn, productionStockBtn,
             booksBtn, bankMgmtBtn, salesmanBtn,
-            employeeMgmtBtn, reportsBtn,
+            employeeMgmtBtn, reportsBtn, settingsBtn,
             collapseBtn
         );
 
@@ -75,6 +77,7 @@ public class home_page {
 
         // Button actions
         homeBtn.setOnAction(e -> contentArea.getChildren().setAll(HomeContent.get()));
+        accountsBtn.setOnAction(e -> contentArea.getChildren().setAll(AccountsContent.get()));
         settingsBtn.setOnAction(e -> contentArea.getChildren().setAll(SettingsContent.get()));
         registerBtn.setOnAction(e -> contentArea.getChildren().setAll(RegisterContent.get()));
         rawStockBtn.setOnAction(e -> contentArea.getChildren().setAll(RawStock.get()));
@@ -93,7 +96,7 @@ public class home_page {
                 scrollPane.setPrefWidth(72);
                 sidebarContent.getChildren().addAll(
                     createIconOnlyButton("🏠", contentArea, HomeContent.get()),
-                    createIconOnlyButton("⚙️", contentArea, SettingsContent.get()),
+                    createIconOnlyButton("💰", contentArea, AccountsContent.get()),
                     createIconOnlyButton("☺", contentArea, ProfileContent.get()),
                     createIconOnlyButton("✎", contentArea, RegisterContent.get()),
                     createIconOnlyButton("📦", contentArea, RawStock.get()),
@@ -102,12 +105,14 @@ public class home_page {
                     createIconOnlyButton("Ⓑ", contentArea, BankManagementContent.get()),
                     createIconOnlyButton("☺", contentArea, SalesmanContent.get()),
                     createIconOnlyButton("☺", contentArea, EmployeeManagementContent.get()),
-                    createIconOnlyButton("📊", contentArea, ReportsContent.get())
+                    createIconOnlyButton("📊", contentArea, ReportsContent.get()),
+                    createIconOnlyButton("⚙️", contentArea, SettingsContent.get())
                 );
                 collapseBtn.setText("⏩");
             } else {
                 scrollPane.setPrefWidth(200);
                 homeBtn.setText("🏠 Home");
+                accountsBtn.setText("💰 Accounts");
                 settingsBtn.setText("⚙️ Settings");
                 registerBtn.setText("✎ Register");
                 rawStockBtn.setText("📦 Raw Stock");
@@ -119,10 +124,10 @@ public class home_page {
                 reportsBtn.setText("📊 Reports");
 
                 sidebarContent.getChildren().addAll(
-                    homeBtn, settingsBtn, registerBtn,
+                    homeBtn, accountsBtn, registerBtn,
                     rawStockBtn, productionStockBtn,
                     booksBtn, bankMgmtBtn, salesmanBtn,
-                    employeeMgmtBtn, reportsBtn
+                    employeeMgmtBtn, reportsBtn, settingsBtn
                 );
                 collapseBtn.setText("⏪");
             }
