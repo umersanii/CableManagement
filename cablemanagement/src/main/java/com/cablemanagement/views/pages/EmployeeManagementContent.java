@@ -40,7 +40,8 @@ public class EmployeeManagementContent {
 
         addButton(buttonBar, "Manage Designations", () -> formArea.getChildren().setAll(createDesignationForm()));
         addButton(buttonBar, "Register New Employee", () -> formArea.getChildren().setAll(createRegisterEmployeeForm()));
-        addButton(buttonBar, "Contract-Based Employee", () -> formArea.getChildren().setAll(createContractEmployeeForm()));
+        addButton(buttonBar, "Register Contract Employee", () -> formArea.getChildren().setAll(createRegisterContractEmployeeForm()));
+        addButton(buttonBar, "Contract-Based Employee", () -> formArea.getChildren().setAll(createContractEmployeeRecordsView()));
         addButton(buttonBar, "Manage All Employees", () -> formArea.getChildren().setAll(createSalaryEmployeeForm()));
         addButton(buttonBar, "View Salary Reports", () -> formArea.getChildren().setAll(createSalaryReportForm()));
         addButton(buttonBar, "Mark Employee Attendance", () -> formArea.getChildren().setAll(createAttendanceMarkForm()));
@@ -63,6 +64,222 @@ public class EmployeeManagementContent {
     }
 
     // ---------------- FORMS ----------------
+
+    ////////////////////////////////////////////////////////////////////////
+    ///                    Designation Management Form                  ////
+    ////////////////////////////////////////////////////////////////////////
+    
+    private static VBox createRegisterContractEmployeeForm() {
+        VBox box = baseForm("Register Contract Employee");
+
+        SQLiteDatabase database = new SQLiteDatabase();
+
+        // Fields
+        TextField nameField = new TextField();
+        nameField.setPromptText("Full Name");
+
+        TextField phoneField = new TextField();
+        phoneField.setPromptText("Phone Number");
+
+        TextField cnicField = new TextField();
+        cnicField.setPromptText("CNIC");
+
+        TextField addressField = new TextField();
+        addressField.setPromptText("Address");
+
+        TextField remarksField = new TextField();
+        remarksField.setPromptText("Remarks");
+
+        TextField taskField = new TextField();
+        taskField.setPromptText("Task (Designation)");
+
+        TextField numTasksField = new TextField();
+        numTasksField.setPromptText("Number of Tasks");
+
+        TextField costPerTaskField = new TextField();
+        costPerTaskField.setPromptText("Cost Per Task");
+
+        TextField totalTasksDoneField = new TextField();
+        totalTasksDoneField.setPromptText("Total Tasks Done");
+
+        DatePicker datePicker = new DatePicker();
+        datePicker.setPromptText("Date");
+
+        Button submitBtn = new Button("Register Contract Employee");
+        submitBtn.getStyleClass().add("register-button");
+
+        Label statusLabel = new Label("");
+        statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+
+        // Grouped rows using HBox
+        HBox phoneCnicRow = new HBox(10, phoneField, cnicField);
+        HBox tasksCostRow = new HBox(10, numTasksField, costPerTaskField);
+        HBox totalDateRow = new HBox(10, totalTasksDoneField, datePicker);
+
+        // Stretch fields to fill equally
+        phoneCnicRow.setHgrow(phoneField, Priority.ALWAYS);
+        phoneCnicRow.setHgrow(cnicField, Priority.ALWAYS);
+
+        tasksCostRow.setHgrow(numTasksField, Priority.ALWAYS);
+        tasksCostRow.setHgrow(costPerTaskField, Priority.ALWAYS);
+
+        totalDateRow.setHgrow(totalTasksDoneField, Priority.ALWAYS);
+        totalDateRow.setHgrow(datePicker, Priority.ALWAYS);
+
+        // Grid layout for clean form structure
+        GridPane grid = new GridPane();
+        grid.setVgap(12);
+        grid.setPadding(new Insets(20));
+        grid.setAlignment(Pos.CENTER);
+
+        grid.add(new Label("Full Name:"), 0, 0);
+        grid.add(nameField, 1, 0);
+
+        grid.add(new Label("Phone & CNIC:"), 0, 1);
+        grid.add(phoneCnicRow, 1, 1);
+
+        grid.add(new Label("Address:"), 0, 2);
+        grid.add(addressField, 1, 2);
+
+        grid.add(new Label("Remarks:"), 0, 3);
+        grid.add(remarksField, 1, 3);
+
+        grid.add(new Label("Task:"), 0, 4);
+        grid.add(taskField, 1, 4);
+
+        grid.add(new Label("Tasks & Cost:"), 0, 5);
+        grid.add(tasksCostRow, 1, 5);
+
+        grid.add(new Label("Total & Date:"), 0, 6);
+        grid.add(totalDateRow, 1, 6);
+
+        grid.add(submitBtn, 1, 7);
+        grid.add(statusLabel, 1, 8);
+
+        // Center everything in the VBox
+        box.setAlignment(Pos.CENTER);
+        box.getChildren().add(grid);
+
+        // Event handler
+        submitBtn.setOnAction(e -> {
+            String name = nameField.getText().trim();
+            String phone = phoneField.getText().trim();
+            String cnic = cnicField.getText().trim();
+            String address = addressField.getText().trim();
+            String remarks = remarksField.getText().trim();
+            String task = taskField.getText().trim();
+            String numTasksText = numTasksField.getText().trim();
+            String costPerTaskText = costPerTaskField.getText().trim();
+            String totalTasksDoneText = totalTasksDoneField.getText().trim();
+            LocalDate date = datePicker.getValue();
+
+            if (name.isEmpty() || task.isEmpty() || numTasksText.isEmpty() ||
+                costPerTaskText.isEmpty() || totalTasksDoneText.isEmpty() || date == null) {
+                statusLabel.setText("Please fill in all required fields.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                return;
+            }
+
+            try {
+                int numTasks = Integer.parseInt(numTasksText);
+                int totalTasksDone = Integer.parseInt(totalTasksDoneText);
+                double costPerTask = Double.parseDouble(costPerTaskText);
+
+                if (numTasks <= 0 || totalTasksDone < 0 || costPerTask <= 0) {
+                    statusLabel.setText("Invalid numeric values.");
+                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                    return;
+                }
+
+                boolean success = database.insertContractEmployee(
+                    name, phone, cnic, address, remarks, task,
+                    numTasks, costPerTask, totalTasksDone, date.toString()
+                );
+
+                if (success) {
+                    statusLabel.setText("Contract employee registered!");
+                    statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+                    // Clear fields
+                    nameField.clear(); phoneField.clear(); cnicField.clear(); addressField.clear();
+                    remarksField.clear(); taskField.clear(); numTasksField.clear();
+                    costPerTaskField.clear(); totalTasksDoneField.clear(); datePicker.setValue(null);
+                } else {
+                    statusLabel.setText("Failed to register employee.");
+                    statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                }
+
+            } catch (NumberFormatException ex) {
+                statusLabel.setText("Please enter valid numeric values.");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+            }
+        });
+
+        return box;
+    }
+
+    private static VBox createContractEmployeeRecordsView() {
+        VBox box = baseForm("Contract Employee Records");
+
+        SQLiteDatabase database = new SQLiteDatabase();
+
+        // Filters
+        DatePicker dateFromPicker = new DatePicker();
+        dateFromPicker.setPromptText("From Date");
+
+        DatePicker dateToPicker = new DatePicker();
+        dateToPicker.setPromptText("To Date");
+
+        TextField timeFromField = new TextField();
+        timeFromField.setPromptText("From Time (HH:mm)");
+
+        TextField timeToField = new TextField();
+        timeToField.setPromptText("To Time (HH:mm)");
+
+        Button filterButton = new Button("Apply Filters");
+
+        TableView<Object[]> table = new TableView<>();
+
+        // Define columns (adjust index based on your DB schema)
+        String[] columnNames = {
+            "Sr", "Name", "Phone", "CNIC", "Address", "Remarks", "Task", "Num Tasks", 
+            "Cost Per Task", "Total Done", "Date", "Time"
+        };
+
+        for (int i = 0; i < columnNames.length; i++) {
+            final int colIndex = i;
+            TableColumn<Object[], String> column = new TableColumn<>(columnNames[i]);
+            column.setCellValueFactory(cellData ->
+                new SimpleStringProperty(
+                    cellData.getValue()[colIndex] != null 
+                    ? cellData.getValue()[colIndex].toString() 
+                    : ""
+                )
+            );
+            table.getColumns().add(column);
+        }
+
+        filterButton.setOnAction(e -> {
+            LocalDate dateFrom = dateFromPicker.getValue();
+            LocalDate dateTo = dateToPicker.getValue();
+            String timeFrom = timeFromField.getText().trim(); // optional
+            String timeTo = timeToField.getText().trim();     // optional
+
+            List<Object[]> records = database.getContractEmployeeRecords(dateFrom, dateTo, timeFrom, timeTo);
+            table.getItems().clear();
+            table.getItems().addAll(records);
+        });
+
+        // Load all records initially
+        filterButton.fire();
+
+        HBox filters = new HBox(10, dateFromPicker, dateToPicker, timeFromField, timeToField, filterButton);
+        filters.setPadding(new Insets(10));
+
+        box.getChildren().addAll(filters, table);
+        return box;
+    }
+
+
 
     ////////////////////////////////////////////////////////////////////////
     ///                    Designation Management Form                  ////
@@ -282,7 +499,7 @@ public class EmployeeManagementContent {
 
         ComboBox<String> salaryTypeCombo = new ComboBox<>();
         salaryTypeCombo.setPromptText("Select Salary Type");
-        salaryTypeCombo.getItems().addAll("monthly", "daily", "hourly", "task");
+        salaryTypeCombo.getItems().addAll("monthly", "daily", "hourly");
 
         TextField salaryAmountField = new TextField();
         salaryAmountField.setPromptText("Salary Amount");
@@ -361,7 +578,7 @@ public class EmployeeManagementContent {
         searchField.setMaxWidth(300);
 
         // Info label
-        Label infoLabel = new Label("Contract-based employees are those with daily, hourly, or task-based payment types.");
+        Label infoLabel = new Label("Contract-based employees are those with daily, hourly payment types.");
         infoLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-style: italic;");
 
         // Table setup

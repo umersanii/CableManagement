@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -951,6 +952,22 @@ public class SQLiteDatabase implements db {
                     "total_price REAL NOT NULL," +
                     "FOREIGN KEY (sales_return_invoice_id) REFERENCES Sales_Return_Invoice(sales_return_invoice_id)," +
                     "FOREIGN KEY (production_stock_id) REFERENCES ProductionStock(production_id)" +
+                    ")",
+
+                    // Contract based employee table
+                    "CREATE TABLE IF NOT EXISTS Contract_Employee (" +
+                    "employee_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "name TEXT NOT NULL," +
+                    "phone TEXT NOT NULL," +
+                    "cnic TEXT NOT NULL," +
+                    "address TEXT NOT NULL," +
+                    "remarks TEXT NOT NULL," +
+                    "task TEXT NOT NULL," +
+                    "num_tasks INTEGER NOT NULL," +
+                    "cost_per_task REAL NOT NULL," +
+                    "total_tasks_done INTEGER NOT NULL," +
+                    "date TEXT NOT NULL," +
+                    "created_at TEXT DEFAULT CURRENT_TIMESTAMP" +
                     ")"
                 };
                 
@@ -6991,6 +7008,65 @@ public List<Object[]> getSalesReturnInvoiceItemsByInvoiceId(int returnInvoiceId)
     }
     return items;
 }
+
+    public boolean insertContractEmployee(String name, String phone, String cnic, String address, String remarks, String task, int numTasks,
+            double costPerTask, int totalTasksDone, String date) {
+        String sql = "INSERT INTO Contract_Employee (name, phone, cnic, address, remarks, task, num_tasks, cost_per_task, total_tasks_done, date) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, name);
+            pstmt.setString(2, phone);
+            pstmt.setString(3, cnic);
+            pstmt.setString(4, address);
+            pstmt.setString(5, remarks);
+            pstmt.setString(6, task);
+            pstmt.setInt(7, numTasks);
+            pstmt.setDouble(8, costPerTask);
+            pstmt.setInt(9, totalTasksDone);
+            pstmt.setString(10, date);
+            int rowsAffected = pstmt.executeUpdate();
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            System.err.println("Error inserting contract employee: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public List<Object[]> getContractEmployeeRecords(LocalDate dateFrom, LocalDate dateTo, String timeFrom, String timeTo) {
+        List<Object[]> records = new ArrayList<>();
+        if (dateFrom == null || dateTo == null) {
+            System.err.println("Error: dateFrom or dateTo is null in getContractEmployeeRecords");
+            return records;
+        }
+        String query = "SELECT * FROM Contract_Employee WHERE date BETWEEN ? AND ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, dateFrom.toString());
+            pstmt.setString(2, dateTo.toString());
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("employee_id"),
+                    rs.getString("name"),
+                    rs.getString("phone"),
+                    rs.getString("cnic"),
+                    rs.getString("address"),
+                    rs.getString("remarks"),
+                    rs.getString("task"),
+                    rs.getInt("num_tasks"),
+                    rs.getDouble("cost_per_task"),
+                    rs.getInt("total_tasks_done"),
+                    rs.getString("date"),
+                    rs.getString("created_at")
+                };
+                records.add(row);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting contract employee records: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return records;
+    }
 
 }
 
