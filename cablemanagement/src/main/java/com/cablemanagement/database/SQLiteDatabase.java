@@ -5390,12 +5390,14 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getInvoiceItemsByID(Integer invoiceID) {
         List<Object[]> items = new ArrayList<>();
-        String query = "SELECT rpii.raw_stock_id, rs.item_name, b.brand_name, rpii.quantity, rpii.unit_price " +
-                    "FROM Raw_Purchase_Invoice_Item rpii " +
-                    "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
-                    "JOIN Brand b ON rs.brand_id = b.brand_id " +
-                    "JOIN Raw_Purchase_Invoice rpi ON rpii.raw_purchase_invoice_id = rpi.raw_purchase_invoice_id " +
-                    "WHERE rpi.raw_purchase_invoice_id = ?";
+        String query = "SELECT rpii.raw_stock_id, rs.item_name, b.brand_name, rpii.quantity, rpii.unit_price, " +
+                      "COALESCE(u.unit_name, 'Piece') as unit_name " +
+                      "FROM Raw_Purchase_Invoice_Item rpii " +
+                      "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                      "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                      "LEFT JOIN Unit u ON rs.unit_id = u.unit_id " +
+                      "JOIN Raw_Purchase_Invoice rpi ON rpii.raw_purchase_invoice_id = rpi.raw_purchase_invoice_id " +
+                      "WHERE rpi.raw_purchase_invoice_id = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setInt(1, invoiceID);
             System.out.println("Executing query: " + query + " with invoiceID: " + invoiceID);
@@ -5406,7 +5408,8 @@ public class SQLiteDatabase implements db {
                         rs.getString("item_name"),
                         rs.getString("brand_name"),
                         rs.getDouble("quantity"),
-                        rs.getDouble("unit_price")
+                        rs.getDouble("unit_price"),
+                        rs.getString("unit_name")
                     };
                     System.out.println("Fetched row: " + Arrays.toString(row));
                     items.add(row);
