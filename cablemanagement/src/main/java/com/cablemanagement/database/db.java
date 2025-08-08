@@ -47,13 +47,14 @@ public interface db {
      * Get all sales return invoices for dropdown selection
      * @return A list of Object arrays containing invoice data
      */
-    List<Object[]> getAllSalesReturnInvoicesForDropdown();
+    List<Object[]> getAllSalesReturnInvoicesForDropdown(); // TODO: remove
 
     
 
 
     // Supplier address method
-    String getSupplierAddress(String supplierName);
+    String getSupplierAddress(String supplierName);  // TODO: remove
+
 
     // Add this method to support category deletion
     public boolean deleteCategory(String categoryName);
@@ -591,7 +592,7 @@ public interface db {
     // --------------------------
     // Employee Salary Payment Operations
     // --------------------------
-    List<Object[]> getAllEmployeeSalaryPayments();
+    List<Object[]> getAllEmployeeSalaryPayments();  // TODO: remove
     
     List<Object[]> getAllEmployeeLoans();
 
@@ -629,7 +630,7 @@ boolean deleteCashTransaction(int transactionId);
 
 double getCashBalance();
 
-boolean updateBankBalance(double newBalance);
+boolean updateBankBalance(double newBalance);  // TODO: remove
 
 List<Object[]> getViewData(String viewName, Map<String, String> filters);
 List<Object[]> getInvoiceItemsByID(Integer invoiceID);
@@ -638,11 +639,11 @@ List<Object[]> getInvoiceItemsByID(Integer invoiceID);
     ///////////////////////////////////////////////////////////////////////////////
     /// ///                   reports Methods
     ///////////////////////////////////////////////////////////////////////////////
-    List<Object[]> getPurchaseReportList(Date fromDate, Date toDate);
-    ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType);
-    ResultSet getSalesReport(Date fromDate, Date toDate, String reportType);
-    ResultSet getReturnPurchaseReport(Date fromDate, Date toDate, String reportType);
-    ResultSet getReturnSalesReport(Date fromDate, Date toDate);
+    List<Object[]> getPurchaseReportList(Date fromDate, Date toDate);  // TODO: remove
+    ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType); //checked by Umer Ghafoor
+    ResultSet getSalesReport(Date fromDate, Date toDate, String reportType); //checked by Umer Ghafoor
+    ResultSet getReturnPurchaseReport(Date fromDate, Date toDate, String reportType);//checked by Umer Ghafoor
+    ResultSet getReturnSalesReport(Date fromDate, Date toDate, String reportType);//checked by Umer Ghafoor
     ResultSet getBankTransferReport(Date fromDate, Date toDate);
     ResultSet getProfitReport(Date fromDate, Date toDate);
     ResultSet getSummaryReport(Date fromDate, Date toDate);
@@ -652,10 +653,10 @@ List<Object[]> getInvoiceItemsByID(Integer invoiceID);
     ResultSet getSuppliersReport();
     ResultSet getAreaWiseReport();
     ResultSet getBrandSalesReport(Date fromDate, Date toDate);
-    ResultSet getBrandProfitReport(Date fromDate, Date toDate);
-    ResultSet getCustomerSalesReport(int customerId, Date fromDate, Date toDate);
-    ResultSet getSupplierSalesReport(int supplierId, Date fromDate, Date toDate);
-    ResultSet getAttendanceReport(int employeeId, Date fromDate, Date toDate);
+    ResultSet getBrandProfitReport(Date fromDate, Date toDate);  // TODO: remove
+    ResultSet getCustomerSalesReport(int customerId, Date fromDate, Date toDate);  // TODO: remove
+    ResultSet getSupplierSalesReport(int supplierId, Date fromDate, Date toDate);  // TODO: remove
+    ResultSet getAttendanceReport(int employeeId, Date fromDate, Date toDate);  // TODO: remove
 
 }
 
