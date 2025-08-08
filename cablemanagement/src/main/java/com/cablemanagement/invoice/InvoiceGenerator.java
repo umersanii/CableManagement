@@ -209,12 +209,25 @@ public class InvoiceGenerator {
             document.add(infoTable);
             document.add(Chunk.NEWLINE);
 
-            // Item Table
-            PdfPTable table = new PdfPTable(7);
-            table.setWidthPercentage(100);
-            table.setWidths(new float[]{1, 4, 1.5f, 2, 2, 2, 2.5f});
+            // Item Table - different layout for purchase vs other invoices
+            PdfPTable table;
+            String[] headers;
+            boolean isPurchaseInvoice = data.getType().toLowerCase().contains("purchase");
+            
+            if (isPurchaseInvoice) {
+                // Purchase invoice: no discount column
+                table = new PdfPTable(6);
+                table.setWidthPercentage(100);
+                table.setWidths(new float[]{1, 4, 1.5f, 2, 2, 2.5f});
+                headers = new String[]{"#", "Item", "Qty", "Unit Price", "Total Price", "Net Price"};
+            } else {
+                // Other invoices: include discount column
+                table = new PdfPTable(7);
+                table.setWidthPercentage(100);
+                table.setWidths(new float[]{1, 4, 1.5f, 2, 2, 2, 2.5f});
+                headers = new String[]{"#", "Item", "Qty", "Unit Price", "Total Price", "Discount %", "Net Price"};
+            }
 
-            String[] headers = {"#", "Item", "Qty", "Unit Price", "Total Price", "Discount %", "Net Price"};
             for (String h : headers) {
                 PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
                 cell.setBackgroundColor(BaseColor.LIGHT_GRAY);
@@ -236,7 +249,12 @@ public class InvoiceGenerator {
                 table.addCell(new Phrase(String.valueOf(item.getQuantity()), regularFont));
                 table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice()), regularFont));
                 table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice() * item.getQuantity()), regularFont));
-                table.addCell(new Phrase(String.format("%.1f%%", item.getDiscountPercent()), regularFont));
+                
+                if (!isPurchaseInvoice) {
+                    // Only add discount column for non-purchase invoices
+                    table.addCell(new Phrase(String.format("%.1f%%", item.getDiscountPercent()), regularFont));
+                }
+                
                 table.addCell(new Phrase(String.format("%.2f", net), regularFont));
             }
 
@@ -245,6 +263,11 @@ public class InvoiceGenerator {
 
             // Summary Table - handling different for raw stock vs other invoice types
             double totalDiscount = items.stream().mapToDouble(i -> i.getQuantity() * i.getUnitPrice() * i.getDiscountPercent() / 100.0).sum();
+            
+            // For purchase invoices that use invoice-level discount instead of item-level discounts
+            if (totalDiscount == 0.0 && data.getDiscountAmount() > 0.0) {
+                totalDiscount = data.getDiscountAmount();
+            }
             
             // Use the balance values from InvoiceData if they are set, otherwise calculate them
             double totalBalance = data.getTotalBalance() != 0 ? data.getTotalBalance() : (total + data.getPreviousBalance());
@@ -298,17 +321,17 @@ public class InvoiceGenerator {
                 // Add items in the specified order: bill, discount, current net bill, previous balance,
                 // total balance, other discount, paid, net balance
                 
-                // Bill (gross total)
+                // Bill (gross total before invoice-level discount)
                 summary.addCell(new Phrase("Bill:", regularFont));
-                summary.addCell(new Phrase(String.format("%.2f", total + totalDiscount), regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", total), regularFont));
                 
                 // Discount
                 summary.addCell(new Phrase("Discount:", regularFont));
                 summary.addCell(new Phrase(String.format("%.2f", totalDiscount), regularFont));
                 
-                // Current Net Bill
+                // Current Net Bill (after invoice-level discount)
                 summary.addCell(new Phrase("Current Net Bill:", regularFont));
-                summary.addCell(new Phrase(String.format("%.2f", total), regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", total - totalDiscount), regularFont));
                 
                 // Previous Balance
                 summary.addCell(new Phrase("Previous Balance:", regularFont));

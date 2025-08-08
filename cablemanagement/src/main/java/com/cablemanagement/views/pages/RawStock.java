@@ -506,6 +506,10 @@ public class RawStock {
             // Capture item data before any clearing happens
             List<RawStockPurchaseItem> capturedItems = new ArrayList<>(itemsTable.getItems());
             
+            // Also capture form field values to prevent them from being lost when form is cleared
+            double capturedDiscount = discountField.getText().trim().isEmpty() ? 0.0 : Double.parseDouble(discountField.getText().trim());
+            double capturedPaidAmount = paidAmountField.getText().trim().isEmpty() ? 0.0 : Double.parseDouble(paidAmountField.getText().trim());
+            
             if (handleEnhancedPurchaseInvoiceSubmit(
                 invoiceNumberField, supplierCombo, invoiceDatePicker,
                 itemsTable, discountField, paidAmountField, totalLabel)) {
@@ -523,7 +527,7 @@ public class RawStock {
                         String.format("%s - %s", item.getRawStockName(), item.getUnitName()),
                         item.getQuantity().intValue(),
                         item.getUnitPrice(),
-                        0.0  // No item-level discount in purchase invoice
+                        0.0  // No item-level discount - use invoice-level discount instead
                     ));
                 }
 
@@ -553,9 +557,9 @@ public class RawStock {
                 System.out.println("Using supplier details: Address=" + supplierAddress + 
                                   ", Tehsil=" + supplierTehsil + ", Contact=" + supplierContact);
                 
-                // Calculate amounts
-                double invoiceDiscount = discountField.getText().trim().isEmpty() ? 0.0 : Double.parseDouble(discountField.getText().trim());
-                double invoicePaidAmount = paidAmountField.getText().trim().isEmpty() ? 0.0 : Double.parseDouble(paidAmountField.getText().trim());
+                // Calculate amounts using captured values
+                double invoiceDiscount = capturedDiscount;
+                double invoicePaidAmount = capturedPaidAmount;
                 double totalAfterDiscount = totalBeforeDiscount - invoiceDiscount;
                 double balance = totalAfterDiscount - invoicePaidAmount;
                 
