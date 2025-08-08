@@ -1377,8 +1377,18 @@ public class ProductionStock {
                         // Prepare invoice data for printing
                         List<Item> printItems = new ArrayList<>();
                         for (SalesInvoiceItemUI item : invoiceItems) {
+                            // Get production stock ID to retrieve unit information
+                            int productionStockId = database.getProductionStockIdByName(item.getProductName());
+                            String unit = "N/A";
+                            if (productionStockId != -1) {
+                                unit = getProductionStockUnit(productionStockId);
+                            }
+                            
+                            // Format the item name as "name - unit"
+                            String itemNameWithUnit = item.getProductName() + " - " + unit;
+                            
                             printItems.add(new Item(
-                                item.getProductName(),
+                                itemNameWithUnit,
                                 (int) item.getQuantity(),
                                 item.getUnitPrice(),
                                 item.getDiscountPercentage() // individual item discount percentage
@@ -1855,8 +1865,17 @@ public class ProductionStock {
                         double netAmount = originalAmount - item.getDiscountAmount();
                         double netUnitPrice = netAmount / item.getQuantity();
                         
+                        // Get unit information using production stock ID
+                        String unit = "N/A";
+                        if (item.getProductionStockId() != 0) {
+                            unit = getProductionStockUnit(item.getProductionStockId());
+                        }
+                        
+                        // Format the item name as "name - unit"
+                        String itemNameWithUnit = item.getProductName() + " - " + unit;
+                        
                         printItems.add(new Item(
-                            item.getProductName(),
+                            itemNameWithUnit,
                             (int) item.getQuantity(),
                             netUnitPrice, // Use net unit price instead of original price
                             0.0 // No discount percentage for return invoice display
