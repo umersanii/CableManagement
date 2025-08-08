@@ -31,3 +31,7 @@
 
 ## UI
 - Salesman and Customer page title 
+
+## Purchase Invoice
+- Previous Balance's Row isn't working properly
+- Total Balance Row also not working

@@ -600,6 +600,7 @@ public class SQLiteDatabase implements db {
             // As a last resort, check a few common locations
             String[] commonLocations = {
                 projectRoot + "/schema.sql",
+                projectRoot + "/CableManagement/cablemanagement/schema.sql",
                 projectRoot + "/cablemanagement/schema.sql",
                 projectRoot + "/src/main/resources/schema.sql",
                 projectRoot + "/src/main/resources/db/schema.sql"
@@ -631,7 +632,10 @@ public class SQLiteDatabase implements db {
             String projectRoot = System.getProperty("user.dir");
             String schemaPath = projectRoot + "/schema.sql";
             
-            // If not found in project root, try the src/main/resources location
+            // If not found in project root, try other common locations
+            if (!new File(schemaPath).exists()) {
+                schemaPath = projectRoot + "/CableManagement/cablemanagement/schema.sql";
+            }
             if (!new File(schemaPath).exists()) {
                 schemaPath = projectRoot + "/cablemanagement/schema.sql";
             }

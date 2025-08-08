@@ -656,8 +656,8 @@ public class ProductionStock {
         });
         
         submitBtn.setOnAction(e -> {
-            // Call submit handler first
-            handleSubmitReturnProductionInvoice(
+            // Call submit handler
+            boolean success = handleSubmitReturnProductionInvoice(
                 returnInvoiceNumberField.getText(),
                 returnDatePicker.getValue(),
                 productionInvoiceCombo.getValue(),
@@ -673,61 +673,7 @@ public class ProductionStock {
                 totalReturnQuantityField
             );
             
-            // After successful submission, get the latest invoice and print it
-            try {
-                // Get the latest return production invoice and its items
-                List<Object[]> lastInvoiceData = sqliteDatabase.getLastProductionReturnInvoice();
-                if (!lastInvoiceData.isEmpty()) {
-                    Object[] lastInvoice = lastInvoiceData.get(0);
-                    String returnInvoiceNumber = (String) lastInvoice[0];
-                    String returnDate = (String) lastInvoice[1];
-                    String notes = (String) lastInvoice[2];
-                    
-                    // Get the items for the invoice
-                    List<Object[]> returnItemsData = sqliteDatabase.getProductionReturnInvoiceItems(returnInvoiceNumber);
-                    
-                    // Prepare items for printing
-                    List<Item> printItems = new ArrayList<>();
-                    for (Object[] itemData : returnItemsData) {
-                        String productName = (String) itemData[0];
-                        double quantity = ((Number) itemData[1]).doubleValue();
-                        double unitCost = ((Number) itemData[2]).doubleValue();
-                        
-                        printItems.add(new Item(
-                            productName,
-                            (int) quantity,
-                            unitCost,
-                            0.0 // no discount for returns
-                        ));
-                    }
-                    
-                    // Create invoice data for printing with proper type and metadata
-                    InvoiceData invoiceData = new InvoiceData(
-                        InvoiceData.TYPE_PRODUCTION_RETURN,
-                        returnInvoiceNumber,
-                        returnDate,
-                        "PRODUCTION RETURN INVOICE",
-                        "", // Empty address field
-                        printItems,
-                        0.0 // no previous balance for returns
-                    );
-                    
-                    // Add notes as metadata
-                    invoiceData.setMetadata("tehsil", "");
-                    invoiceData.setMetadata("contact", "");
-                    invoiceData.setMetadata("notes", notes);
-                    
-                    // Try to open for preview first
-                    boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Production Return");
-                    if (!previewSuccess) {
-                        // If preview fails, try printer selection
-                        PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Production Return");
-                    }
-                }
-            } catch (Exception ex) {
-                showAlert("Print Error", "Failed to print return invoice: " + ex.getMessage());
-                ex.printStackTrace();
-            }
+            // Print logic is now handled inside the method
         });
 
         return form;
@@ -3012,6 +2958,21 @@ public class ProductionStock {
         return -1;
     }
 
+    // Helper method to get production stock name by ID
+    private static String getProductionStockNameById(int productionId) {
+        try {
+            List<Object[]> productionStocks = database.getAllProductionStocksForDropdown();
+            for (Object[] stock : productionStocks) {
+                if (((Integer) stock[0]).equals(productionId)) {
+                    return stock[1].toString(); // product_name
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "Unknown Product";
+    }
+
     // Helper method to get production stock unit cost by production ID
     private static double getProductionStockUnitCost(int productionId) {
         try {
@@ -3029,7 +2990,7 @@ public class ProductionStock {
     }
 
     // Handle return production invoice submission
-    private static void handleSubmitReturnProductionInvoice(String returnInvoiceNumber, LocalDate returnDate, 
+    private static boolean handleSubmitReturnProductionInvoice(String returnInvoiceNumber, LocalDate returnDate, 
                                                           String selectedProductionInvoice, ObservableList<String> returnItems,
                                                           String totalReturnQuantity, TextField returnInvoiceNumberField,
                                                           DatePicker returnDatePicker, ComboBox<String> productionInvoiceCombo,
@@ -3040,17 +3001,17 @@ public class ProductionStock {
             // Validation
             if (selectedProductionInvoice == null || selectedProductionInvoice.isEmpty()) {
                 showAlert("Missing Information", "Please select a production invoice");
-                return;
+                return false;
             }
             
             if (returnItems.isEmpty()) {
                 showAlert("Missing Information", "Please add at least one item to return");
-                return;
+                return false;
             }
             
             if (totalReturnQuantity.isEmpty() || Integer.parseInt(totalReturnQuantity) <= 0) {
                 showAlert("Missing Information", "Total return quantity must be greater than 0");
-                return;
+                return false;
             }
 
             // Extract production invoice ID
@@ -3120,6 +3081,57 @@ public class ProductionStock {
                 if (!returnInvoiceItems.isEmpty()) {
                     sqliteDatabase.insertProductionReturnInvoiceItems(returnInvoiceId, returnInvoiceItems);
                     
+                    // Wrap printing logic in try-catch like Purchase Return
+                    try {
+                        // Prepare items for printing
+                        List<Item> printItems = new ArrayList<>();
+                        for (Object[] returnItemData : returnInvoiceItems) {
+                            int productionStockId = (Integer) returnItemData[0];
+                            double returnQuantity = (Double) returnItemData[1];
+                            double unitCost = (Double) returnItemData[2];
+                            
+                            // Get product name for this production stock ID
+                            String productName = getProductionStockNameById(productionStockId);
+                            
+                            printItems.add(new Item(
+                                productName,
+                                (int) returnQuantity,
+                                unitCost,
+                                0.0 // no discount for returns
+                            ));
+                        }
+                        
+                        // Create invoice data for printing with proper type and metadata
+                        InvoiceData invoiceData = new InvoiceData(
+                            InvoiceData.TYPE_PRODUCTION_RETURN,
+                            returnInvoiceNumber,
+                            formattedDate,
+                            "PRODUCTION RETURN INVOICE",
+                            "", // Empty address field
+                            printItems,
+                            0.0 // no previous balance for returns
+                        );
+                        
+                        // Add notes as metadata
+                        invoiceData.setMetadata("tehsil", "");
+                        invoiceData.setMetadata("contact", "");
+                        invoiceData.setMetadata("notes", notes);
+                        
+                        // Open invoice for print preview
+                        boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Production Return");
+                        
+                        if (!previewSuccess) {
+                            // Fallback to printer selection if preview fails
+                            boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Production Return");
+                            if (!printSuccess) {
+                                showAlert("Error", "Failed to print return invoice " + returnInvoiceNumber);
+                            }
+                        }
+                    } catch (Exception ex) {
+                        showAlert("Error", "Failed to prepare return invoice for printing: " + ex.getMessage());
+                        ex.printStackTrace();
+                    }
+                    
                     showAlert("Success", "Return production invoice saved successfully!\nReturn Invoice Number: " + returnInvoiceNumber);
                     
                     // Clear form
@@ -3138,16 +3150,20 @@ public class ProductionStock {
                     returnQuantityField.clear();
                     totalReturnQuantityField.setText("0");
                     
+                    return true;
                 } else {
                     showAlert("Error", "No valid return items found to save");
+                    return false;
                 }
             } else {
                 showAlert("Error", "Failed to create return production invoice");
+                return false;
             }
             
         } catch (Exception e) {
             e.printStackTrace();
             showAlert("Error", "Failed to submit return production invoice: " + e.getMessage());
+            return false;
         }
     }
 
