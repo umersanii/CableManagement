@@ -969,52 +969,160 @@ private static VBox createSalesReport() {
 
         Label heading = createHeading("Balance Sheet");
 
-        // Date picker for as-of date
-        HBox dateBox = new HBox(10);
-        Label asOfLabel = new Label("As of Date:");
-        DatePicker asOfDatePicker = new DatePicker();
-        asOfDatePicker.setValue(LocalDate.now());
-        Button updateBtn = createActionButton("Update");
-        dateBox.getChildren().addAll(asOfLabel, asOfDatePicker, updateBtn);
-        dateBox.setAlignment(Pos.CENTER_LEFT);
-
         // Action buttons
-        HBox buttons = createReportActionButtons();
+        HBox actionButtons = new HBox(15);
+        actionButtons.setAlignment(Pos.CENTER_LEFT);
+        actionButtons.setPadding(new Insets(10));
+        
+        Button refreshBtn = createActionButton("Refresh");
+        Button viewDetailedBtn = createActionButton("View Detailed Balance Sheet");
+        Button printBtn = createActionButton("Print");
+        actionButtons.getChildren().addAll(refreshBtn, viewDetailedBtn, printBtn);
 
-        // Balance sheet - maps to View_Balance_Sheet
+        // Balance sheet - gets data from database
         GridPane balanceGrid = new GridPane();
         balanceGrid.setHgap(20);
         balanceGrid.setVgap(10);
         balanceGrid.setPadding(new Insets(15));
+        balanceGrid.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #dee2e6; -fx-border-width: 1;");
 
-        // Assets
-        Label assetsLabel = new Label("Assets");
-        assetsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14;");
-        balanceGrid.add(assetsLabel, 0, 0);
+        // Error label for feedback
+        Label errorLabel = new Label("");
+        errorLabel.setStyle("-fx-text-fill: red;");
 
-        addBalanceSheetItem(balanceGrid, 1, "Cash Balance:", "15000.00");
-        addBalanceSheetItem(balanceGrid, 2, "Bank Balance:", "600000.00");
-        addBalanceSheetItem(balanceGrid, 3, "Inventory:", "250000.00");
-        addBalanceSheetItem(balanceGrid, 4, "Total Assets:", "865000.00");
+        // Load balance sheet data from database
+        Runnable loadBalanceSheet = () -> {
+            balanceGrid.getChildren().clear();
+            errorLabel.setText("");
+            try {
+                if (config.database != null && config.database.isConnected()) {
+                    Object[] balanceData = config.database.getBalanceSheetData();
+                    
+                    // Defensive programming - check for null data
+                    if (balanceData == null || balanceData.length < 8) {
+                        errorLabel.setText("Error: Invalid balance sheet data returned from database");
+                        return;
+                    }
+                    
+                    // Safely extract data with null checks
+                    double totalBankBalance = (balanceData[0] != null) ? (Double) balanceData[0] : 0.0;
+                    double customersOweUs = (balanceData[1] != null) ? (Double) balanceData[1] : 0.0;
+                    double weOweCustomers = (balanceData[2] != null) ? (Double) balanceData[2] : 0.0;
+                    double suppliersOweUs = (balanceData[3] != null) ? (Double) balanceData[3] : 0.0;
+                    double weOweSuppliers = (balanceData[4] != null) ? (Double) balanceData[4] : 0.0;
+                    double totalReceivables = (balanceData[5] != null) ? (Double) balanceData[5] : 0.0;
+                    double totalPayables = (balanceData[6] != null) ? (Double) balanceData[6] : 0.0;
+                    double netWorth = (balanceData[7] != null) ? (Double) balanceData[7] : 0.0;
+                    
+                    int row = 0;
+                    
+                    // Assets Header
+                    Label assetsLabel = new Label("ASSETS");
+                    assetsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #27ae60;");
+                    balanceGrid.add(assetsLabel, 0, row++);
+                    
+                    // Current Assets
+                    addBalanceSheetItem(balanceGrid, row++, "Cash in Hand (All Banks):", String.format("Rs. %.2f", totalBankBalance));
+                    addBalanceSheetItem(balanceGrid, row++, "Accounts Receivable (Customers):", String.format("Rs. %.2f", customersOweUs));
+                    addBalanceSheetItem(balanceGrid, row++, "Accounts Receivable (Suppliers):", String.format("Rs. %.2f", suppliersOweUs));
+                    
+                    // Total Assets
+                    Label totalAssetsLabel = new Label("TOTAL ASSETS:");
+                    totalAssetsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+                    balanceGrid.add(totalAssetsLabel, 0, row);
+                    
+                    Label totalAssetsValue = new Label(String.format("Rs. %.2f", totalBankBalance + totalReceivables));
+                    totalAssetsValue.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #27ae60;");
+                    balanceGrid.add(totalAssetsValue, 1, row++);
+                    
+                    // Spacer
+                    balanceGrid.add(new Label(" "), 0, row++);
+                    
+                    // Liabilities Header
+                    Label liabilitiesLabel = new Label("LIABILITIES");
+                    liabilitiesLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #e74c3c;");
+                    balanceGrid.add(liabilitiesLabel, 0, row++);
+                    
+                    // Current Liabilities
+                    addBalanceSheetItem(balanceGrid, row++, "Accounts Payable (Customers):", String.format("Rs. %.2f", weOweCustomers));
+                    addBalanceSheetItem(balanceGrid, row++, "Accounts Payable (Suppliers):", String.format("Rs. %.2f", weOweSuppliers));
+                    
+                    // Total Liabilities
+                    Label totalLiabilitiesLabel = new Label("TOTAL LIABILITIES:");
+                    totalLiabilitiesLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+                    balanceGrid.add(totalLiabilitiesLabel, 0, row);
+                    
+                    Label totalLiabilitiesValue = new Label(String.format("Rs. %.2f", totalPayables));
+                    totalLiabilitiesValue.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #e74c3c;");
+                    balanceGrid.add(totalLiabilitiesValue, 1, row++);
+                    
+                    // Spacer
+                    balanceGrid.add(new Label(" "), 0, row++);
+                    
+                    // Net Worth Header
+                    Label netWorthLabel = new Label("NET WORTH");
+                    netWorthLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #3498db;");
+                    balanceGrid.add(netWorthLabel, 0, row++);
+                    
+                    // Net Worth Value
+                    Label netWorthDescLabel = new Label("NET WORTH (Assets - Liabilities):");
+                    netWorthDescLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+                    balanceGrid.add(netWorthDescLabel, 0, row);
+                    
+                    String netWorthColor = netWorth >= 0 ? "#27ae60" : "#e74c3c";
+                    Label netWorthValue = new Label(String.format("Rs. %.2f", netWorth));
+                    netWorthValue.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: " + netWorthColor + ";");
+                    balanceGrid.add(netWorthValue, 1, row++);
+                    
+                    // Footer
+                    balanceGrid.add(new Label(" "), 0, row++);
+                    Label footerLabel = new Label("As of: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+                    footerLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #7f8c8d;");
+                    balanceGrid.add(footerLabel, 0, row);
+                    
+                } else {
+                    errorLabel.setText("Database not connected.");
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error loading balance sheet data: " + ex.getMessage());
+            }
+        };
 
-        // Liabilities
-        Label liabilitiesLabel = new Label("Liabilities");
-        liabilitiesLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14;");
-        balanceGrid.add(liabilitiesLabel, 0, 5);
+        // Refresh button action
+        refreshBtn.setOnAction(e -> loadBalanceSheet.run());
 
-        addBalanceSheetItem(balanceGrid, 6, "Accounts Payable:", "75000.00");
-        addBalanceSheetItem(balanceGrid, 7, "Employee Loans:", "15000.00");
-        addBalanceSheetItem(balanceGrid, 8, "Total Liabilities:", "90000.00");
+        // View detailed balance sheet button action
+        viewDetailedBtn.setOnAction(e -> {
+            try {
+                com.cablemanagement.views.BalanceSheetView.showBalanceSheet();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error opening detailed balance sheet: " + ex.getMessage());
+            }
+        });
 
-        // Equity
-        Label equityLabel = new Label("Equity");
-        equityLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14;");
-        balanceGrid.add(equityLabel, 0, 9);
+        // Print button action
+        printBtn.setOnAction(e -> {
+            try {
+                // Generate temporary filename for balance sheet PDF
+                String timestamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+                String filename = System.getProperty("java.io.tmpdir") + java.io.File.separator + 
+                                 "BalanceSheet_Summary_" + timestamp + ".pdf";
+                
+                // Use the BalanceSheetGenerator to create and open PDF for printing
+                com.cablemanagement.invoice.BalanceSheetGenerator.generateAndPreviewBalanceSheet(filename);
+                
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error preparing balance sheet for printing: " + ex.getMessage());
+            }
+        });
 
-        addBalanceSheetItem(balanceGrid, 10, "Owner's Equity:", "775000.00");
-        addBalanceSheetItem(balanceGrid, 11, "Total Liabilities & Equity:", "865000.00");
+        // Load initial data
+        loadBalanceSheet.run();
 
-        form.getChildren().addAll(heading, dateBox, buttons, balanceGrid);
+        form.getChildren().addAll(heading, actionButtons, errorLabel, balanceGrid);
         return form;
     }
 

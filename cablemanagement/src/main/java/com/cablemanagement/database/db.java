@@ -569,6 +569,7 @@ List<Object[]> getInvoiceItemsByID(Integer invoiceID);
     ResultSet getProfitReport(Date fromDate, Date toDate);
     ResultSet getSummaryReport(Date fromDate, Date toDate);
     ResultSet getBalanceSheet();
+    Object[] getBalanceSheetData();
     ResultSet getCustomersReport();
     ResultSet getSuppliersReport();
     ResultSet getAreaWiseReport();
