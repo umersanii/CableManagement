@@ -6327,27 +6327,89 @@ public ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType
     }
 
     @Override
-    
-    
-    public ResultSet getReturnSalesReport(Date fromDate, Date toDate) {
-        System.out.println("DEBUG: getReturnSalesReport called with dates: " + fromDate + " to " + toDate);
+    public ResultSet getReturnSalesReport(Date fromDate, Date toDate, String reportType) {
+        System.out.println("DEBUG: getReturnSalesReport called with dates: " + fromDate + " to " + toDate + " and reportType: " + reportType);
         
         // Convert Date to string format for comparison
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         String fromDateStr = sdf.format(fromDate);
         String toDateStr = sdf.format(toDate);
         
-        System.out.println("DEBUG: Date strings: " + fromDateStr + " to " + toDateStr);
+        System.out.println("DEBUG: Date strings: " + fromDateStr + " to " + toDateStr + ", Report type: " + reportType);
         
-        String query = "SELECT " +
-                "sri.return_invoice_number AS return_invoice_number, " +
-                "sri.return_date AS return_date, " +
-                "c.customer_name AS customer_name, " +
-                "sri.total_return_amount AS total_return_amount " +
-                "FROM Sales_Return_Invoice sri " +
-                "LEFT JOIN Customer c ON sri.customer_id = c.customer_id " +
-                "WHERE sri.return_date >= ? AND sri.return_date <= ? " +
-                "ORDER BY sri.return_date DESC";
+        String query;
+        
+        switch (reportType) {
+            case "Product-wise Report":
+                query = "SELECT " +
+                        "ps.product_name AS product_name, " +
+                        "SUM(srii.quantity) AS total_quantity_returned, " +
+                        "SUM(srii.total_price) AS total_returned_amount " +
+                        "FROM Sales_Return_Invoice sri " +
+                        "LEFT JOIN Sales_Return_Invoice_Item srii ON sri.sales_return_invoice_id = srii.sales_return_invoice_id " +
+                        "LEFT JOIN ProductionStock ps ON srii.production_stock_id = ps.production_id " +
+                        "WHERE sri.return_date >= ? AND sri.return_date <= ? " +
+                        "GROUP BY ps.product_name " +
+                        "ORDER BY total_returned_amount DESC";
+                break;
+                
+            case "Category-wise Report":
+                // Since ProductionStock doesn't have category_id, we'll use a simplified approach
+                // or join through Brand to get some categorization
+                query = "SELECT " +
+                        "b.brand_name AS category, " +
+                        "SUM(srii.quantity) AS total_quantity_returned, " +
+                        "SUM(srii.total_price) AS total_returned_amount " +
+                        "FROM Sales_Return_Invoice sri " +
+                        "LEFT JOIN Sales_Return_Invoice_Item srii ON sri.sales_return_invoice_id = srii.sales_return_invoice_id " +
+                        "LEFT JOIN ProductionStock ps ON srii.production_stock_id = ps.production_id " +
+                        "LEFT JOIN Brand b ON ps.brand_id = b.brand_id " +
+                        "WHERE sri.return_date >= ? AND sri.return_date <= ? " +
+                        "GROUP BY b.brand_name " +
+                        "ORDER BY total_returned_amount DESC";
+                break;
+                
+            case "Brand-wise Report":
+                query = "SELECT " +
+                        "b.brand_name AS brand_name, " +
+                        "SUM(srii.quantity) AS total_quantity_returned, " +
+                        "SUM(srii.total_price) AS total_returned_amount " +
+                        "FROM Sales_Return_Invoice sri " +
+                        "LEFT JOIN Sales_Return_Invoice_Item srii ON sri.sales_return_invoice_id = srii.sales_return_invoice_id " +
+                        "LEFT JOIN ProductionStock ps ON srii.production_stock_id = ps.production_id " +
+                        "LEFT JOIN Brand b ON ps.brand_id = b.brand_id " +
+                        "WHERE sri.return_date >= ? AND sri.return_date <= ? " +
+                        "GROUP BY b.brand_name " +
+                        "ORDER BY total_returned_amount DESC";
+                break;
+                
+            case "Manufacturer-wise Report":
+                query = "SELECT " +
+                        "m.manufacturer_name AS manufacturer_name, " +
+                        "SUM(srii.quantity) AS total_quantity_returned, " +
+                        "SUM(srii.total_price) AS total_returned_amount " +
+                        "FROM Sales_Return_Invoice sri " +
+                        "LEFT JOIN Sales_Return_Invoice_Item srii ON sri.sales_return_invoice_id = srii.sales_return_invoice_id " +
+                        "LEFT JOIN ProductionStock ps ON srii.production_stock_id = ps.production_id " +
+                        "LEFT JOIN Brand b ON ps.brand_id = b.brand_id " +
+                        "LEFT JOIN Manufacturer m ON b.manufacturer_id = m.manufacturer_id " +
+                        "WHERE sri.return_date >= ? AND sri.return_date <= ? " +
+                        "GROUP BY m.manufacturer_name " +
+                        "ORDER BY total_returned_amount DESC";
+                break;
+                
+            default: // "All Reports"
+                query = "SELECT " +
+                        "sri.return_invoice_number AS return_invoice_number, " +
+                        "sri.return_date AS return_date, " +
+                        "c.customer_name AS customer_name, " +
+                        "sri.total_return_amount AS total_return_amount " +
+                        "FROM Sales_Return_Invoice sri " +
+                        "LEFT JOIN Customer c ON sri.customer_id = c.customer_id " +
+                        "WHERE sri.return_date >= ? AND sri.return_date <= ? " +
+                        "ORDER BY sri.return_date DESC";
+                break;
+        }
         
         try {
             PreparedStatement pstmt = connection.prepareStatement(query);

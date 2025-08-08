@@ -453,6 +453,21 @@ public class ReportsContent {
 
         Label heading = createHeading("Return Sales Report");
 
+        // Report type dropdown
+        HBox reportTypeBox = new HBox(10);
+        Label reportLabel = new Label("Select Report:");
+        ComboBox<String> reportComboBox = new ComboBox<>();
+        reportComboBox.getItems().addAll(
+            "All Reports",
+            "Product-wise Report",
+            "Category-wise Report",
+            "Brand-wise Report",
+            "Manufacturer-wise Report"
+        );
+        reportComboBox.setValue("All Reports");
+        reportTypeBox.getChildren().addAll(reportLabel, reportComboBox);
+        reportTypeBox.setAlignment(Pos.CENTER_LEFT);
+
         // Date range filters
         HBox dateRangeBox = new HBox(10);
         Label fromLabel = new Label("From:");
@@ -466,22 +481,8 @@ public class ReportsContent {
         // Action buttons
         HBox buttons = createReportActionButtons();
 
-        // Return sales report table - maps to Sales_Return_Invoice table
-        TableView<ReturnSalesReport> table = new TableView<>();
-        
-        TableColumn<ReturnSalesReport, String> invCol = new TableColumn<>("Invoice #");
-        invCol.setCellValueFactory(new PropertyValueFactory<>("invoiceNumber"));
-        
-        TableColumn<ReturnSalesReport, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(new PropertyValueFactory<>("invoiceDate"));
-        
-        TableColumn<ReturnSalesReport, String> customerCol = new TableColumn<>("Customer");
-        customerCol.setCellValueFactory(new PropertyValueFactory<>("customerName"));
-        
-        TableColumn<ReturnSalesReport, String> amountCol = new TableColumn<>("Amount");
-        amountCol.setCellValueFactory(new PropertyValueFactory<>("totalAmount"));
-        
-        table.getColumns().addAll(invCol, dateCol, customerCol, amountCol);
+        // Return sales report table (dynamic)
+        TableView<Map<String, String>> table = new TableView<>();
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         // Error label for feedback
@@ -491,28 +492,43 @@ public class ReportsContent {
         // Load data from backend
         filterBtn.setOnAction(e -> {
             table.getItems().clear();
+            table.getColumns().clear();
             errorLabel.setText("");
             try {
                 if (config.database != null && config.database.isConnected()) {
                     java.sql.Date from = java.sql.Date.valueOf(fromDatePicker.getValue());
                     java.sql.Date to = java.sql.Date.valueOf(toDatePicker.getValue());
-                    java.sql.ResultSet rs = config.database.getReturnSalesReport(from, to);
-                    int count = 0;
-                    while (rs != null && rs.next()) {
-                        // Format the amount as string with proper formatting
-                        String totalAmount = String.format("%.2f", rs.getDouble("total_return_amount"));
+                    String selectedReport = reportComboBox.getValue();
+                    
+                    java.sql.ResultSet rs = config.database.getReturnSalesReport(from, to, selectedReport);
+                    
+                    if (rs != null && rs.next()) {
+                        java.sql.ResultSetMetaData metaData = rs.getMetaData();
+                        int columnCount = metaData.getColumnCount();
+
+                        // Create columns dynamically
+                        for (int i = 1; i <= columnCount; i++) {
+                            final String colName = metaData.getColumnLabel(i);
+                            TableColumn<Map<String, String>, String> col = new TableColumn<>(colName);
+                            col.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getOrDefault(colName, "")));
+                            table.getColumns().add(col);
+                        }
+
+                        // Fill data
+                        ObservableList<Map<String, String>> data = FXCollections.observableArrayList();
                         
-                        table.getItems().add(new ReturnSalesReport(
-                            rs.getString("return_invoice_number"),
-                            rs.getString("return_date"),
-                            rs.getString("customer_name"),
-                            totalAmount
-                        ));
-                        count++;
-                    }
-                    System.out.println("ReturnSalesReport rows loaded: " + count);
-                    if (count == 0) {
-                        errorLabel.setText("No return sales data found for selected date range.");
+                        // The first rs.next() above already moved to the first row, so process that row first
+                        do {
+                            Map<String, String> row = new HashMap<>();
+                            for (int i = 1; i <= columnCount; i++) {
+                                row.put(metaData.getColumnLabel(i), rs.getString(i));
+                            }
+                            data.add(row);
+                        } while (rs.next());
+
+                        table.setItems(data);
+                    } else {
+                        errorLabel.setText("No data found for selected filters.");
                     }
                 } else {
                     errorLabel.setText("Database not connected.");
@@ -526,7 +542,7 @@ public class ReportsContent {
         // Optionally, trigger filter on load
         filterBtn.fire();
 
-        form.getChildren().addAll(heading, dateRangeBox, buttons, errorLabel, table);
+        form.getChildren().addAll(heading, reportTypeBox, dateRangeBox, buttons, errorLabel, table);
         return form;
     }
 
