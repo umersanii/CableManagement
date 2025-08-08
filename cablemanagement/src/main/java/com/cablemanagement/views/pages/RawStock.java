@@ -1,5 +1,6 @@
 package com.cablemanagement.views.pages;
 
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -1014,7 +1015,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                     List<Item> printItems = new ArrayList<>();
                     for (RawStockPurchaseItem item : selectedItemsTable.getItems()) {
                         printItems.add(new Item(
-                            item.getRawStockName(),
+                            item.getRawStockName() + " - " + item.getUnitName(),
                             (int)Math.floor(item.getQuantity()),
                             item.getUnitPrice(),
                             0.0  // No discount for return items
@@ -1374,7 +1375,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                         List<Item> printItems = new ArrayList<>();
                         for (RawStockUseItem item : items) {
                             printItems.add(new Item(
-                                item.getRawStockName(),
+                                item.getRawStockName() + " - " + item.getUnitName(),
                                 (int)Math.floor(item.getQuantityUsed()),
                                 item.getUnitCost(),
                                 0.0  // No discount for use items
@@ -2194,9 +2195,15 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
     private static TableView<RawStockUseItem> createRawStockItemsTable() {
         TableView<RawStockUseItem> table = new TableView<>();
         
-        TableColumn<RawStockUseItem, String> nameCol = new TableColumn<>("Stock Name");
-        nameCol.setCellValueFactory(new PropertyValueFactory<>("rawStockName"));
-        nameCol.setPrefWidth(180); // Reduced from 200
+        TableColumn<RawStockUseItem, String> nameCol = new TableColumn<>("Item");
+        nameCol.setCellValueFactory(cellData -> {
+            RawStockUseItem item = cellData.getValue();
+            String itemName = item.getRawStockName();
+            String unitName = item.getUnitName();
+            String displayText = itemName + " - " + unitName;
+            return new SimpleStringProperty(displayText);
+        });
+        nameCol.setPrefWidth(200); // Increased to accommodate "Name - Unit" format
         
         TableColumn<RawStockUseItem, String> brandCol = new TableColumn<>("Brand");
         brandCol.setCellValueFactory(new PropertyValueFactory<>("brandName"));
@@ -2209,10 +2216,6 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         TableColumn<RawStockUseItem, Double> availableCol = new TableColumn<>("Available");
         availableCol.setCellValueFactory(new PropertyValueFactory<>("availableQuantity"));
         availableCol.setPrefWidth(80); // Reduced from 100
-        
-        TableColumn<RawStockUseItem, String> unitCol = new TableColumn<>("Unit");
-        unitCol.setCellValueFactory(new PropertyValueFactory<>("unitName"));
-        unitCol.setPrefWidth(80); // Increased from 60
         
         TableColumn<RawStockUseItem, Double> costCol = new TableColumn<>("Unit Cost");
         costCol.setCellValueFactory(new PropertyValueFactory<>("unitCost"));
@@ -2243,7 +2246,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             }
         });
         
-        table.getColumns().addAll(nameCol, brandCol, categoryCol, availableCol, unitCol, costCol);
+        table.getColumns().addAll(nameCol, brandCol, categoryCol, availableCol, costCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
         return table;
@@ -2255,9 +2258,15 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
     private static TableView<RawStockUseItem> createSelectedUsageItemsTable() {
         TableView<RawStockUseItem> table = new TableView<>();
         
-        TableColumn<RawStockUseItem, String> nameCol = new TableColumn<>("Stock Name");
-        nameCol.setCellValueFactory(new PropertyValueFactory<>("rawStockName"));
-        nameCol.setPrefWidth(180); // Reduced from 200
+        TableColumn<RawStockUseItem, String> nameCol = new TableColumn<>("Item");
+        nameCol.setCellValueFactory(cellData -> {
+            RawStockUseItem item = cellData.getValue();
+            String itemName = item.getRawStockName();
+            String unitName = item.getUnitName();
+            String displayText = itemName + " - " + unitName;
+            return new SimpleStringProperty(displayText);
+        });
+        nameCol.setPrefWidth(200); // Increased to accommodate "Name - Unit" format
         
         TableColumn<RawStockUseItem, String> brandCol = new TableColumn<>("Brand");
         brandCol.setCellValueFactory(new PropertyValueFactory<>("brandName"));
@@ -2266,10 +2275,6 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         TableColumn<RawStockUseItem, Double> quantityCol = new TableColumn<>("Qty Used");
         quantityCol.setCellValueFactory(new PropertyValueFactory<>("quantityUsed"));
         quantityCol.setPrefWidth(80); // Reduced from 100
-        
-        TableColumn<RawStockUseItem, String> unitCol = new TableColumn<>("Unit");
-        unitCol.setCellValueFactory(new PropertyValueFactory<>("unitName"));
-        unitCol.setPrefWidth(80); // Increased from 60
         
         TableColumn<RawStockUseItem, Double> costCol = new TableColumn<>("Unit Cost");
         costCol.setCellValueFactory(new PropertyValueFactory<>("unitCost"));
@@ -2316,7 +2321,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             }
         });
         
-        table.getColumns().addAll(nameCol, brandCol, quantityCol, unitCol, costCol, totalCol);
+        table.getColumns().addAll(nameCol, brandCol, quantityCol, costCol, totalCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
         return table;
@@ -2594,7 +2599,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                             List<Item> printItems = new ArrayList<>();
                             for (RawStockUseItem item : items) {
                                 printItems.add(new Item(
-                                    item.getRawStockName(),
+                                    item.getRawStockName() + " - " + item.getUnitName(),
                                     (int)Math.floor(item.getQuantityUsed()),
                                     item.getUnitCost(),
                                     0.0  // No discount for use items

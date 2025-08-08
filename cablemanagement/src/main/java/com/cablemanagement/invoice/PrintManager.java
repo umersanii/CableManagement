@@ -352,6 +352,93 @@ public class PrintManager {
     }
     
     /**
+     * Open any PDF file for preview and printing
+     * @param filename The path to the PDF file
+     * @param documentType The type of document (e.g., "Balance Sheet", "Report")
+     * @return true if PDF was successfully opened for preview
+     */
+    public static boolean openPDFForPreview(String filename, String documentType) {
+        try {
+            File pdfFile = new File(filename);
+            if (!pdfFile.exists()) {
+                showErrorAlert("File Not Found", "The PDF file could not be found.\nFile: " + filename);
+                return false;
+            }
+            
+            if (pdfFile.length() == 0) {
+                showErrorAlert("Invalid File", "The PDF file is empty or corrupted.\nFile: " + filename);
+                return false;
+            }
+            
+            System.out.println("Opening " + documentType + " PDF: " + pdfFile.length() + " bytes");
+            
+            // Add a small delay to ensure file is completely written and closed
+            Thread.sleep(500);
+            
+            // Open PDF in default viewer
+            if (Desktop.isDesktopSupported()) {
+                Desktop desktop = Desktop.getDesktop();
+                if (desktop.isSupported(Desktop.Action.OPEN)) {
+                    System.out.println("Opening PDF in default viewer...");
+                    
+                    // Show information dialog before opening PDF
+                    Alert infoAlert = new Alert(Alert.AlertType.INFORMATION);
+                    infoAlert.setTitle("Print Preview Ready");
+                    infoAlert.setHeaderText(documentType + " Preview");
+                    infoAlert.setContentText("The " + documentType + " PDF has been generated and will open in your default PDF viewer.\n\n" +
+                                           "You can then:\n" +
+                                           "• Review the document\n" +
+                                           "• Press Ctrl+P to open the print dialog\n" +
+                                           "• Choose your printer and print settings\n\n" +
+                                           "File saved at: " + filename + "\n\n" +
+                                           "Click OK to open the PDF viewer.");
+                    infoAlert.showAndWait();
+                    
+                    // Open PDF in a new thread to prevent blocking
+                    new Thread(() -> {
+                        try {
+                            String os = System.getProperty("os.name").toLowerCase();
+                            if (os.contains("linux")) {
+                                // Use xdg-open on Linux for better compatibility
+                                Runtime.getRuntime().exec(new String[]{"xdg-open", pdfFile.getAbsolutePath()});
+                            } else {
+                                desktop.open(pdfFile);
+                            }
+                        } catch (Exception e) {
+                            Platform.runLater(() -> {
+                                showErrorAlert("Preview Error", 
+                                    "Could not open PDF viewer automatically.\n\n" +
+                                    "The PDF has been saved at:\n" + filename + "\n\n" +
+                                    "You can manually open this file with any PDF viewer.\n\n" +
+                                    "Error: " + e.getMessage());
+                            });
+                        }
+                    }, "PDFPreviewThread").start();
+                    
+                    return true;
+                } else {
+                    showErrorAlert("Desktop Not Supported", 
+                        "Cannot open files automatically on this system.\n\n" +
+                        "The PDF has been saved at:\n" + filename + "\n\n" +
+                        "Please open this file manually with your PDF viewer.");
+                    return false;
+                }
+            } else {
+                showErrorAlert("Desktop Not Supported", 
+                    "Desktop operations are not supported on this system.\n\n" +
+                    "The PDF has been saved at:\n" + filename + "\n\n" +
+                    "Please open this file manually with your PDF viewer.");
+                return false;
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            showErrorAlert("Preview Error", "An error occurred while opening the PDF: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
      * Clean up temporary print files older than 24 hours
      */
     public static void cleanupTempFiles() {

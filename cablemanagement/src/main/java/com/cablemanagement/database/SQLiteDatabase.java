@@ -35,7 +35,18 @@ import java.nio.file.Path;
 public class SQLiteDatabase implements db {
 
     public SQLiteDatabase() {
-        this.databasePath = "cable_management.db";
+        // First try the current directory, then fall back to relative path
+        String currentDir = System.getProperty("user.dir");
+        System.out.println("DEBUG: Current working directory: " + currentDir);
+        
+        if (currentDir.endsWith("cablemanagement")) {
+            this.databasePath = "cable_management.db";
+        } else {
+            this.databasePath = "CableManagement/cablemanagement/cable_management.db";
+        }
+        
+        System.out.println("DEBUG: Database path set to: " + this.databasePath);
+        
         // Auto-connect when instantiated
         connect(null, null, null);
         // Initialize all required tables
@@ -3295,9 +3306,10 @@ public class SQLiteDatabase implements db {
     public List<Object[]> getAllRawStocksWithUnitsForDropdown() {
         List<Object[]> rawStocks = new ArrayList<>();
         String query = "SELECT rs.stock_id, rs.item_name, b.brand_name, " +
-                      "'N/A' as unit_name, rs.quantity, rs.unit_price " +
+                      "u.unit_name, rs.quantity, rs.unit_price " +
                       "FROM Raw_Stock rs " +
                       "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                      "LEFT JOIN Unit u ON rs.unit_id = u.unit_id " +
                       "WHERE rs.quantity > 0 " +
                       "ORDER BY rs.item_name";
         
@@ -3310,7 +3322,7 @@ public class SQLiteDatabase implements db {
                     rs.getString("item_name"),
                     "N/A", // category_name (not available in Raw_Stock table)
                     rs.getString("brand_name"),
-                    rs.getString("unit_name"),
+                    rs.getString("unit_name") != null ? rs.getString("unit_name") : "N/A",
                     rs.getDouble("quantity"),
                     rs.getDouble("unit_price")
                 };
@@ -6508,6 +6520,99 @@ public class SQLiteDatabase implements db {
         } catch (SQLException e) {
             e.printStackTrace();
             return null;
+        }
+    }
+
+    @Override
+    public Object[] getBalanceSheetData() {
+        try {
+            System.out.println("DEBUG: Starting balance sheet data calculation...");
+            
+            // 1. Cash in hand from all banks
+            double totalBankBalance = 0.0;
+            String bankQuery = "SELECT COALESCE(SUM(balance), 0) as total FROM Bank";
+            try (PreparedStatement pstmt = connection.prepareStatement(bankQuery)) {
+                ResultSet rs = pstmt.executeQuery();
+                if (rs.next()) {
+                    totalBankBalance = rs.getDouble("total");
+                }
+                System.out.println("DEBUG: Total bank balance: " + totalBankBalance);
+            } catch (SQLException e) {
+                System.err.println("DEBUG: Error getting bank balance: " + e.getMessage());
+                totalBankBalance = 0.0;
+            }
+            
+            // 2. Customer balances (money they owe us vs we owe them)
+            double customersOweUs = 0.0;
+            double weOweCustomers = 0.0;
+            String customerQuery = "SELECT customer_name, balance FROM Customer";
+            try (PreparedStatement pstmt = connection.prepareStatement(customerQuery)) {
+                ResultSet rs = pstmt.executeQuery();
+                while (rs.next()) {
+                    double balance = rs.getDouble("balance");
+                    if (balance > 0) {
+                        customersOweUs += balance; // Positive means they owe us
+                    } else {
+                        weOweCustomers += Math.abs(balance); // Negative means we owe them
+                    }
+                }
+                System.out.println("DEBUG: Customers owe us: " + customersOweUs + ", We owe customers: " + weOweCustomers);
+            } catch (SQLException e) {
+                System.err.println("DEBUG: Error getting customer balances: " + e.getMessage());
+            }
+            
+            // 3. Supplier balances (money we owe them vs they owe us)
+            double weOweSuppliers = 0.0;
+            double suppliersOweUs = 0.0;
+            String supplierQuery = "SELECT supplier_name, balance FROM Supplier";
+            try (PreparedStatement pstmt = connection.prepareStatement(supplierQuery)) {
+                ResultSet rs = pstmt.executeQuery();
+                while (rs.next()) {
+                    double balance = rs.getDouble("balance");
+                    if (balance > 0) {
+                        weOweSuppliers += balance; // Positive means we owe them
+                    } else {
+                        suppliersOweUs += Math.abs(balance); // Negative means they owe us
+                    }
+                }
+                System.out.println("DEBUG: We owe suppliers: " + weOweSuppliers + ", Suppliers owe us: " + suppliersOweUs);
+            } catch (SQLException e) {
+                System.err.println("DEBUG: Error getting supplier balances: " + e.getMessage());
+            }
+            
+            // Calculate net amounts
+            double totalAssetsFromPeople = customersOweUs + suppliersOweUs; // Money coming to us
+            double totalLiabilitiesToPeople = weOweCustomers + weOweSuppliers; // Money going from us
+            double netWorth = totalBankBalance + totalAssetsFromPeople - totalLiabilitiesToPeople;
+            
+            System.out.println("DEBUG: Balance sheet calculated successfully");
+            System.out.println("DEBUG: Net worth: " + netWorth);
+            
+            return new Object[] {
+                totalBankBalance,        // 0 - Cash in hand (all banks)
+                customersOweUs,          // 1 - Customers owe us
+                weOweCustomers,          // 2 - We owe customers
+                suppliersOweUs,          // 3 - Suppliers owe us
+                weOweSuppliers,          // 4 - We owe suppliers
+                totalAssetsFromPeople,   // 5 - Total receivables
+                totalLiabilitiesToPeople,// 6 - Total payables
+                netWorth                 // 7 - Net worth
+            };
+            
+        } catch (Exception e) {
+            System.err.println("Error calculating balance sheet: " + e.getMessage());
+            e.printStackTrace();
+            // Return array with proper default values instead of nulls
+            return new Object[] {
+                0.0, // totalBankBalance
+                0.0, // customersOweUs  
+                0.0, // weOweCustomers
+                0.0, // suppliersOweUs
+                0.0, // weOweSuppliers
+                0.0, // totalAssetsFromPeople
+                0.0, // totalLiabilitiesToPeople
+                0.0  // netWorth
+            };
         }
     }
 
