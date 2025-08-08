@@ -345,94 +345,106 @@ public class ReportsContent {
         return form;
     }
 
-    private static VBox createReturnPurchaseReport() {
-        VBox form = new VBox(15);
-        form.setPadding(new Insets(20));
-        form.getStyleClass().add("form-container");
+private static VBox createReturnPurchaseReport() {
+    VBox form = new VBox(15);
+    form.setPadding(new Insets(20));
+    form.getStyleClass().add("form-container");
 
-        Label heading = createHeading("Return Purchase Report");
+    Label heading = createHeading("Return Purchase Report");
 
-        // Date range filters
-        HBox dateRangeBox = new HBox(10);
-        Label fromLabel = new Label("From:");
-        DatePicker fromDatePicker = new DatePicker(LocalDate.now().minusDays(7));
-        Label toLabel = new Label("To:");
-        DatePicker toDatePicker = new DatePicker(LocalDate.now());
-        Button filterBtn = createActionButton("Filter");
-        dateRangeBox.getChildren().addAll(fromLabel, fromDatePicker, toLabel, toDatePicker, filterBtn);
-        dateRangeBox.setAlignment(Pos.CENTER_LEFT);
+    // Report type dropdown
+    HBox reportTypeBox = new HBox(10);
+    Label reportLabel = new Label("Select Report:");
+    ComboBox<String> reportComboBox = new ComboBox<>();
+    reportComboBox.getItems().addAll(
+        "All Reports",
+        "Product-wise Report",
+        "Category-wise Report",
+        "Brand-wise Report",
+        "Manufacturer-wise Report"
+    );
+    reportComboBox.setValue("All Reports");
+    reportTypeBox.getChildren().addAll(reportLabel, reportComboBox);
+    reportTypeBox.setAlignment(Pos.CENTER_LEFT);
 
-        // Action buttons
-        HBox buttons = createReportActionButtons();
+    // Date range filters
+    HBox dateRangeBox = new HBox(10);
+    Label fromLabel = new Label("From:");
+    DatePicker fromDatePicker = new DatePicker(LocalDate.now().minusDays(7));
+    Label toLabel = new Label("To:");
+    DatePicker toDatePicker = new DatePicker(LocalDate.now());
+    Button filterBtn = createActionButton("Filter");
+    dateRangeBox.getChildren().addAll(fromLabel, fromDatePicker, toLabel, toDatePicker, filterBtn);
+    dateRangeBox.setAlignment(Pos.CENTER_LEFT);
 
-        // Return purchase report table - maps to View_Return_Purchase_Report
-        TableView<ReturnPurchaseReport> table = new TableView<>();
-        
-        TableColumn<ReturnPurchaseReport, String> invCol = new TableColumn<>("Invoice #");
-        invCol.setCellValueFactory(new PropertyValueFactory<>("invoiceNumber"));
-        
-        TableColumn<ReturnPurchaseReport, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(new PropertyValueFactory<>("invoiceDate"));
-        
-        TableColumn<ReturnPurchaseReport, String> supplierCol = new TableColumn<>("Supplier");
-        supplierCol.setCellValueFactory(new PropertyValueFactory<>("supplierName"));
-        
-        TableColumn<ReturnPurchaseReport, String> amountCol = new TableColumn<>("Amount");
-        amountCol.setCellValueFactory(new PropertyValueFactory<>("totalAmount"));
-        
-        TableColumn<ReturnPurchaseReport, String> discountCol = new TableColumn<>("Discount");
-        discountCol.setCellValueFactory(new PropertyValueFactory<>("discountAmount"));
-        
-        TableColumn<ReturnPurchaseReport, String> paidCol = new TableColumn<>("Paid");
-        paidCol.setCellValueFactory(new PropertyValueFactory<>("paidAmount"));
-        
-        table.getColumns().addAll(invCol, dateCol, supplierCol, amountCol, discountCol, paidCol);
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+    // Action buttons
+    HBox buttons = createReportActionButtons();
 
-        // Error label for feedback
-        Label errorLabel = new Label("");
-        errorLabel.setStyle("-fx-text-fill: red;");
+    // Table (dynamic)
+    TableView<Map<String, String>> table = new TableView<>();
+    table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        // Load data from backend
-        filterBtn.setOnAction(e -> {
-            table.getItems().clear();
-            errorLabel.setText("");
-            try {
-                if (config.database != null && config.database.isConnected()) {
-                    java.sql.Date from = java.sql.Date.valueOf(fromDatePicker.getValue());
-                    java.sql.Date to = java.sql.Date.valueOf(toDatePicker.getValue());
-                    java.sql.ResultSet rs = config.database.getReturnPurchaseReport(from, to);
-                    int count = 0;
-                    while (rs != null && rs.next()) {
-                        table.getItems().add(new ReturnPurchaseReport(
-                            rs.getString("invoiceNumber"),
-                            rs.getString("invoiceDate"),
-                            rs.getString("supplierName"),
-                            rs.getString("totalAmount"),
-                            rs.getString("discountAmount"),
-                            rs.getString("paidAmount")
-                        ));
-                        count++;
+    // Error label
+    Label errorLabel = new Label("");
+    errorLabel.setStyle("-fx-text-fill: red;");
+
+    // Load data
+    filterBtn.setOnAction(e -> {
+        table.getItems().clear();
+        table.getColumns().clear();
+        errorLabel.setText("");
+
+        try {
+            if (config.database != null && config.database.isConnected()) {
+                java.sql.Date from = java.sql.Date.valueOf(fromDatePicker.getValue());
+                java.sql.Date to = java.sql.Date.valueOf(toDatePicker.getValue());
+                String selectedReport = reportComboBox.getValue();
+
+                ResultSet rs = config.database.getReturnPurchaseReport(from, to, selectedReport); // Make sure backend handles report type
+
+                if (rs != null && rs.next()) {
+                    ResultSetMetaData metaData = rs.getMetaData();
+                    int columnCount = metaData.getColumnCount();
+
+                    // Create columns dynamically
+                    for (int i = 1; i <= columnCount; i++) {
+                        final String colName = metaData.getColumnLabel(i);
+                        TableColumn<Map<String, String>, String> col = new TableColumn<>(colName);
+                        col.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getOrDefault(colName, "")));
+                        table.getColumns().add(col);
                     }
-                    System.out.println("ReturnPurchaseReport rows loaded: " + count);
-                    if (count == 0) {
-                        errorLabel.setText("No data found for selected date range.");
-                    }
+
+                    // Fill data
+                    ObservableList<Map<String, String>> data = FXCollections.observableArrayList();
+                    
+                    // The first rs.next() above already moved to the first row, so process that row first
+                    do {
+                        Map<String, String> row = new HashMap<>();
+                        for (int i = 1; i <= columnCount; i++) {
+                            row.put(metaData.getColumnLabel(i), rs.getString(i));
+                        }
+                        data.add(row);
+                    } while (rs.next());
+
+                    table.setItems(data);
                 } else {
-                    errorLabel.setText("Database not connected.");
+                    errorLabel.setText("No data found for selected filters.");
                 }
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                errorLabel.setText("Error loading data: " + ex.getMessage());
+            } else {
+                errorLabel.setText("Database not connected.");
             }
-        });
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            errorLabel.setText("Error loading data: " + ex.getMessage());
+        }
+    });
 
-        // Optionally, trigger filter on load
-        filterBtn.fire();
+    // Trigger load on start
+    filterBtn.fire();
 
-        form.getChildren().addAll(heading, dateRangeBox, buttons, errorLabel, table);
-        return form;
-    }
+    form.getChildren().addAll(heading, reportTypeBox, dateRangeBox, buttons, errorLabel, table);
+    return form;
+}
 
     private static VBox createReturnSalesReport() {
         VBox form = new VBox(15);
