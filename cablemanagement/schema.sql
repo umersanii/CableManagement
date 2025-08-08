@@ -394,3 +394,4 @@ CREATE TABLE IF NOT EXISTS Contract_Employee (
     date TEXT NOT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+

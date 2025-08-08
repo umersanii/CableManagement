@@ -51,15 +51,9 @@ public class SQLiteDatabase implements db {
     private Connection connection;
     private String databasePath;
 
-    
-    // Method to get the database connection
     public Connection getConnection() {
         return this.connection;
     }
-
-
-    // Implement missing methods from db interface
-
 
     
     public List<Object[]> getLastProductionReturnInvoice() {
@@ -3347,10 +3341,7 @@ public class SQLiteDatabase implements db {
         return invoices;
     }
 
-    // --------------------------
-    // Production Return Invoice Operations  
-    // --------------------------
-    
+
     /**
      * Generate auto-increment production return invoice number
      */
@@ -3563,23 +3554,7 @@ public class SQLiteDatabase implements db {
         }
     }
     
-    /**
-     * Get production stock price by ID
-     */
-    private double getProductionStockPrice(int productionStockId) {
-        String query = "SELECT unit_cost FROM ProductionStock WHERE production_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setInt(1, productionStockId);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                return rs.getDouble("unit_cost");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0.0;
-    }
-    
+
     /**
      * Get available items for return from a specific production invoice
      */
@@ -4830,14 +4805,6 @@ public class SQLiteDatabase implements db {
 
 
 
-    ///////////////////////////////////////////////////////////////////
-    /// Un sare Functions ki mock implementation
-    /// 
-    /// 
-    /// 
-    /// 
-    
-
     // Delete Methods
     @Override
     public String getSupplierAddress(String supplierName) {
@@ -5376,16 +5343,16 @@ public class SQLiteDatabase implements db {
         return results;
     }
     @Override
-        public List<Object[]> getAllProductionStock() {
-            // Dummy implementation: returns an empty list
-            return new ArrayList<>();
-        }
+    public List<Object[]> getAllProductionStock() {
+        // Dummy implementation: returns an empty list
+        return new ArrayList<>();
+    }
 
-        @Override
-        public List<Object[]> getAllRawStock() {
-            // Dummy implementation: returns an empty list
-            return new ArrayList<>();
-        }
+    @Override
+    public List<Object[]> getAllRawStock() {
+        // Dummy implementation: returns an empty list
+        return new ArrayList<>();
+    }
 
     @Override
     public List<Object[]> getInvoiceItemsByID(Integer invoiceID) {
@@ -6219,9 +6186,7 @@ public class SQLiteDatabase implements db {
             return null;
         }
     }
-    /**
-     * Ensure all required views exist in the database
-     */
+
     /**
      * Ensure all required views exist in the database
      */
@@ -6329,126 +6294,64 @@ public class SQLiteDatabase implements db {
         }
     }
 
-    /**
-     * Check if a view exists in the database
-     */
-    private boolean viewExists(String viewName) {
-        try {
-            String sql = "SELECT name FROM sqlite_master WHERE type='view' AND name=?";
-            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-                stmt.setString(1, viewName);
-                try (ResultSet rs = stmt.executeQuery()) {
-                    return rs.next();
-                }
+    @Override
+    public int getSalesInvoiceIdByNumber(String invoiceNumber) {
+        String query = "SELECT sales_invoice_id FROM Sales_Invoice WHERE sales_invoice_number = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, invoiceNumber);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("sales_invoice_id");
             }
         } catch (SQLException e) {
-            return false;
+            System.err.println("Error getting sales invoice ID: " + e.getMessage());
+            e.printStackTrace();
         }
+        return -1;
     }
-
-    /**
-     * Add sample data for testing reports
-     */
-    // public void addSampleDataForTesting() {
-    //     System.out.println("DEBUG: Adding sample data for testing...");
-        
-    //     try {
-    //         // Check if we already have data
-    //         String countCustomersQuery = "SELECT COUNT(*) as total FROM Customer";
-    //         try (PreparedStatement countStmt = connection.prepareStatement(countCustomersQuery)) {
-    //             ResultSet countRs = countStmt.executeQuery();
-    //             if (countRs.next() && countRs.getInt("total") > 0) {
-    //                 System.out.println("DEBUG: Sample customer data already exists");
-    //                 countRs.close();
-    //                 return;
-    //             }
-    //             countRs.close();
-    //         }
-            
-    //         // // Insert sample customers with tehsil assignments
-    //         // insertCustomer("Ali Traders", "03001234567", "Lahore");
-    //         // insertCustomer("Pak Electric House", "03111234567", "Karachi");
-    //         // insertCustomer("Modern Cables Ltd", "03221234567", "Islamabad");
-    //         // insertCustomer("Cable World", "03331234567", "Faisalabad");
-            
-    //         // // Insert sample suppliers with tehsil assignments  
-    //         // insertSupplier("RawMetals Pvt Ltd", "03441234567", "Lahore");
-    //         // insertSupplier("Insulation Depot", "03551234567", "Karachi");
-    //         // insertSupplier("Wire Masters", "03661234567", "Islamabad");
-    //         // insertSupplier("Industrial Supplies Co", "03771234567", "Multan");
-            
-    //         // // Insert sample banks
-    //         // insertBank("Allied Bank Limited", "001-2345-6789", "Model Town Branch");
-    //         // insertBank("Habib Bank Limited", "123-4567-8901", "Gulshan Branch");
-    //         // insertBank("MCB Bank Limited", "456-7890-1234", "Main Boulevard Branch");
-    //         // insertBank("Standard Chartered", "789-0123-4567", "Commercial Area Branch");
-            
-    //         System.out.println("DEBUG: Sample data added successfully");
-            
-    //     } catch (Exception e) {
-    //         System.err.println("DEBUG: Error adding sample data: " + e.getMessage());
-    //         e.printStackTrace();
-    //     }
-    // }
 
     @Override
-public int getSalesInvoiceIdByNumber(String invoiceNumber) {
-    String query = "SELECT sales_invoice_id FROM Sales_Invoice WHERE sales_invoice_number = ?";
-    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-        pstmt.setString(1, invoiceNumber);
-        ResultSet rs = pstmt.executeQuery();
-        if (rs.next()) {
-            return rs.getInt("sales_invoice_id");
+    public int getSalesReturnInvoiceIdByNumber(String returnInvoiceNumber) {
+        String query = "SELECT sales_return_invoice_id FROM Sales_Return_Invoice WHERE return_invoice_number = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, returnInvoiceNumber);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("sales_return_invoice_id");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting sales return invoice ID: " + e.getMessage());
+            e.printStackTrace();
         }
-    } catch (SQLException e) {
-        System.err.println("Error getting sales invoice ID: " + e.getMessage());
-        e.printStackTrace();
+        return -1;
     }
-    return -1;
-}
 
-@Override
-public int getSalesReturnInvoiceIdByNumber(String returnInvoiceNumber) {
-    String query = "SELECT sales_return_invoice_id FROM Sales_Return_Invoice WHERE return_invoice_number = ?";
-    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-        pstmt.setString(1, returnInvoiceNumber);
-        ResultSet rs = pstmt.executeQuery();
-        if (rs.next()) {
-            return rs.getInt("sales_return_invoice_id");
+    @Override
+    public List<Object[]> getSalesReturnInvoiceItemsByInvoiceId(int returnInvoiceId) {
+        List<Object[]> items = new ArrayList<>();
+        String query = "SELECT srii.production_stock_id, ps.product_name, srii.quantity, srii.unit_price " +
+                    "FROM Sales_Return_Invoice_Item srii " +
+                    "JOIN ProductionStock ps ON srii.production_stock_id = ps.production_id " +
+                    "WHERE srii.sales_return_invoice_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, returnInvoiceId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("production_stock_id"),
+                    rs.getString("product_name"),
+                    rs.getDouble("quantity"),
+                    rs.getDouble("unit_price")
+                };
+                items.add(row);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting sales return invoice items: " + e.getMessage());
+            e.printStackTrace();
         }
-    } catch (SQLException e) {
-        System.err.println("Error getting sales return invoice ID: " + e.getMessage());
-        e.printStackTrace();
+        return items;
     }
-    return -1;
-}
-
-@Override
-public List<Object[]> getSalesReturnInvoiceItemsByInvoiceId(int returnInvoiceId) {
-    List<Object[]> items = new ArrayList<>();
-    String query = "SELECT srii.production_stock_id, ps.product_name, srii.quantity, srii.unit_price " +
-                  "FROM Sales_Return_Invoice_Item srii " +
-                  "JOIN ProductionStock ps ON srii.production_stock_id = ps.production_id " +
-                  "WHERE srii.sales_return_invoice_id = ?";
-    
-    try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-        pstmt.setInt(1, returnInvoiceId);
-        ResultSet rs = pstmt.executeQuery();
-        while (rs.next()) {
-            Object[] row = {
-                rs.getInt("production_stock_id"),
-                rs.getString("product_name"),
-                rs.getDouble("quantity"),
-                rs.getDouble("unit_price")
-            };
-            items.add(row);
-        }
-    } catch (SQLException e) {
-        System.err.println("Error getting sales return invoice items: " + e.getMessage());
-        e.printStackTrace();
-    }
-    return items;
-}
 
     public boolean insertContractEmployee(String name, String phone, String cnic, String address, String remarks, String task, int numTasks,
             double costPerTask, int totalTasksDone, String date) {
