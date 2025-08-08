@@ -5587,43 +5587,105 @@ public class SQLiteDatabase implements db {
         }
     }
 
+    // Checked by Umer Ghafoor
     @Override
-    public ResultSet getSalesReport(Date fromDate, Date toDate) {
-        String query = "SELECT " +
-                "si.sales_invoice_number AS sales_invoice_number, " +
-                "si.sales_date AS sales_date, " +
-                "COALESCE(c.customer_name, 'Unknown Customer') AS customer_name, " +
-                "si.total_amount AS total_amount, " +
-                "si.discount_amount AS discount_amount, " +
-                "si.paid_amount AS paid_amount " +
-                "FROM Sales_Invoice si " +
-                "LEFT JOIN Customer c ON si.customer_id = c.customer_id " +
-                "WHERE si.sales_date BETWEEN ? AND ? " +
-                "ORDER BY si.sales_date DESC";
+    public ResultSet getSalesReport(Date fromDate, Date toDate, String reportType) {
+        String query = "";
+        
+        // Base date filter
+        String dateFilter = " WHERE si.sales_date BETWEEN ? AND ? ";
+
+        switch (reportType) {
+            case "Product-wise Report":
+                query = "SELECT " +
+                        "ps.product_name AS Product, " +
+                        "SUM(sii.quantity) AS Quantity, " +
+                        "SUM(sii.total_price) AS TotalAmount " +
+                        "FROM Sales_Invoice si " +
+                        "JOIN Sales_Invoice_Item sii ON si.sales_invoice_id = sii.sales_invoice_id " +
+                        "JOIN ProductionStock ps ON sii.production_stock_id = ps.production_id " +
+                        dateFilter +
+                        "GROUP BY ps.product_name " +
+                        "ORDER BY TotalAmount DESC";
+                System.out.println("DEBUG: Generated Product-wise Report Query: " + query);
+                break;
+
+            case "Category-wise Report":
+                query = "SELECT " +
+                        "cat.category_name AS Category, " +
+                        "SUM(sii.quantity) AS Quantity, " +
+                        "SUM(sii.total_price) AS TotalAmount " +
+                        "FROM Sales_Invoice si " +
+                        "JOIN Sales_Invoice_Item sii ON si.sales_invoice_id = sii.sales_invoice_id " +
+                        "JOIN ProductionStock ps ON sii.production_stock_id = ps.production_id " +
+                        "JOIN Category cat ON ps.category_id = cat.category_id " +
+                        dateFilter +
+                        "GROUP BY cat.category_name " +
+                        "ORDER BY TotalAmount DESC";
+                System.out.println("DEBUG: Generated Category-wise Report Query: " + query);
+                break;
+
+            case "Brand-wise Report":
+                query = "SELECT " +
+                        "b.brand_name AS Brand, " +
+                        "SUM(sii.quantity) AS Quantity, " +
+                        "SUM(sii.total_price) AS TotalAmount " +
+                        "FROM Sales_Invoice si " +
+                        "JOIN Sales_Invoice_Item sii ON si.sales_invoice_id = sii.sales_invoice_id " +
+                        "JOIN ProductionStock ps ON sii.production_stock_id = ps.production_id " +
+                        "JOIN Brand b ON ps.brand_id = b.brand_id " +
+                        dateFilter +
+                        "GROUP BY b.brand_name " +
+                        "ORDER BY TotalAmount DESC";
+                System.out.println("DEBUG: Generated Brand-wise Report Query: " + query);
+                break;
+
+            case "Manufacturer-wise Report":
+                query = "SELECT " +
+                        "m.manufacturer_name AS Manufacturer, " +
+                        "SUM(sii.quantity) AS Quantity, " +
+                        "SUM(sii.total_price) AS TotalAmount " +
+                        "FROM Sales_Invoice si " +
+                        "JOIN Sales_Invoice_Item sii ON si.sales_invoice_id = sii.sales_invoice_id " +
+                        "JOIN ProductionStock ps ON sii.production_stock_id = ps.production_id " +
+                        "JOIN Manufacturer m ON ps.manufacturer_id = m.manufacturer_id " +
+                        dateFilter +
+                        "GROUP BY m.manufacturer_name " +
+                        "ORDER BY TotalAmount DESC";
+                System.out.println("DEBUG: Generated Manufacturer-wise Report Query: " + query);
+                break;
+
+            default: // "All Reports"
+                query = "SELECT " +
+                        "si.sales_invoice_number AS Invoice, " +
+                        "si.sales_date AS Date, " +
+                        "COALESCE(c.customer_name, 'Unknown') AS Customer, " +
+                        "si.total_amount AS Amount, " +
+                        "si.discount_amount AS Discount, " +
+                        "si.paid_amount AS Paid " +
+                        "FROM Sales_Invoice si " +
+                        "LEFT JOIN Customer c ON si.customer_id = c.customer_id " +
+                        dateFilter +
+                        "ORDER BY si.sales_date DESC";
+                System.out.println("DEBUG: Generated All Reports Query: " + query);
+                break;
+        }
+
         try {
             PreparedStatement pstmt = connection.prepareStatement(query);
-            // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
             String fromDateStr = sdf.format(fromDate);
             String toDateStr = sdf.format(toDate);
-            
-            // Debug logging
-            System.out.println("DEBUG: getSalesReport called with dates:");
-            System.out.println("DEBUG: fromDate: " + fromDate + " -> " + fromDateStr);
-            System.out.println("DEBUG: toDate: " + toDate + " -> " + toDateStr);
-            System.out.println("DEBUG: Query: " + query);
-            
+
             pstmt.setString(1, fromDateStr);
             pstmt.setString(2, toDateStr);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            // Debug: Just log that we're returning the ResultSet
-            System.out.println("DEBUG: Returning ResultSet from getSalesReport");
-            
-            return rs;
+
+            System.out.println("DEBUG: getSalesReport [" + reportType + "]");
+            System.out.println("Query: " + query);
+
+            return pstmt.executeQuery();
         } catch (SQLException e) {
-            System.err.println("DEBUG: SQLException in getSalesReport: " + e.getMessage());
+            System.err.println("Error in getSalesReport: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
