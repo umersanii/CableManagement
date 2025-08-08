@@ -6003,47 +6003,105 @@ public class SQLiteDatabase implements db {
         return reports;
     }
 
-    @Override
-    public ResultSet getPurchaseReport(Date fromDate, Date toDate) {
-        String query = "SELECT " +
-                "rpi.invoice_number AS invoiceNumber, " +
-                "rpi.invoice_date AS invoiceDate, " +
-                "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
-                "rpi.total_amount AS totalAmount, " +
-                "rpi.discount_amount AS discountAmount, " +
-                "rpi.paid_amount AS paidAmount " +
-                "FROM Raw_Purchase_Invoice rpi " +
-                "LEFT JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
-                "WHERE rpi.invoice_date BETWEEN ? AND ? " +
-                "ORDER BY rpi.invoice_date DESC";
-        try {
-            PreparedStatement pstmt = connection.prepareStatement(query);
-            // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            String fromDateStr = sdf.format(fromDate);
-            String toDateStr = sdf.format(toDate);
-            
-            // Debug logging
-            System.out.println("DEBUG: getPurchaseReport called with dates:");
-            System.out.println("DEBUG: fromDate: " + fromDate + " -> " + fromDateStr);
-            System.out.println("DEBUG: toDate: " + toDate + " -> " + toDateStr);
-            System.out.println("DEBUG: Query: " + query);
-            
-            pstmt.setString(1, fromDateStr);
-            pstmt.setString(2, toDateStr);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            // Debug: Just log that we're returning the ResultSet
-            System.out.println("DEBUG: Returning ResultSet from getPurchaseReport");
-            
-            return rs;
-        } catch (SQLException e) {
-            System.err.println("DEBUG: SQLException in getPurchaseReport: " + e.getMessage());
-            e.printStackTrace();
-            return null;
+public ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType) {
+    String baseQuery =
+        "SELECT " +
+        "rpi.invoice_number AS invoiceNumber, " +
+        "rpi.invoice_date AS invoiceDate, " +
+        "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
+        "rpi.total_amount AS totalAmount, " +
+        "rpi.discount_amount AS discountAmount, " +
+        "rpi.paid_amount AS paidAmount " +
+        "FROM Raw_Purchase_Invoice rpi " +
+        "LEFT JOIN Supplier s ON rpi.supplier_id = s.supplier_id ";
+
+    String whereClause = "WHERE rpi.invoice_date BETWEEN ? AND ? ";
+    String orderBy = "ORDER BY rpi.invoice_date DESC";
+
+    try {
+        String finalQuery;
+
+        switch (reportType.trim()) {
+            case "Product-wise Report":
+                finalQuery =
+                    "SELECT " +
+                    "rpi.invoice_number AS invoiceNumber, " +
+                    "rpi.invoice_date AS invoiceDate, " +
+                    "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
+                    "rs.item_name AS productName, " +
+                    "rpii.quantity AS quantity, " +
+                    "rpii.unit_price AS unitPrice, " +
+                    "(rpii.quantity * rpii.unit_price) AS totalCost " +
+                    "FROM Raw_Purchase_Invoice rpi " +
+                    "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
+                    "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                    "LEFT JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
+                    whereClause + orderBy;
+                break;
+
+            case "Category-wise Report":
+                finalQuery =
+                    "SELECT " +
+                    "c.category_name AS categoryName, " +
+                    "SUM(rpii.quantity * rpii.unit_price) AS totalCost " +
+                    "FROM Raw_Purchase_Invoice rpi " +
+                    "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
+                    "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                    "JOIN Category c ON rs.category_id = c.category_id " +
+                    "WHERE rpi.invoice_date BETWEEN ? AND ? " +
+                    "GROUP BY c.category_name " +
+                    "ORDER BY totalCost DESC";
+                break;
+
+            case "Brand-wise Report":
+                finalQuery =
+                    "SELECT " +
+                    "b.brand_name AS brandName, " +
+                    "SUM(rpii.quantity * rpii.unit_price) AS totalCost " +
+                    "FROM Raw_Purchase_Invoice rpi " +
+                    "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
+                    "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                    "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                    "WHERE rpi.invoice_date BETWEEN ? AND ? " +
+                    "GROUP BY b.brand_name " +
+                    "ORDER BY totalCost DESC";
+                break;
+
+            case "Manufacturer-wise Report":
+                finalQuery =
+                    "SELECT " +
+                    "m.manufacturer_name AS manufacturerName, " +
+                    "SUM(rpii.quantity * rpii.unit_price) AS totalCost " +
+                    "FROM Raw_Purchase_Invoice rpi " +
+                    "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
+                    "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                    "JOIN Manufacturer m ON rs.manufacturer_id = m.manufacturer_id " +
+                    "WHERE rpi.invoice_date BETWEEN ? AND ? " +
+                    "GROUP BY m.manufacturer_name " +
+                    "ORDER BY totalCost DESC";
+                break;
+
+            default: // "All Reports"
+                finalQuery = baseQuery + whereClause + orderBy;
+                break;
         }
+
+        System.out.println("DEBUG: Final Query: " + finalQuery);
+
+        PreparedStatement pstmt = connection.prepareStatement(finalQuery);
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        pstmt.setString(1, sdf.format(fromDate));
+        pstmt.setString(2, sdf.format(toDate));
+
+        return pstmt.executeQuery();
+
+    } catch (SQLException e) {
+        System.err.println("DEBUG: SQLException in getPurchaseReport: " + e.getMessage());
+        e.printStackTrace();
+        return null;
     }
+}
+
 
     // Checked by Umer Ghafoor
     @Override
@@ -6057,13 +6115,17 @@ public class SQLiteDatabase implements db {
             case "Product-wise Report":
                 query = "SELECT " +
                         "ps.product_name AS Product, " +
+                        "cat.category_name AS Category, " +
+                        "b.brand_name AS Brand, " +
                         "SUM(sii.quantity) AS Quantity, " +
                         "SUM(sii.total_price) AS TotalAmount " +
                         "FROM Sales_Invoice si " +
                         "JOIN Sales_Invoice_Item sii ON si.sales_invoice_id = sii.sales_invoice_id " +
                         "JOIN ProductionStock ps ON sii.production_stock_id = ps.production_id " +
+                        "LEFT JOIN Category cat ON ps.category_id = cat.category_id " +
+                        "LEFT JOIN Brand b ON ps.brand_id = b.brand_id " +
                         dateFilter +
-                        "GROUP BY ps.product_name " +
+                        "GROUP BY ps.product_name, cat.category_name, b.brand_name " +
                         "ORDER BY TotalAmount DESC";
                 System.out.println("DEBUG: Generated Product-wise Report Query: " + query);
                 break;
