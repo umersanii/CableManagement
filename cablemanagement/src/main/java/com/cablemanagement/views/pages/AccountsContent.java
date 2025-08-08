@@ -720,6 +720,11 @@ public class AccountsContent {
         TextField paymentAmountField = new TextField();
         paymentAmountField.setPromptText("Enter payment amount");
         
+        // Add remaining balance label
+        Label remainingBalanceLabel = new Label("Remaining Balance: " + String.format("%.2f", currentBalance));
+        remainingBalanceLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
+        remainingBalanceLabel.setStyle("-fx-text-fill: #3498db;");
+        
         DatePicker paymentDatePicker = new DatePicker(LocalDate.now());
         
         TextField descriptionField = new TextField();
@@ -728,15 +733,16 @@ public class AccountsContent {
         grid.add(currentBalanceLabel, 0, 0, 2, 1);
         grid.add(new Label("Payment Amount:"), 0, 1);
         grid.add(paymentAmountField, 1, 1);
-        grid.add(new Label("Payment Date:"), 0, 2);
-        grid.add(paymentDatePicker, 1, 2);
-        grid.add(new Label("Description:"), 0, 3);
-        grid.add(descriptionField, 1, 3);
+        grid.add(remainingBalanceLabel, 0, 2, 2, 1);
+        grid.add(new Label("Payment Date:"), 0, 3);
+        grid.add(paymentDatePicker, 1, 3);
+        grid.add(new Label("Description:"), 0, 4);
+        grid.add(descriptionField, 1, 4);
         
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         
-        // Validate payment amount
+        // Validate payment amount and update remaining balance
         Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
         okButton.setDisable(true);
         
@@ -744,8 +750,15 @@ public class AccountsContent {
             try {
                 double amount = Double.parseDouble(newValue);
                 okButton.setDisable(amount <= 0);
+                
+                // Update remaining balance display
+                double remainingBalance = currentBalance - amount;
+                remainingBalanceLabel.setText("Remaining Balance: " + String.format("%.2f", remainingBalance));
+                remainingBalanceLabel.setStyle("-fx-text-fill: " + (remainingBalance > 0 ? "#e74c3c" : "#27ae60") + "; -fx-font-weight: bold;");
             } catch (NumberFormatException e) {
                 okButton.setDisable(true);
+                remainingBalanceLabel.setText("Remaining Balance: " + String.format("%.2f", currentBalance));
+                remainingBalanceLabel.setStyle("-fx-text-fill: #3498db; -fx-font-weight: bold;");
             }
         });
         
@@ -1008,6 +1021,11 @@ public class AccountsContent {
         TextField paymentAmountField = new TextField();
         paymentAmountField.setPromptText("Enter payment amount");
         
+        // Add remaining balance label
+        Label remainingBalanceLabel = new Label("Remaining Balance: " + String.format("%.2f", currentBalance));
+        remainingBalanceLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
+        remainingBalanceLabel.setStyle("-fx-text-fill: #3498db;");
+        
         DatePicker paymentDatePicker = new DatePicker(LocalDate.now());
         
         TextField descriptionField = new TextField();
@@ -1016,15 +1034,16 @@ public class AccountsContent {
         grid.add(currentBalanceLabel, 0, 0, 2, 1);
         grid.add(new Label("Payment Amount:"), 0, 1);
         grid.add(paymentAmountField, 1, 1);
-        grid.add(new Label("Payment Date:"), 0, 2);
-        grid.add(paymentDatePicker, 1, 2);
-        grid.add(new Label("Description:"), 0, 3);
-        grid.add(descriptionField, 1, 3);
+        grid.add(remainingBalanceLabel, 0, 2, 2, 1);
+        grid.add(new Label("Payment Date:"), 0, 3);
+        grid.add(paymentDatePicker, 1, 3);
+        grid.add(new Label("Description:"), 0, 4);
+        grid.add(descriptionField, 1, 4);
         
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         
-        // Validate payment amount
+        // Validate payment amount and update remaining balance
         Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
         okButton.setDisable(true);
         
@@ -1032,8 +1051,15 @@ public class AccountsContent {
             try {
                 double amount = Double.parseDouble(newValue);
                 okButton.setDisable(amount <= 0);
+                
+                // Update remaining balance display
+                double remainingBalance = currentBalance - amount;
+                remainingBalanceLabel.setText("Remaining Balance: " + String.format("%.2f", remainingBalance));
+                remainingBalanceLabel.setStyle("-fx-text-fill: " + (remainingBalance > 0 ? "#e74c3c" : "#27ae60") + "; -fx-font-weight: bold;");
             } catch (NumberFormatException e) {
                 okButton.setDisable(true);
+                remainingBalanceLabel.setText("Remaining Balance: " + String.format("%.2f", currentBalance));
+                remainingBalanceLabel.setStyle("-fx-text-fill: #3498db; -fx-font-weight: bold;");
             }
         });
         
