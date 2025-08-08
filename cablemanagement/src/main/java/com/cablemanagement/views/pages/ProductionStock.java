@@ -2861,8 +2861,19 @@ public class ProductionStock {
                 if (parts.length == 2) {
                     String productName = parts[0];
                     double quantity = Double.parseDouble(parts[1]);
+                    
+                    // Get production stock ID by name to retrieve unit information
+                    int productionStockId = getProductionStockIdByName(productName);
+                    String unit = "N/A";
+                    if (productionStockId != -1) {
+                        unit = getProductionStockUnit(productionStockId);
+                    }
+                    
+                    // Format the item name as "name - unit"
+                    String itemNameWithUnit = productName + " - " + unit;
+                    
                     printItems.add(new Item(
-                        productName,
+                        itemNameWithUnit,
                         (int) quantity,
                         0.0, // unit price not applicable for production
                         0.0  // discount not applicable for production
@@ -2989,6 +3000,23 @@ public class ProductionStock {
         return 0.0;
     }
 
+    // Helper method to get production stock unit by production ID
+    private static String getProductionStockUnit(int productionId) {
+        try {
+            List<Object[]> productionStocks = database.getAllProductionStocksForDropdown();
+            for (Object[] stock : productionStocks) {
+                if (((Integer) stock[0]).equals(productionId)) {
+                    // stock[4] contains unit_name based on getAllProductionStocksForDropdown structure
+                    String unit = (String) stock[4]; // unit_name
+                    return unit != null ? unit : "N/A";
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "N/A";
+    }
+
     // Handle return production invoice submission
     private static boolean handleSubmitReturnProductionInvoice(String returnInvoiceNumber, LocalDate returnDate, 
                                                           String selectedProductionInvoice, ObservableList<String> returnItems,
@@ -3090,11 +3118,15 @@ public class ProductionStock {
                             double returnQuantity = (Double) returnItemData[1];
                             double unitCost = (Double) returnItemData[2];
                             
-                            // Get product name for this production stock ID
+                            // Get product name and unit for this production stock ID
                             String productName = getProductionStockNameById(productionStockId);
+                            String unit = getProductionStockUnit(productionStockId);
+                            
+                            // Format the item name as "name - unit"
+                            String itemNameWithUnit = productName + " - " + unit;
                             
                             printItems.add(new Item(
-                                productName,
+                                itemNameWithUnit,
                                 (int) returnQuantity,
                                 unitCost,
                                 0.0 // no discount for returns
