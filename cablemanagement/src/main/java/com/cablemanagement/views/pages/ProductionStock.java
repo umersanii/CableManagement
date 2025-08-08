@@ -1377,8 +1377,8 @@ public class ProductionStock {
                         // Prepare invoice data for printing
                         List<Item> printItems = new ArrayList<>();
                         for (SalesInvoiceItemUI item : invoiceItems) {
-                            // Get production stock ID to retrieve unit information
-                            int productionStockId = database.getProductionStockIdByName(item.getProductName());
+                            // Get production stock ID to retrieve unit information using helper method
+                            int productionStockId = getProductionStockIdByName(item.getProductName());
                             String unit = "N/A";
                             if (productionStockId != -1) {
                                 unit = getProductionStockUnit(productionStockId);
