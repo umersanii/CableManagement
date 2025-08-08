@@ -1,6 +1,7 @@
 package com.cablemanagement.views.pages;
 
 import com.cablemanagement.config;
+import com.cablemanagement.database.SQLiteDatabase;
 import com.cablemanagement.invoice.*;
 import com.cablemanagement.model.*;
 
@@ -561,9 +562,19 @@ public class BooksContent {
                 double quantity = selectedRecord.getQuantity();
                 String notes = selectedRecord.getNotes();
                 
+                // Get production stock ID to retrieve unit information
+                int productionStockId = getProductionStockIdByName(productName);
+                String unit = "N/A";
+                if (productionStockId != -1) {
+                    unit = getProductionStockUnit(productionStockId);
+                }
+                
+                // Format the item name as "name - unit"
+                String itemNameWithUnit = productName + " - " + unit;
+                
                 // Create items list for invoice
                 List<Item> printItems = new ArrayList<>();
-                printItems.add(new Item(productName, (int)quantity, 0.0, 0.0)); // Unit price not available
+                printItems.add(new Item(itemNameWithUnit, (int)quantity, 0.0, 0.0)); // Unit price not available
                 
                 // Create invoice data for printing
                 InvoiceData invoiceData = new InvoiceData(
@@ -625,13 +636,48 @@ public class BooksContent {
 
             try {
                 // Get record details
-                String reference = selectedRecord.getReference();
+                String returnInvoiceNumber = selectedRecord.getReference();
                 String date = selectedRecord.getDate();
-                double quantity = selectedRecord.getQuantity();
                 
-                // Create items list for invoice
+                // Get return invoice ID from return invoice number
+                int returnInvoiceId = -1;
+                try {
+                    List<Object[]> returnInvoices = config.database.getViewData("View_Return_Production_Book", new HashMap<>());
+                    for (Object[] invoice : returnInvoices) {
+                        if (returnInvoiceNumber.equals(invoice[1])) {
+                            returnInvoiceId = (Integer) invoice[0]; // return_invoice_id
+                            break;
+                        }
+                    }
+                } catch (Exception ex) {
+                    System.err.println("Could not find return invoice ID: " + ex.getMessage());
+                }
+                
+                // Create items list for invoice with detailed product information
                 List<Item> printItems = new ArrayList<>();
-                printItems.add(new Item(reference, (int)quantity, 0.0, 0.0)); // Reference as name since detailed product info not available
+                
+                if (returnInvoiceId > 0) {
+                    // Get detailed return invoice items using SQLiteDatabase directly
+                    SQLiteDatabase sqliteDb = (SQLiteDatabase) config.database;
+                    List<Object[]> returnItems = sqliteDb.getProductionReturnInvoiceItems(returnInvoiceId);
+                    for (Object[] item : returnItems) {
+                        int productionId = (Integer) item[1];
+                        String productName = (String) item[2];
+                        double quantity = (Double) item[4];
+                        double unitCost = (Double) item[5];
+                        
+                        // Get unit information using production stock ID
+                        String unit = getProductionStockUnit(productionId);
+                        
+                        // Format the item name as "name - unit"
+                        String itemNameWithUnit = productName + " - " + unit;
+                        
+                        printItems.add(new Item(itemNameWithUnit, (int)quantity, unitCost, 0.0));
+                    }
+                } else {
+                    // Fallback if we can't get detailed info
+                    printItems.add(new Item(returnInvoiceNumber, (int)selectedRecord.getQuantity(), 0.0, 0.0));
+                }
                 
                 // Create invoice data for printing with proper type
                 InvoiceData invoiceData = new InvoiceData(
@@ -711,7 +757,15 @@ public class BooksContent {
                     String productName = item[1].toString();
                     double quantity = Double.parseDouble(item[2].toString());
                     double unitPrice = Double.parseDouble(item[3].toString());
-                    printItems.add(new Item(productName, (int)quantity, unitPrice, 0.0));
+                    
+                    // Get production stock ID to retrieve unit information
+                    int productionStockId = Integer.parseInt(item[0].toString());
+                    String unit = getProductionStockUnit(productionStockId);
+                    
+                    // Format the item name as "name - unit"
+                    String itemNameWithUnit = productName + " - " + unit;
+                    
+                    printItems.add(new Item(itemNameWithUnit, (int)quantity, unitPrice, 0.0));
                 }
 
                 // Get customer details from database
@@ -823,7 +877,15 @@ public class BooksContent {
                     String productName = item[1].toString(); // product_name
                     double quantity = Double.parseDouble(item[2].toString()); // quantity
                     double unitPrice = Double.parseDouble(item[3].toString()); // unit_price
-                    printItems.add(new Item(productName, (int)quantity, unitPrice, 0.0));
+                    
+                    // Get production stock ID to retrieve unit information
+                    int productionStockId = Integer.parseInt(item[0].toString());
+                    String unit = getProductionStockUnit(productionStockId);
+                    
+                    // Format the item name as "name - unit"
+                    String itemNameWithUnit = productName + " - " + unit;
+                    
+                    printItems.add(new Item(itemNameWithUnit, (int)quantity, unitPrice, 0.0));
                 }
 
                 // Get customer details from database
@@ -1882,5 +1944,37 @@ private static void loadReturnPurchaseData(TableView<ReturnPurchaseRecord> table
         String getCustomer() { return customer.get(); }
         double getAmount() { return amount.get(); }
         String getOriginalInvoice() { return originalInvoice.get(); }
+    }
+    
+    // Helper method to get production stock ID by name
+    private static int getProductionStockIdByName(String productName) {
+        try {
+            List<Object[]> productionStocks = config.database.getAllProductionStocksForDropdown();
+            for (Object[] stock : productionStocks) {
+                if (stock[1].toString().equals(productName)) {
+                    return (Integer) stock[0]; // production_id
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+    
+    // Helper method to get production stock unit by production ID
+    private static String getProductionStockUnit(int productionId) {
+        try {
+            List<Object[]> productionStocks = config.database.getAllProductionStocksForDropdown();
+            for (Object[] stock : productionStocks) {
+                if (((Integer) stock[0]).equals(productionId)) {
+                    // stock[4] contains unit_name based on getAllProductionStocksForDropdown structure
+                    String unit = (String) stock[4]; // unit_name
+                    return unit != null ? unit : "N/A";
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "N/A";
     }
 }
