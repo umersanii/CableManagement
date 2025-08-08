@@ -16,6 +16,8 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.cablemanagement.config;
 
@@ -128,6 +130,21 @@ public class ReportsContent {
 
         Label heading = createHeading("Purchase Report");
 
+        // Report type dropdown
+        HBox reportTypeBox = new HBox(10);
+        Label reportLabel = new Label("Select Report:");
+        ComboBox<String> reportComboBox = new ComboBox<>();
+        reportComboBox.getItems().addAll(
+            "All Reports",
+            "Product-wise Report",
+            "Category-wise Report",
+            "Brand-wise Report",
+            "Manufacturer-wise Report"
+        );
+        reportComboBox.setValue("All Reports");
+        reportTypeBox.getChildren().addAll(reportLabel, reportComboBox);
+        reportTypeBox.setAlignment(Pos.CENTER_LEFT);
+
         // Date range filters
         HBox dateRangeBox = new HBox(10);
         Label fromLabel = new Label("From:");
@@ -141,58 +158,80 @@ public class ReportsContent {
         // Action buttons
         HBox buttons = createReportActionButtons();
 
-        // Purchase report table - maps to View_Purchase_Report
-        TableView<PurchaseReport> table = new TableView<>();
+        // Purchase report table
+        TableView<Map<String, String>> table = new TableView<>();
 
-        TableColumn<PurchaseReport, String> invCol = new TableColumn<>("Invoice #");
-        invCol.setCellValueFactory(new PropertyValueFactory<>("invoiceNumber"));
+        TableColumn<Map<String, String>, String> invCol = new TableColumn<>("Invoice #");
+        invCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getOrDefault("Invoice #", "")));
 
-        TableColumn<PurchaseReport, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(new PropertyValueFactory<>("invoiceDate"));
+        TableColumn<Map<String, String>, String> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getOrDefault("Date", "")));
 
-        TableColumn<PurchaseReport, String> supplierCol = new TableColumn<>("Supplier");
-        supplierCol.setCellValueFactory(new PropertyValueFactory<>("supplierName"));
+        TableColumn<Map<String, String>, String> supplierCol = new TableColumn<>("Supplier");
+        supplierCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getOrDefault("Supplier", "")));
 
-        TableColumn<PurchaseReport, String> amountCol = new TableColumn<>("Amount");
-        amountCol.setCellValueFactory(new PropertyValueFactory<>("totalAmount"));
+        TableColumn<Map<String, String>, String> amountCol = new TableColumn<>("Amount");
+        amountCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getOrDefault("Amount", "")));
 
-        TableColumn<PurchaseReport, String> discountCol = new TableColumn<>("Discount");
-        discountCol.setCellValueFactory(new PropertyValueFactory<>("discountAmount"));
+        TableColumn<Map<String, String>, String> discountCol = new TableColumn<>("Discount");
+        discountCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getOrDefault("Discount", "")));
 
-        TableColumn<PurchaseReport, String> paidCol = new TableColumn<>("Paid");
-        paidCol.setCellValueFactory(new PropertyValueFactory<>("paidAmount"));
+        TableColumn<Map<String, String>, String> paidCol = new TableColumn<>("Paid");
+        paidCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getOrDefault("Paid", "")));
 
-        table.getColumns().addAll(invCol, dateCol, supplierCol, amountCol, discountCol, paidCol);
+        table.getColumns().add(invCol);
+        table.getColumns().add(dateCol);
+        table.getColumns().add(supplierCol);
+        table.getColumns().add(amountCol);
+        table.getColumns().add(discountCol);
+        table.getColumns().add(paidCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        // Error label for feedback
+        // Error label
         Label errorLabel = new Label("");
         errorLabel.setStyle("-fx-text-fill: red;");
 
-        // Load data from backend
+        // Load data on filter
         filterBtn.setOnAction(e -> {
             table.getItems().clear();
+            table.getColumns().clear();
             errorLabel.setText("");
+
             try {
                 if (config.database != null && config.database.isConnected()) {
                     java.sql.Date from = java.sql.Date.valueOf(fromDatePicker.getValue());
                     java.sql.Date to = java.sql.Date.valueOf(toDatePicker.getValue());
-                    java.sql.ResultSet rs = config.database.getPurchaseReport(from, to);
-                    int count = 0;
-                    while (rs != null && rs.next()) {
-                        table.getItems().add(new PurchaseReport(
-                            rs.getString("invoiceNumber"),
-                            rs.getString("invoiceDate"),
-                            rs.getString("supplierName"),
-                            rs.getString("totalAmount"),
-                            rs.getString("discountAmount"),
-                            rs.getString("paidAmount")
-                        ));
-                        count++;
-                    }
-                    System.out.println("PurchaseReport rows loaded: " + count);
-                    if (count == 0) {
-                        errorLabel.setText("No data found for selected date range.");
+                    String selectedReport = reportComboBox.getValue();
+
+                    ResultSet rs = config.database.getPurchaseReport(from, to, selectedReport);
+                    if (rs != null && rs.next()) {
+                        ResultSetMetaData metaData = rs.getMetaData();
+                        int columnCount = metaData.getColumnCount();
+
+                        // Create columns dynamically
+                        for (int i = 1; i <= columnCount; i++) {
+                            final String colName = metaData.getColumnLabel(i);
+                            TableColumn<Map<String, String>, String> col = new TableColumn<>(colName);
+                            col.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getOrDefault(colName, "")));
+                            table.getColumns().add(col);
+                        }
+
+                        // Remove rs.beforeFirst(); because SQLite ResultSet is TYPE_FORWARD_ONLY
+
+                        // Fill table with data
+                        ObservableList<Map<String, String>> data = FXCollections.observableArrayList();
+                        // The first rs.next() above already moved to the first row, so process that row first
+                        do {
+                            Map<String, String> row = new HashMap<>();
+                            for (int i = 1; i <= columnCount; i++) {
+                                row.put(metaData.getColumnLabel(i), rs.getString(i));
+                            }
+                            data.add(row);
+                        } while (rs.next());
+
+                        table.setItems(data);
+                    } else {
+                        errorLabel.setText("No data found for selected filters.");
                     }
                 } else {
                     errorLabel.setText("Database not connected.");
@@ -203,108 +242,108 @@ public class ReportsContent {
             }
         });
 
-        // Optionally, trigger filter on load
+        // Trigger filter once on load
         filterBtn.fire();
 
-        form.getChildren().addAll(heading, dateRangeBox, buttons, errorLabel, table);
+        form.getChildren().addAll(heading, reportTypeBox, dateRangeBox, buttons, errorLabel, table);
         return form;
     }
 
-private static VBox createSalesReport() {
-    VBox form = new VBox(15);
-    form.setPadding(new Insets(20));
-    form.getStyleClass().add("form-container");
+    private static VBox createSalesReport() {
+        VBox form = new VBox(15);
+        form.setPadding(new Insets(20));
+        form.getStyleClass().add("form-container");
 
-    Label heading = createHeading("Sales Report");
+        Label heading = createHeading("Sales Report");
 
-    HBox reportTypeBox = new HBox(10);
-    Label reportLabel = new Label("Select Report:");
-    ComboBox<String> reportComboBox = new ComboBox<>();
-    reportComboBox.getItems().addAll(
-        "All Reports",
-        "Product-wise Report",
-        "Category-wise Report",
-        "Brand-wise Report",
-        "Manufacturer-wise Report"
-    );
-    reportComboBox.setValue("All Reports"); // default
-    reportTypeBox.getChildren().addAll(reportLabel, reportComboBox);
-    reportTypeBox.setAlignment(Pos.CENTER_LEFT);
+        HBox reportTypeBox = new HBox(10);
+        Label reportLabel = new Label("Select Report:");
+        ComboBox<String> reportComboBox = new ComboBox<>();
+        reportComboBox.getItems().addAll(
+            "All Reports",
+            "Product-wise Report",
+            "Category-wise Report",
+            "Brand-wise Report",
+            "Manufacturer-wise Report"
+        );
+        reportComboBox.setValue("All Reports"); // default
+        reportTypeBox.getChildren().addAll(reportLabel, reportComboBox);
+        reportTypeBox.setAlignment(Pos.CENTER_LEFT);
 
-    HBox dateRangeBox = new HBox(10);
-    Label fromLabel = new Label("From:");
-    DatePicker fromDatePicker = new DatePicker(LocalDate.now().minusDays(7));
-    Label toLabel = new Label("To:");
-    DatePicker toDatePicker = new DatePicker(LocalDate.now());
-    Button filterBtn = createActionButton("Filter");
-    dateRangeBox.getChildren().addAll(fromLabel, fromDatePicker, toLabel, toDatePicker, filterBtn);
-    dateRangeBox.setAlignment(Pos.CENTER_LEFT);
+        HBox dateRangeBox = new HBox(10);
+        Label fromLabel = new Label("From:");
+        DatePicker fromDatePicker = new DatePicker(LocalDate.now().minusDays(7));
+        Label toLabel = new Label("To:");
+        DatePicker toDatePicker = new DatePicker(LocalDate.now());
+        Button filterBtn = createActionButton("Filter");
+        dateRangeBox.getChildren().addAll(fromLabel, fromDatePicker, toLabel, toDatePicker, filterBtn);
+        dateRangeBox.setAlignment(Pos.CENTER_LEFT);
 
-    HBox buttons = createReportActionButtons();
+        HBox buttons = createReportActionButtons();
 
-    TableView<ObservableList<String>> table = new TableView<>();
-    table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        TableView<ObservableList<String>> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-    Label errorLabel = new Label("");
-    errorLabel.setStyle("-fx-text-fill: red;");
+        Label errorLabel = new Label("");
+        errorLabel.setStyle("-fx-text-fill: red;");
 
-    filterBtn.setOnAction(e -> {
-        table.getItems().clear();
-        table.getColumns().clear();
-        errorLabel.setText("");
+        filterBtn.setOnAction(e -> {
+            table.getItems().clear();
+            table.getColumns().clear();
+            errorLabel.setText("");
 
-        try {
-            if (config.database != null && config.database.isConnected()) {
-                java.sql.Date from = java.sql.Date.valueOf(fromDatePicker.getValue());
-                java.sql.Date to = java.sql.Date.valueOf(toDatePicker.getValue());
-                String selectedReport = reportComboBox.getValue();
+            try {
+                if (config.database != null && config.database.isConnected()) {
+                    java.sql.Date from = java.sql.Date.valueOf(fromDatePicker.getValue());
+                    java.sql.Date to = java.sql.Date.valueOf(toDatePicker.getValue());
+                    String selectedReport = reportComboBox.getValue();
 
-                ResultSet rs = config.database.getSalesReport(from, to, selectedReport);
+                    ResultSet rs = config.database.getSalesReport(from, to, selectedReport);
 
-                if (rs != null) {
-                    ResultSetMetaData meta = rs.getMetaData();
-                    int columnCount = meta.getColumnCount();
+                    if (rs != null) {
+                        ResultSetMetaData meta = rs.getMetaData();
+                        int columnCount = meta.getColumnCount();
 
-                    // Auto-create columns
-                    for (int i = 1; i <= columnCount; i++) {
-                        final int colIndex = i;
-                        TableColumn<ObservableList<String>, String> col =
-                            new TableColumn<>(meta.getColumnLabel(i));
-                        col.setCellValueFactory(data ->
-                            new SimpleStringProperty(data.getValue().get(colIndex - 1))
-                        );
-                        table.getColumns().add(col);
-                    }
-
-                    // Add rows
-                    while (rs.next()) {
-                        ObservableList<String> row = FXCollections.observableArrayList();
+                        // Auto-create columns
                         for (int i = 1; i <= columnCount; i++) {
-                            row.add(rs.getString(i));
+                            final int colIndex = i;
+                            TableColumn<ObservableList<String>, String> col =
+                                new TableColumn<>(meta.getColumnLabel(i));
+                            col.setCellValueFactory(data ->
+                                new SimpleStringProperty(data.getValue().get(colIndex - 1))
+                            );
+                            table.getColumns().add(col);
                         }
-                        table.getItems().add(row);
-                    }
 
-                    if (table.getItems().isEmpty()) {
-                        errorLabel.setText("No data found for selected filters.");
+                        // Add rows
+                        while (rs.next()) {
+                            ObservableList<String> row = FXCollections.observableArrayList();
+                            for (int i = 1; i <= columnCount; i++) {
+                                row.add(rs.getString(i));
+                            }
+                            table.getItems().add(row);
+                        }
+
+                        if (table.getItems().isEmpty()) {
+                            errorLabel.setText("No data found for selected filters.");
+                        }
+                    } else {
+                        errorLabel.setText("No data returned from query.");
                     }
                 } else {
-                    errorLabel.setText("No data returned from query.");
+                    errorLabel.setText("Database not connected.");
                 }
-            } else {
-                errorLabel.setText("Database not connected.");
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                errorLabel.setText("Error loading sales data: " + ex.getMessage());
             }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            errorLabel.setText("Error loading sales data: " + ex.getMessage());
-        }
-    });
+        });
 
-    filterBtn.fire();
+        filterBtn.fire();
 
-    form.getChildren().addAll(heading, reportTypeBox, dateRangeBox, buttons, errorLabel, table);
-    return form;
-}
+        form.getChildren().addAll(heading, reportTypeBox, dateRangeBox, buttons, errorLabel, table);
+        return form;
+    }
 
     private static VBox createReturnPurchaseReport() {
         VBox form = new VBox(15);

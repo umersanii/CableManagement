@@ -634,7 +634,7 @@ List<Object[]> getInvoiceItemsByID(Integer invoiceID);
     /// ///                   reports Methods
     ///////////////////////////////////////////////////////////////////////////////
     List<Object[]> getPurchaseReportList(Date fromDate, Date toDate);
-    ResultSet getPurchaseReport(Date fromDate, Date toDate);
+    ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType);
     ResultSet getSalesReport(Date fromDate, Date toDate, String reportType);
     ResultSet getReturnPurchaseReport(Date fromDate, Date toDate);
     ResultSet getReturnSalesReport(Date fromDate, Date toDate);
