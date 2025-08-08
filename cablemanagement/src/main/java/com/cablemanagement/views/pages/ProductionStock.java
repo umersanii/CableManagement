@@ -1532,6 +1532,13 @@ public class ProductionStock {
         returnAmountField.setEditable(false);
         returnAmountField.setStyle("-fx-background-color: #f0f0f0;");
         
+        // Refund method ComboBox
+        ComboBox<String> refundMethodComboBox = new ComboBox<>();
+        refundMethodComboBox.getItems().addAll("Refund to Balance", "Cash Refund");
+        refundMethodComboBox.setValue("Refund to Balance"); // Default selection
+        refundMethodComboBox.setPrefWidth(300);
+        refundMethodComboBox.getStyleClass().add("combo-box");
+        
         // Return items table
         TableView<SalesInvoiceItemUI> returnItemsTable = new TableView<>();
         returnItemsTable.setPrefHeight(250);
@@ -1653,7 +1660,8 @@ public class ProductionStock {
                 createFormRow("Original Invoice:", originalInvoiceComboBox),
                 createFormRow("Return Date:", returnDatePicker),
                 createFormRow("Customer:", customerField),
-                createFormRow("Return Amount:", returnAmountField)
+                createFormRow("Return Amount:", returnAmountField),
+                createFormRow("Refund Method:", refundMethodComboBox)
             ),
             new VBox(15,
                 createSubheading("Available Items from Original Invoice:"),
@@ -1818,9 +1826,10 @@ public class ProductionStock {
             String customer = customerField.getText().trim();
             String date = returnDatePicker.getValue().format(DATE_FORMATTER);
             String returnAmountText = returnAmountField.getText().trim();
+            String refundMethod = refundMethodComboBox.getValue();
             
-            if (selectedDisplay == null || customer.isEmpty() || returnItems.isEmpty()) {
-                showAlert("Missing Information", "Please select original invoice and add at least one return item");
+            if (selectedDisplay == null || customer.isEmpty() || returnItems.isEmpty() || refundMethod == null) {
+                showAlert("Missing Information", "Please select original invoice, refund method and add at least one return item");
                 return;
             }
             
@@ -1853,8 +1862,9 @@ public class ProductionStock {
                 }
                 
                 // Save to database
+                boolean updateBalance = "Refund to Balance".equals(refundMethod);
                 boolean success = database.insertSalesReturnInvoice(returnInvoiceNumber, originalSalesInvoiceId, 
-                    customerId, date, totalReturnAmount, items);
+                    customerId, date, totalReturnAmount, items, updateBalance);
                 
                 if (success) {
                     // Prepare invoice data for printing
@@ -1943,15 +1953,21 @@ public class ProductionStock {
                     boolean previewSuccess = PrintManager.openInvoiceForPrintPreview(invoiceData, "Sales Return");
                     
                     if (previewSuccess) {
+                        String refundDetails = updateBalance ? "Amount refunded to customer balance." : "Cash refund - balance not updated.";
                         showAlert("Success", "Sales return invoice created successfully!\n\nReturn Invoice Number: " + returnInvoiceNumber + 
+                                "\nRefund Method: " + refundMethod + "\n" + refundDetails + 
                                 "\n\nThe return invoice has been opened for preview and printing.");
                     } else {
                         // Fallback to printer selection if preview fails
                         boolean printSuccess = PrintManager.printInvoiceWithPrinterSelection(invoiceData, "Sales Return");
                         if (printSuccess) {
-                            showAlert("Success", "Sales return invoice created and printed successfully!\n\nReturn Invoice Number: " + returnInvoiceNumber);
+                            String refundDetails = updateBalance ? "Amount refunded to customer balance." : "Cash refund - balance not updated.";
+                            showAlert("Success", "Sales return invoice created and printed successfully!\n\nReturn Invoice Number: " + returnInvoiceNumber + 
+                                    "\nRefund Method: " + refundMethod + "\n" + refundDetails);
                         } else {
-                            showAlert("Partial Success", "Sales return invoice created successfully but printing failed.\n\nReturn Invoice Number: " + returnInvoiceNumber);
+                            String refundDetails = updateBalance ? "Amount refunded to customer balance." : "Cash refund - balance not updated.";
+                            showAlert("Partial Success", "Sales return invoice created successfully but printing failed.\n\nReturn Invoice Number: " + returnInvoiceNumber + 
+                                    "\nRefund Method: " + refundMethod + "\n" + refundDetails);
                         }
                     }
                     
@@ -1962,6 +1978,7 @@ public class ProductionStock {
                     returnDatePicker.setValue(LocalDate.now());
                     customerField.clear();
                     returnAmountField.clear();
+                    refundMethodComboBox.setValue("Refund to Balance"); // Reset to default
                     availableItems.clear();
                     returnItems.clear();
                 } else {

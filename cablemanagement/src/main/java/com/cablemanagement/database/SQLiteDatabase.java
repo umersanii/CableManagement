@@ -1392,60 +1392,12 @@ public class SQLiteDatabase implements db {
 
     @Override
     public double getCustomerCurrentBalance(String customerName) {
-        double initialBalance = getCustomerBalance(customerName); // Initial balance from Customer table
-        double invoiceBalance = 0.0;
-        double returnBalance = 0.0;
+        // Simply return the stored balance from the Customer table
+        double storedBalance = getCustomerBalance(customerName);
         
-        System.out.println("DEBUG: Calculating balance for customer: " + customerName);
-        System.out.println("DEBUG: Initial balance: " + initialBalance);
+        System.out.println("DEBUG: Current balance for customer: " + customerName + " = " + storedBalance);
         
-        // Calculate total from sales invoices (amount owed by customer)
-        // This should be total_amount - paid_amount for unpaid invoices
-        String invoiceQuery = "SELECT " +
-                            "SUM(si.total_amount - si.discount_amount - si.paid_amount) as unpaid_amount, " +
-                            "COUNT(*) as invoice_count " +
-                            "FROM Sales_Invoice si " +
-                            "JOIN Customer c ON si.customer_id = c.customer_id " +
-                            "WHERE c.customer_name = ? AND (si.total_amount - si.discount_amount - si.paid_amount) > 0";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(invoiceQuery)) {
-            pstmt.setString(1, customerName);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    invoiceBalance = rs.getDouble("unpaid_amount");
-                    int invoiceCount = rs.getInt("invoice_count");
-                    System.out.println("DEBUG: Unpaid invoice amount: " + invoiceBalance + " (from " + invoiceCount + " invoices)");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        // Calculate total from sales return invoices (amount to be refunded to customer)
-        String returnQuery = "SELECT SUM(sri.total_return_amount) as return_amount, COUNT(*) as return_count " +
-                           "FROM Sales_Return_Invoice sri " +
-                           "JOIN Customer c ON sri.customer_id = c.customer_id " +
-                           "WHERE c.customer_name = ?";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(returnQuery)) {
-            pstmt.setString(1, customerName);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    returnBalance = rs.getDouble("return_amount");
-                    int returnCount = rs.getInt("return_count");
-                    System.out.println("DEBUG: Return amount: " + returnBalance + " (from " + returnCount + " returns)");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        // Current balance = Initial balance + Invoice unpaid amount - Return amount
-        double currentBalance = initialBalance + invoiceBalance - returnBalance;
-        System.out.println("DEBUG: Final calculated balance: " + currentBalance + 
-                          " (Initial: " + initialBalance + " + Unpaid: " + invoiceBalance + " - Returns: " + returnBalance + ")");
-        
-        return currentBalance;
+        return storedBalance;
     }
 
     @Override
@@ -1500,55 +1452,64 @@ public class SQLiteDatabase implements db {
      */
     @Override
     public double getCustomerPreviousBalance(String customerName, String excludeInvoiceNumber) {
-        double initialBalance = getCustomerBalance(customerName); // Initial balance from Customer table
-        double invoiceBalance = 0.0;
-        double returnBalance = 0.0;
+        // Get the current stored balance
+        double currentBalance = getCustomerBalance(customerName);
         
-        System.out.println("DEBUG: Calculating previous balance for customer: " + customerName + ", excluding invoice: " + excludeInvoiceNumber);
+        // Determine if this is a return invoice by checking if the invoice number starts with "SRI"
+        boolean isReturnInvoice = excludeInvoiceNumber != null && excludeInvoiceNumber.startsWith("SRI");
         
-        // Calculate total from sales invoices EXCLUDING the current invoice
-        String invoiceQuery = "SELECT SUM(si.total_amount - si.discount_amount - si.paid_amount) as unpaid_amount " +
-                            "FROM Sales_Invoice si " +
-                            "JOIN Customer c ON si.customer_id = c.customer_id " +
-                            "WHERE c.customer_name = ? AND si.sales_invoice_number != ? " +
-                            "AND (si.total_amount - si.discount_amount - si.paid_amount) > 0";
+        double currentInvoiceNetAmount = 0.0;
         
-        try (PreparedStatement pstmt = connection.prepareStatement(invoiceQuery)) {
-            pstmt.setString(1, customerName);
-            pstmt.setString(2, excludeInvoiceNumber);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    invoiceBalance = rs.getDouble("unpaid_amount");
-                    System.out.println("DEBUG: Previous unpaid invoice amount: " + invoiceBalance);
+        if (isReturnInvoice) {
+            // For return invoices, look in Sales_Return_Invoice table
+            String query = "SELECT sri.total_return_amount as net_amount " +
+                          "FROM Sales_Return_Invoice sri " +
+                          "JOIN Customer c ON sri.customer_id = c.customer_id " +
+                          "WHERE c.customer_name = ? AND sri.return_invoice_number = ?";
+            
+            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+                pstmt.setString(1, customerName);
+                pstmt.setString(2, excludeInvoiceNumber);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        currentInvoiceNetAmount = rs.getDouble("net_amount");
+                        // For returns, we ADD back the return amount to get previous balance
+                        // because the current balance has already been reduced by the return
+                        currentBalance += currentInvoiceNetAmount;
+                    }
                 }
+            } catch (SQLException e) {
+                e.printStackTrace();
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } else {
+            // For regular sales invoices, look in Sales_Invoice table
+            String query = "SELECT (si.total_amount - si.discount_amount - si.paid_amount) as net_amount " +
+                          "FROM Sales_Invoice si " +
+                          "JOIN Customer c ON si.customer_id = c.customer_id " +
+                          "WHERE c.customer_name = ? AND si.sales_invoice_number = ?";
+            
+            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+                pstmt.setString(1, customerName);
+                pstmt.setString(2, excludeInvoiceNumber);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        currentInvoiceNetAmount = rs.getDouble("net_amount");
+                        // For regular invoices, subtract the invoice amount to get previous balance
+                        currentBalance -= currentInvoiceNetAmount;
+                    }
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
         
-        // Calculate total from sales return invoices EXCLUDING the current invoice
-        String returnQuery = "SELECT SUM(sri.total_return_amount) as return_amount " +
-                           "FROM Sales_Return_Invoice sri " +
-                           "JOIN Customer c ON sri.customer_id = c.customer_id " +
-                           "WHERE c.customer_name = ? AND sri.return_invoice_number != ?";
+        double previousBalance = currentBalance;
         
-        try (PreparedStatement pstmt = connection.prepareStatement(returnQuery)) {
-            pstmt.setString(1, customerName);
-            pstmt.setString(2, excludeInvoiceNumber);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    returnBalance = rs.getDouble("return_amount");
-                    System.out.println("DEBUG: Return amount (excluding current): " + returnBalance);
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        // Previous balance = Initial balance + Previous unpaid amount - Return amount
-        double previousBalance = initialBalance + invoiceBalance - returnBalance;
-        System.out.println("DEBUG: Previous balance calculated: " + previousBalance + 
-                          " (Initial: " + initialBalance + " + Previous Unpaid: " + invoiceBalance + " - Returns: " + returnBalance + ")");
+        System.out.println("DEBUG: Previous balance calculation for customer: " + customerName);
+        System.out.println("  Invoice number: " + excludeInvoiceNumber + " (Return: " + isReturnInvoice + ")");
+        System.out.println("  Current stored balance: " + getCustomerBalance(customerName));
+        System.out.println("  Current invoice net amount: " + currentInvoiceNetAmount);
+        System.out.println("  Calculated previous balance: " + previousBalance);
         
         return previousBalance;
     }
@@ -1618,15 +1579,20 @@ public class SQLiteDatabase implements db {
     public Object[] getCustomerInvoiceBalanceDetails(String customerName, String invoiceNumber, 
                                                    double currentInvoiceTotal, double currentInvoicePaid) {
         double previousBalance = getCustomerPreviousBalance(customerName, invoiceNumber);
-        double totalBalance = previousBalance + currentInvoiceTotal;
-        double netBalance = totalBalance - currentInvoicePaid;
+        
+        // Note: currentInvoiceTotal should be the net amount (after discount)
+        // The net amount that will be added to customer balance
+        double netInvoiceAmount = currentInvoiceTotal - currentInvoicePaid;
+        double totalBalance = previousBalance + netInvoiceAmount;
+        double netBalance = totalBalance; // Net balance is same as total balance since paid amount is already subtracted
         
         System.out.println("DEBUG: Balance details for " + customerName + " invoice " + invoiceNumber + ":");
         System.out.println("  Previous Balance: " + previousBalance);
-        System.out.println("  Current Invoice Total: " + currentInvoiceTotal);
-        System.out.println("  Total Balance: " + totalBalance);
-        System.out.println("  Current Invoice Paid: " + currentInvoicePaid);
-        System.out.println("  Net Balance: " + netBalance);
+        System.out.println("  currentInvoiceTotal (net after discount): " + currentInvoiceTotal);
+        System.out.println("  currentInvoicePaid: " + currentInvoicePaid);
+        System.out.println("  netInvoiceAmount: " + netInvoiceAmount);
+        System.out.println("  Calculated Total Balance: " + totalBalance);
+        System.out.println("  Calculated Net Balance: " + netBalance);
         
         return new Object[]{previousBalance, totalBalance, netBalance};
     }
@@ -1901,9 +1867,22 @@ public class SQLiteDatabase implements db {
                 insertStmt.setString(4, description);
                 insertStmt.setDouble(5, newBalance);
                 
-                boolean result = insertStmt.executeUpdate() > 0;
-                connection.commit();
-                return result;
+                if (insertStmt.executeUpdate() > 0) {
+                    // Also update the Customer table balance field
+                    String updateCustomerBalanceQuery = "UPDATE Customer SET balance = balance - ? WHERE customer_id = ?";
+                    try (PreparedStatement updateStmt = connection.prepareStatement(updateCustomerBalanceQuery)) {
+                        updateStmt.setDouble(1, paymentAmount);
+                        updateStmt.setInt(2, customerId);
+                        updateStmt.executeUpdate();
+                        
+                        System.out.println("DEBUG: Customer balance reduced by payment: " + paymentAmount);
+                        connection.commit();
+                        return true;
+                    }
+                } else {
+                    connection.rollback();
+                    return false;
+                }
             }
         } catch (SQLException e) {
             try {
@@ -4564,9 +4543,27 @@ public class SQLiteDatabase implements db {
                 
                 if (insertSalesInvoiceItems(salesInvoiceId, items)) {
                     System.out.println("DEBUG: Sales invoice items inserted successfully");
-                    connection.commit();
-                    System.out.println("DEBUG: Transaction committed successfully");
-                    return true;
+                    
+                    // Update customer balance: add net invoice amount (total - discount - paid)
+                    double netInvoiceAmount = totalAmount - discountAmount - paidAmount;
+                    String updateBalanceQuery = "UPDATE Customer SET balance = balance + ? WHERE customer_id = ?";
+                    
+                    try (PreparedStatement balanceStmt = connection.prepareStatement(updateBalanceQuery)) {
+                        balanceStmt.setDouble(1, netInvoiceAmount);
+                        balanceStmt.setInt(2, customerId);
+                        int updated = balanceStmt.executeUpdate();
+                        
+                        if (updated > 0) {
+                            System.out.println("DEBUG: Customer balance updated by: " + netInvoiceAmount);
+                            connection.commit();
+                            System.out.println("DEBUG: Transaction committed successfully");
+                            return true;
+                        } else {
+                            System.out.println("DEBUG: Failed to update customer balance, rolling back");
+                            connection.rollback();
+                            return false;
+                        }
+                    }
                 } else {
                     System.out.println("DEBUG: Failed to insert sales invoice items, rolling back");
                     connection.rollback();
@@ -4786,7 +4783,7 @@ public class SQLiteDatabase implements db {
     @Override
     public boolean insertSalesReturnInvoice(String returnInvoiceNumber, int originalSalesInvoiceId, 
                                            int customerId, String returnDate, double totalReturnAmount, 
-                                           List<Object[]> items) {
+                                           List<Object[]> items, boolean updateBalance) {
         try {
             connection.setAutoCommit(false);
             
@@ -4794,6 +4791,21 @@ public class SQLiteDatabase implements db {
                                                                        customerId, returnDate, totalReturnAmount);
             
             if (salesReturnInvoiceId > 0 && insertSalesReturnInvoiceItems(salesReturnInvoiceId, items)) {
+                // Update customer balance only if refund method is "Refund to Balance"
+                if (updateBalance) {
+                    String updateBalanceQuery = "UPDATE Customer SET balance = balance - ? WHERE customer_id = ?";
+                    
+                    try (PreparedStatement balanceStmt = connection.prepareStatement(updateBalanceQuery)) {
+                        balanceStmt.setDouble(1, totalReturnAmount);
+                        balanceStmt.setInt(2, customerId);
+                        balanceStmt.executeUpdate();
+                        
+                        System.out.println("DEBUG: Customer balance reduced by return amount: " + totalReturnAmount);
+                    }
+                } else {
+                    System.out.println("DEBUG: Cash refund - customer balance not updated");
+                }
+                
                 connection.commit();
                 return true;
             } else {
@@ -4815,6 +4827,14 @@ public class SQLiteDatabase implements db {
                 e.printStackTrace();
             }
         }
+    }
+    
+    // Overloaded method for backward compatibility - defaults to updating balance
+    public boolean insertSalesReturnInvoice(String returnInvoiceNumber, int originalSalesInvoiceId, 
+                                           int customerId, String returnDate, double totalReturnAmount, 
+                                           List<Object[]> items) {
+        return insertSalesReturnInvoice(returnInvoiceNumber, originalSalesInvoiceId, customerId, 
+                                      returnDate, totalReturnAmount, items, true);
     }
 
     @Override

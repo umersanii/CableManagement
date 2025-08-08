@@ -209,12 +209,20 @@ public class InvoiceGenerator {
             document.add(infoTable);
             document.add(Chunk.NEWLINE);
 
-            // Item Table - different layout for purchase vs other invoices
+            // Item Table - different layout for purchase vs production vs other invoices
             PdfPTable table;
             String[] headers;
             boolean isPurchaseInvoice = data.getType().toLowerCase().contains("purchase");
+            boolean isProductionInvoice = data.getType().toLowerCase().equals(InvoiceData.TYPE_PRODUCTION) || 
+                                        data.getType().toLowerCase().equals(InvoiceData.TYPE_PRODUCTION_RETURN);
             
-            if (isPurchaseInvoice) {
+            if (isProductionInvoice) {
+                // Production invoice: simplified table with just item and quantity
+                table = new PdfPTable(3);
+                table.setWidthPercentage(100);
+                table.setWidths(new float[]{1, 6, 2});
+                headers = new String[]{"#", "Item", "Qty"};
+            } else if (isPurchaseInvoice) {
                 // Purchase invoice: no discount column
                 table = new PdfPTable(6);
                 table.setWidthPercentage(100);
@@ -250,15 +258,22 @@ public class InvoiceGenerator {
                 table.addCell(new Phrase(String.valueOf(i + 1), regularFont));
                 table.addCell(new Phrase(item.getName(), regularFont));
                 table.addCell(new Phrase(String.valueOf(item.getQuantity()), regularFont));
-                table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice()), regularFont));
-                table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice() * item.getQuantity()), regularFont));
                 
-                if (!isPurchaseInvoice) {
-                    // Only add discount column for non-purchase invoices
-                    table.addCell(new Phrase(String.format("%.1f%%", item.getDiscountPercent()), regularFont));
+                if (isProductionInvoice) {
+                    // Production invoices only show item number, name, and quantity
+                    // No price or monetary columns
+                } else {
+                    // For purchase and sales invoices, add monetary columns
+                    table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice()), regularFont));
+                    table.addCell(new Phrase(String.format("%.2f", item.getUnitPrice() * item.getQuantity()), regularFont));
+                    
+                    if (!isPurchaseInvoice) {
+                        // Only add discount column for non-purchase invoices
+                        table.addCell(new Phrase(String.format("%.1f%%", item.getDiscountPercent()), regularFont));
+                    }
+                    
+                    table.addCell(new Phrase(String.format("%.2f", net), regularFont));
                 }
-                
-                table.addCell(new Phrase(String.format("%.2f", net), regularFont));
             }
 
             document.add(table);
@@ -315,7 +330,20 @@ public class InvoiceGenerator {
                 summary.setWidths(new float[]{5f, 5f});
                 summary.setSpacingBefore(10f);
                 
-                // Production invoices don't need quantity summary since it's shown per item
+                // Add total items count for production invoices
+                summary.addCell(new Phrase("Total Items:", regularFont));
+                summary.addCell(new Phrase(String.valueOf(items.size()), regularFont));
+                
+                // Add total quantity produced
+                double totalQuantity = items.stream().mapToDouble(Item::getQuantity).sum();
+                summary.addCell(new Phrase("Total Quantity Produced:", regularFont));
+                summary.addCell(new Phrase(String.format("%.0f", totalQuantity), regularFont));
+                
+                // Add notes if available
+                if (data.hasMetadata("notes") && !data.getMetadata("notes").toString().trim().isEmpty()) {
+                    summary.addCell(new Phrase("Notes:", regularFont));
+                    summary.addCell(new Phrase(data.getMetadata("notes").toString(), regularFont));
+                }
             } else {
                 // Regular summary table for purchase/sales invoices in single column layout
                 summary = new PdfPTable(2);

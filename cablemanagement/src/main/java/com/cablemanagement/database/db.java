@@ -542,6 +542,11 @@ public interface db {
     
     boolean insertSalesReturnInvoice(String returnInvoiceNumber, int originalSalesInvoiceId, 
                                     int customerId, String returnDate, double totalReturnAmount, 
+                                    List<Object[]> items, boolean updateBalance);
+    
+    // Overloaded method for backward compatibility
+    boolean insertSalesReturnInvoice(String returnInvoiceNumber, int originalSalesInvoiceId, 
+                                    int customerId, String returnDate, double totalReturnAmount, 
                                     List<Object[]> items);
     
     List<Object[]> getAllSalesReturnInvoices();
