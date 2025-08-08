@@ -5,6 +5,7 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.KeyCode;
@@ -12,6 +13,8 @@ import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.SimpleDoubleProperty;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
 import java.util.List;
@@ -2530,31 +2533,67 @@ public class ProductionStock {
         table.setMaxHeight(300);
         table.getStyleClass().add("table-view");
         
+        // Make the table responsive to window size changes
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        
         TableColumn<ProductionStockRecord, String> nameCol = new TableColumn<>("Product Name");
         nameCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getName()));
         nameCol.setPrefWidth(150);
+        nameCol.setMinWidth(120);
         
         TableColumn<ProductionStockRecord, String> brandCol = new TableColumn<>("Brand");
         brandCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getBrand()));
         brandCol.setPrefWidth(120);
+        brandCol.setMinWidth(100);
         
         TableColumn<ProductionStockRecord, String> unitCol = new TableColumn<>("Unit");
         unitCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getUnit()));
         unitCol.setPrefWidth(60);
+        unitCol.setMinWidth(50);
         
         TableColumn<ProductionStockRecord, String> quantityCol = new TableColumn<>("Quantity");
         quantityCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getQuantity())));
         quantityCol.setPrefWidth(100);
+        quantityCol.setMinWidth(80);
         
         TableColumn<ProductionStockRecord, String> unitCostCol = new TableColumn<>("Unit Cost");
         unitCostCol.setCellValueFactory(data -> new SimpleStringProperty(formatNumber(data.getValue().getUnitCost())));
         unitCostCol.setPrefWidth(100);
+        unitCostCol.setMinWidth(80);
         
         TableColumn<ProductionStockRecord, String> totalCostCol = new TableColumn<>("Total Cost");
         totalCostCol.setCellValueFactory(data -> new SimpleStringProperty(formatNumber(data.getValue().getTotalCost())));
         totalCostCol.setPrefWidth(100);
+        totalCostCol.setMinWidth(80);
         
-        table.getColumns().addAll(nameCol, brandCol, unitCol, quantityCol, unitCostCol, totalCostCol);
+        // Add Edit column with button
+        TableColumn<ProductionStockRecord, Void> actionsCol = new TableColumn<>("Actions");
+        actionsCol.setPrefWidth(100);
+        actionsCol.setMinWidth(80);
+        actionsCol.setCellFactory(param -> new TableCell<>() {
+            private final Button editButton = new Button("Edit");
+            
+            {
+                editButton.getStyleClass().add("edit-button");
+                editButton.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
+                editButton.setOnAction(event -> {
+                    ProductionStockRecord record = getTableView().getItems().get(getIndex());
+                    openEditProductionStockDialog(record, getTableView());
+                });
+            }
+            
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    setGraphic(editButton);
+                }
+            }
+        });
+        
+        table.getColumns().addAll(nameCol, brandCol, unitCol, quantityCol, unitCostCol, totalCostCol, actionsCol);
         return table;
     }
 
@@ -3367,6 +3406,303 @@ public class ProductionStock {
         } catch (Exception e) {
             System.err.println("Error filtering production stock table: " + e.getMessage());
             showAlert("Error", "Failed to filter table: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Opens a dialog to edit production stock item details
+     * 
+     * @param record The production stock record to edit
+     * @param tableView The table view to refresh after editing
+     */
+    private static void openEditProductionStockDialog(ProductionStockRecord record, TableView<ProductionStockRecord> tableView) {
+        // Create a modal dialog
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("Edit Production Stock Item");
+        dialog.setMinWidth(450);
+        dialog.setMinHeight(500);
+        
+        // Create the form layout
+        VBox layout = new VBox(20);
+        layout.setPadding(new Insets(20));
+        layout.setAlignment(Pos.CENTER);
+        
+        // Create form fields
+        Label titleLabel = new Label("Edit Product: " + record.getName());
+        titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        
+        // Create input fields
+        GridPane formGrid = new GridPane();
+        formGrid.setHgap(15);
+        formGrid.setVgap(15);
+        formGrid.setPadding(new Insets(10));
+        formGrid.setAlignment(Pos.CENTER);
+        
+        // Product ID (hidden)
+        Label idLabel = new Label("Product ID:");
+        TextField idField = new TextField(String.valueOf(record.getProductionId()));
+        idField.setEditable(false);
+        idField.setVisible(false);
+        idLabel.setVisible(false);
+        
+        // Product Name
+        Label nameLabel = new Label("Product Name:");
+        TextField nameField = new TextField(record.getName());
+        
+        // Brand (ComboBox)
+        Label brandLabel = new Label("Brand:");
+        ComboBox<String> brandComboBox = new ComboBox<>();
+        brandComboBox.setPromptText("-- Select Brand --");
+        brandComboBox.setEditable(false);
+        brandComboBox.setPrefWidth(200);
+        
+        try {
+            List<Brand> brands = database.getAllBrands();
+            ObservableList<String> brandNames = FXCollections.observableArrayList();
+            for (Brand brand : brands) {
+                brandNames.add(brand.nameProperty().get());
+            }
+            brandComboBox.setItems(brandNames);
+            brandComboBox.setValue(record.getBrand());
+        } catch (Exception e) {
+            showAlert("Database Error", "Failed to load brands: " + e.getMessage());
+        }
+        
+        // Unit (ComboBox)
+        Label unitLabel = new Label("Unit:");
+        ComboBox<String> unitComboBox = new ComboBox<>();
+        unitComboBox.setPromptText("-- Select Unit --");
+        unitComboBox.setEditable(false);
+        unitComboBox.setPrefWidth(200);
+        
+        try {
+            List<String> units = database.getAllUnits();
+            unitComboBox.setItems(FXCollections.observableArrayList(units));
+            unitComboBox.setValue(record.getUnit());
+        } catch (Exception e) {
+            showAlert("Database Error", "Failed to load units: " + e.getMessage());
+        }
+        
+        // Quantity
+        Label quantityLabel = new Label("Quantity:");
+        TextField quantityField = new TextField(String.valueOf(record.getQuantity()));
+        
+        // Unit Cost
+        Label unitCostLabel = new Label("Unit Cost:");
+        TextField unitCostField = new TextField(formatNumber(record.getUnitCost()));
+        
+        // Sale Price
+        Label salePriceLabel = new Label("Sale Price:");
+        TextField salePriceField = new TextField(formatNumber(record.getSalePrice()));
+        
+        // Add form fields to grid
+        formGrid.add(idLabel, 0, 0);
+        formGrid.add(idField, 1, 0);
+        formGrid.add(nameLabel, 0, 1);
+        formGrid.add(nameField, 1, 1);
+        formGrid.add(brandLabel, 0, 2);
+        formGrid.add(brandComboBox, 1, 2);
+        formGrid.add(unitLabel, 0, 3);
+        formGrid.add(unitComboBox, 1, 3);
+        formGrid.add(quantityLabel, 0, 4);
+        formGrid.add(quantityField, 1, 4);
+        formGrid.add(unitCostLabel, 0, 5);
+        formGrid.add(unitCostField, 1, 5);
+        formGrid.add(salePriceLabel, 0, 6);
+        formGrid.add(salePriceField, 1, 6);
+        
+        // Action buttons
+        HBox buttonBox = new HBox(15);
+        buttonBox.setAlignment(Pos.CENTER);
+        
+        Button updateButton = new Button("Update");
+        updateButton.setStyle("-fx-background-color: #28a745; -fx-text-fill: white;");
+        updateButton.setPrefWidth(120);
+        
+        Button cancelButton = new Button("Cancel");
+        cancelButton.setStyle("-fx-background-color: #6c757d; -fx-text-fill: white;");
+        cancelButton.setPrefWidth(120);
+        
+        buttonBox.getChildren().addAll(updateButton, cancelButton);
+        
+        // Add all components to layout
+        layout.getChildren().addAll(titleLabel, formGrid, buttonBox);
+        
+        // Create scene and show dialog
+        Scene scene = new Scene(layout);
+        // Add your application CSS if needed
+        // scene.getStylesheets().add(getClass().getResource("path/to/styles.css").toExternalForm());
+        dialog.setScene(scene);
+        
+        // Button actions
+        updateButton.setOnAction(e -> {
+            try {
+                // Validate inputs
+                String name = nameField.getText().trim();
+                String brand = brandComboBox.getValue();
+                String unit = unitComboBox.getValue();
+                String quantityText = quantityField.getText().trim();
+                String unitCostText = unitCostField.getText().trim();
+                String salePriceText = salePriceField.getText().trim();
+                
+                // Perform validations
+                if (name.isEmpty()) {
+                    showAlert("Missing Information", "Please enter a product name.");
+                    nameField.requestFocus();
+                    return;
+                }
+                
+                if (brand == null || brand.isEmpty()) {
+                    showAlert("Missing Information", "Please select a brand.");
+                    brandComboBox.requestFocus();
+                    return;
+                }
+                
+                if (unit == null || unit.isEmpty()) {
+                    showAlert("Missing Information", "Please select a unit.");
+                    unitComboBox.requestFocus();
+                    return;
+                }
+                
+                if (quantityText.isEmpty()) {
+                    showAlert("Missing Information", "Please enter quantity.");
+                    quantityField.requestFocus();
+                    return;
+                }
+                
+                if (unitCostText.isEmpty()) {
+                    showAlert("Missing Information", "Please enter unit cost.");
+                    unitCostField.requestFocus();
+                    return;
+                }
+                
+                if (salePriceText.isEmpty()) {
+                    showAlert("Missing Information", "Please enter sale price.");
+                    salePriceField.requestFocus();
+                    return;
+                }
+                
+                // Parse numeric values
+                int quantity;
+                double unitCost, salePrice;
+                
+                try {
+                    quantity = Integer.parseInt(quantityText);
+                    if (quantity <= 0) {
+                        showAlert("Invalid Input", "Quantity must be greater than 0.");
+                        quantityField.requestFocus();
+                        return;
+                    }
+                } catch (NumberFormatException ex) {
+                    showAlert("Invalid Input", "Quantity must be a valid number.");
+                    quantityField.requestFocus();
+                    return;
+                }
+                
+                try {
+                    unitCost = Double.parseDouble(unitCostText);
+                    if (unitCost <= 0) {
+                        showAlert("Invalid Input", "Unit cost must be greater than 0.");
+                        unitCostField.requestFocus();
+                        return;
+                    }
+                } catch (NumberFormatException ex) {
+                    showAlert("Invalid Input", "Unit cost must be a valid number.");
+                    unitCostField.requestFocus();
+                    return;
+                }
+                
+                try {
+                    salePrice = Double.parseDouble(salePriceText);
+                    if (salePrice <= 0) {
+                        showAlert("Invalid Input", "Sale price must be greater than 0.");
+                        salePriceField.requestFocus();
+                        return;
+                    }
+                } catch (NumberFormatException ex) {
+                    showAlert("Invalid Input", "Sale price must be a valid number.");
+                    salePriceField.requestFocus();
+                    return;
+                }
+                
+                if (salePrice <= unitCost) {
+                    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                    alert.setTitle("Price Warning");
+                    alert.setHeaderText("Sale price is less than or equal to unit cost");
+                    alert.setContentText(String.format("Sale Price: %.2f\nUnit Cost: %.2f\n\nThis will result in no profit or a loss. Do you want to continue?", salePrice, unitCost));
+                    
+                    if (alert.showAndWait().get() != ButtonType.OK) {
+                        salePriceField.requestFocus();
+                        return;
+                    }
+                }
+                
+                // Get production ID
+                int productionId = Integer.parseInt(idField.getText());
+                
+                // Update the production stock in the database
+                boolean success = updateProductionStock(productionId, name, brand, unit, quantity, unitCost, salePrice);
+                
+                if (success) {
+                    showAlert("Success", "Production stock updated successfully!");
+                    dialog.close();
+                    
+                    // Refresh the table view
+                    refreshProductionStockTable(tableView);
+                } else {
+                    showAlert("Error", "Failed to update production stock. Please try again.");
+                }
+                
+            } catch (Exception ex) {
+                showAlert("Error", "An error occurred while updating: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
+        
+        cancelButton.setOnAction(e -> dialog.close());
+        
+        dialog.showAndWait();
+    }
+    
+    /**
+     * Updates a production stock item in the database
+     * 
+     * @param productionId The ID of the production stock to update
+     * @param name Product name
+     * @param brand Brand name
+     * @param unit Unit name
+     * @param quantity Quantity
+     * @param unitCost Unit cost
+     * @param salePrice Sale price
+     * @return true if update was successful
+     */
+    private static boolean updateProductionStock(int productionId, String name, String brand, String unit, int quantity, double unitCost, double salePrice) {
+        try {
+            // Create SQL update statement
+            String updateQuery = "UPDATE ProductionStock SET product_name = ?, brand_id = (SELECT brand_id FROM Brand WHERE brand_name = ?), "
+                + "unit_id = (SELECT unit_id FROM Unit WHERE unit_name = ?), quantity = ?, unit_cost = ?, sale_price = ? "
+                + "WHERE production_id = ?";
+            
+            // Execute the update using the database connection
+            java.sql.Connection conn = database.getConnection();
+            java.sql.PreparedStatement pstmt = conn.prepareStatement(updateQuery);
+            pstmt.setString(1, name);
+            pstmt.setString(2, brand);
+            pstmt.setString(3, unit);
+            pstmt.setInt(4, quantity);
+            pstmt.setDouble(5, unitCost);
+            pstmt.setDouble(6, salePrice);
+            pstmt.setInt(7, productionId);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            pstmt.close();
+            
+            return rowsAffected > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            showAlert("Database Error", "Failed to update production stock: " + e.getMessage());
+            return false;
         }
     }
 }

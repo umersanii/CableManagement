@@ -1,7 +1,10 @@
 package com.cablemanagement.database;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
@@ -570,7 +573,46 @@ public class SQLiteDatabase implements db {
     }
 
     private String readSqlFile(String filePath) throws IOException {
-        return new String(Files.readAllBytes(Path.of(filePath)));
+        try {
+            // Try to read from the absolute path first
+            if (new File(filePath).exists()) {
+                return new String(Files.readAllBytes(Path.of(filePath)));
+            }
+            
+            // Try to find the file in the classpath resources
+            InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filePath);
+            if (inputStream != null) {
+                return new String(inputStream.readAllBytes());
+            }
+            
+            // Try to find the file relative to the project root
+            String projectRoot = System.getProperty("user.dir");
+            Path projectPath = Path.of(projectRoot, filePath);
+            if (Files.exists(projectPath)) {
+                return new String(Files.readAllBytes(projectPath));
+            }
+            
+            // As a last resort, check a few common locations
+            String[] commonLocations = {
+                projectRoot + "/schema.sql",
+                projectRoot + "/cablemanagement/schema.sql",
+                projectRoot + "/src/main/resources/schema.sql",
+                projectRoot + "/src/main/resources/db/schema.sql"
+            };
+            
+            for (String location : commonLocations) {
+                File file = new File(location);
+                if (file.exists()) {
+                    System.out.println("Found schema file at: " + location);
+                    return new String(Files.readAllBytes(file.toPath()));
+                }
+            }
+            
+            throw new IOException("Could not find schema file: " + filePath);
+        } catch (IOException e) {
+            System.err.println("Error reading SQL file: " + filePath);
+            throw e;
+        }
     }
 
     private void initializeDatabase() {
@@ -580,8 +622,17 @@ public class SQLiteDatabase implements db {
             // Enable foreign key constraints
             stmt.execute("PRAGMA foreign_keys = ON");
 
-            // Read SQL from file
-            String sql = readSqlFile("schema.sql");
+            // Read SQL from file - first try the project root location
+            String projectRoot = System.getProperty("user.dir");
+            String schemaPath = projectRoot + "/schema.sql";
+            
+            // If not found in project root, try the src/main/resources location
+            if (!new File(schemaPath).exists()) {
+                schemaPath = projectRoot + "/cablemanagement/schema.sql";
+            }
+            
+            System.out.println("Looking for schema at: " + schemaPath);
+            String sql = readSqlFile(schemaPath);
 
             // Split statements and execute them one by one
             String[] queries = sql.split(";");
