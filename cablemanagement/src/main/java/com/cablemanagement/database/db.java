@@ -641,8 +641,8 @@ List<Object[]> getInvoiceItemsByID(Integer invoiceID);
     ResultSet getBankTransferReport(Date fromDate, Date toDate);
     ResultSet getProfitReport(Date fromDate, Date toDate);
     ResultSet getSummaryReport(Date fromDate, Date toDate);
-    ResultSet getBalanceSheet();
-    Object[] getBalanceSheetData();
+    ResultSet getBalanceSheet(); // Checked by Sani
+    Object[] getBalanceSheetData(); // Checked by Sani
     ResultSet getCustomersReport();
     ResultSet getSuppliersReport();
     ResultSet getAreaWiseReport();
