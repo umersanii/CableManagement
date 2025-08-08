@@ -92,6 +92,15 @@ public class RawStock {
         bar.getChildren().add(btn);
     }
 
+    // Create form field references accessible to other methods
+    private static TextField rawStockNameField;
+    private static TextField rawStockQuantityField;
+    private static TextField rawStockUnitPriceField;
+    private static ComboBox<String> rawStockBrandCombo;
+    private static ComboBox<String> rawStockUnitCombo;
+    private static ComboBox<String> rawStockSupplierCombo;
+    private static TableView<RawStockRecord> rawStockTable;
+    
     private static VBox createRawStockForm() {
         VBox form = new VBox(15);
         form.setPadding(new Insets(20));
@@ -99,42 +108,55 @@ public class RawStock {
 
         Label heading = createHeading("Register Raw Stock");
 
-        // Input fields matching RawStock table structure
-        TextField nameField = createTextField("Stock Name");
-        TextField quantityField = createTextField("0", "Quantity");
-        TextField unitPriceField = createTextField("Unit Price");
+        // Initialize form fields
+        rawStockNameField = createTextField("Stock Name");
+        rawStockQuantityField = createTextField("0", "Quantity");
+        rawStockUnitPriceField = createTextField("Unit Price");
         
         // Brand ComboBox for better database integration
-        ComboBox<String> brandCombo = new ComboBox<>();
-        brandCombo.setPromptText("Select Brand");
+        rawStockBrandCombo = new ComboBox<>();
+        rawStockBrandCombo.setPromptText("Select Brand");
         for (Brand b : database.getAllBrands()) {
-            brandCombo.getItems().add(b.nameProperty().get());
+            rawStockBrandCombo.getItems().add(b.nameProperty().get());
         }
-        brandCombo.setPrefWidth(200);
+        rawStockBrandCombo.setPrefWidth(200);
         
         // Unit ComboBox for selecting units
-        ComboBox<String> unitCombo = new ComboBox<>();
-        unitCombo.setPromptText("Select Unit");
-        unitCombo.getItems().addAll(database.getAllUnits());
-        unitCombo.setPrefWidth(200);
+        rawStockUnitCombo = new ComboBox<>();
+        rawStockUnitCombo.setPromptText("Select Unit");
+        rawStockUnitCombo.getItems().addAll(database.getAllUnits());
+        rawStockUnitCombo.setPrefWidth(200);
         
         // Supplier ComboBox (optional)
-        ComboBox<String> supplierCombo = new ComboBox<>();
-        supplierCombo.setPromptText("Select Supplier");
-        supplierCombo.getItems().addAll(database.getAllSupplierNames());
-        supplierCombo.setPrefWidth(200);
+        rawStockSupplierCombo = new ComboBox<>();
+        rawStockSupplierCombo.setPromptText("Select Supplier");
+        rawStockSupplierCombo.getItems().addAll(database.getAllSupplierNames());
+        rawStockSupplierCombo.setPrefWidth(200);
 
         Button submitBtn = createSubmitButton("Submit Raw Stock");
 
         // Raw Stock Table
         Label tableHeading = createSubheading("Registered Raw Stock:");
-        TableView<RawStockRecord> stockTable = createRawStockTable();
-        refreshRawStockTable(stockTable);
+        rawStockTable = createRawStockTable();
+        refreshRawStockTable(rawStockTable);
+        
+        // Add update functionality (double-click)
+        rawStockTable.setRowFactory(tv -> {
+            TableRow<RawStockRecord> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !row.isEmpty()) {
+                    RawStockRecord selectedStock = row.getItem();
+                    showUpdateStockDialog(selectedStock, rawStockNameField, rawStockBrandCombo, rawStockUnitCombo, 
+                                          rawStockQuantityField, rawStockUnitPriceField, rawStockTable);
+                }
+            });
+            return row;
+        });
 
         submitBtn.setOnAction(e -> handleRawStockSubmit(
-            nameField, brandCombo, unitCombo, supplierCombo,
-            quantityField, unitPriceField,
-            stockTable
+            rawStockNameField, rawStockBrandCombo, rawStockUnitCombo, rawStockSupplierCombo,
+            rawStockQuantityField, rawStockUnitPriceField,
+            rawStockTable
         ));
 
         // Create form content in a compact layout
@@ -142,13 +164,13 @@ public class RawStock {
         formContent.setStyle("-fx-text-fill: black;");
         formContent.getChildren().addAll(
             heading, 
-            createFormRow("Stock Name:", nameField),
-            createFormRow("Brand:", brandCombo),
-            createFormRow("Unit:", unitCombo),
-            createFormRow("Supplier:", supplierCombo),
-            createFormRow("Quantity:", quantityField),
-            createFormRow("Unit Price:", unitPriceField),
-            submitBtn, tableHeading, stockTable
+            createFormRow("Stock Name:", rawStockNameField),
+            createFormRow("Brand:", rawStockBrandCombo),
+            createFormRow("Unit:", rawStockUnitCombo),
+            createFormRow("Supplier:", rawStockSupplierCombo),
+            createFormRow("Quantity:", rawStockQuantityField),
+            createFormRow("Unit Price:", rawStockUnitPriceField),
+            submitBtn, tableHeading, rawStockTable
         );
 
         // Wrap form in ScrollPane for responsiveness
@@ -232,7 +254,41 @@ public class RawStock {
             }
         });
         
-        table.getColumns().addAll(idCol, nameCol, brandCol, unitCol, qtyCol, priceCol, totalCol);
+        // Add action column with update button
+        TableColumn<RawStockRecord, Void> actionCol = new TableColumn<>("Action");
+        actionCol.setPrefWidth(80);
+        actionCol.setCellFactory(column -> new TableCell<RawStockRecord, Void>() {
+            private final Button updateButton = new Button("Update");
+            {
+                updateButton.getStyleClass().add("action-button");
+                updateButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 11px;");
+                updateButton.setOnAction(event -> {
+                    RawStockRecord record = getTableView().getItems().get(getIndex());
+                    // Use the static form fields
+                    showUpdateStockDialog(
+                        record, 
+                        rawStockNameField, 
+                        rawStockBrandCombo, 
+                        rawStockUnitCombo, 
+                        rawStockQuantityField, 
+                        rawStockUnitPriceField, 
+                        rawStockTable
+                    );
+                });
+            }
+
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    setGraphic(updateButton);
+                }
+            }
+        });
+        
+        table.getColumns().addAll(idCol, nameCol, brandCol, unitCol, qtyCol, priceCol, totalCol, actionCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
         // Apply CSS class for proper header styling (defined in style.css)
@@ -1094,6 +1150,111 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+    
+    private static void showUpdateStockDialog(
+        RawStockRecord selectedStock, 
+        TextField nameField, 
+        ComboBox<String> brandCombo, 
+        ComboBox<String> unitCombo,
+        TextField quantityField, 
+        TextField unitPriceField, 
+        TableView<RawStockRecord> stockTable
+    ) {
+        // Create a dialog for updating the selected raw stock
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Update Raw Stock");
+        dialog.setHeaderText("Update Raw Stock: " + selectedStock.getName());
+        
+        // Set the button types
+        ButtonType updateButtonType = new ButtonType("Update", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(updateButtonType, ButtonType.CANCEL);
+        
+        // Create the dialog content
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 150, 10, 10));
+        
+        TextField updateNameField = createTextField(selectedStock.getName(), "Stock Name");
+        
+        ComboBox<String> updateBrandCombo = new ComboBox<>();
+        updateBrandCombo.setPromptText("Select Brand");
+        for (Brand b : database.getAllBrands()) {
+            updateBrandCombo.getItems().add(b.nameProperty().get());
+        }
+        updateBrandCombo.setValue(selectedStock.getBrand());
+        
+        ComboBox<String> updateUnitCombo = new ComboBox<>();
+        updateUnitCombo.setPromptText("Select Unit");
+        updateUnitCombo.getItems().addAll(database.getAllUnits());
+        updateUnitCombo.setValue(selectedStock.getUnit());
+        
+        TextField updateQuantityField = createTextField(String.format("%.0f", selectedStock.getQuantity()), "Quantity");
+        TextField updateUnitPriceField = createTextField(String.format("%.2f", selectedStock.getUnitPrice()), "Unit Price");
+        
+        // Add fields to grid
+        grid.add(new Label("Stock Name:"), 0, 0);
+        grid.add(updateNameField, 1, 0);
+        grid.add(new Label("Brand:"), 0, 1);
+        grid.add(updateBrandCombo, 1, 1);
+        grid.add(new Label("Unit:"), 0, 2);
+        grid.add(updateUnitCombo, 1, 2);
+        grid.add(new Label("Quantity:"), 0, 3);
+        grid.add(updateQuantityField, 1, 3);
+        grid.add(new Label("Unit Price:"), 0, 4);
+        grid.add(updateUnitPriceField, 1, 4);
+        
+        dialog.getDialogPane().setContent(grid);
+        
+        // Request focus on the name field by default
+        updateNameField.requestFocus();
+        
+        // Handle dialog result
+        Optional<ButtonType> result = dialog.showAndWait();
+        if (result.isPresent() && result.get() == updateButtonType) {
+            // Validate inputs
+            String name = updateNameField.getText().trim();
+            String brand = updateBrandCombo.getValue();
+            String unit = updateUnitCombo.getValue();
+            String quantityText = updateQuantityField.getText().trim();
+            String unitPriceText = updateUnitPriceField.getText().trim();
+            
+            if (name.isEmpty() || brand == null || unit == null || quantityText.isEmpty() || unitPriceText.isEmpty()) {
+                showAlert(Alert.AlertType.ERROR, "Error", "All fields are required");
+                return;
+            }
+            
+            try {
+                double quantity = Double.parseDouble(quantityText);
+                double unitPrice = Double.parseDouble(unitPriceText);
+                
+                // Update raw stock in database
+                boolean success = database.updateRawStock(
+                    selectedStock.getId(), name, brand, unit, quantity, unitPrice
+                );
+                
+                if (success) {
+                    showAlert(Alert.AlertType.INFORMATION, "Success", "Raw stock updated successfully!");
+                    
+                    // Populate the form fields with the updated values
+                    nameField.setText(name);
+                    brandCombo.setValue(brand);
+                    unitCombo.setValue(unit);
+                    quantityField.setText(String.format("%.0f", quantity));
+                    unitPriceField.setText(String.format("%.2f", unitPrice));
+                    
+                    // Refresh the table
+                    refreshRawStockTable(stockTable);
+                } else {
+                    showAlert(Alert.AlertType.ERROR, "Error", "Failed to update raw stock");
+                }
+            } catch (NumberFormatException ex) {
+                showAlert(Alert.AlertType.ERROR, "Invalid Input", "Please enter valid numbers for quantity and unit price");
+            } catch (Exception ex) {
+                showAlert(Alert.AlertType.ERROR, "Error", "An error occurred: " + ex.getMessage());
+            }
+        }
     }
 
     private static ScrollPane createRawStockUseInvoiceForm() {

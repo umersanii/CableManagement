@@ -2042,6 +2042,55 @@ public class SQLiteDatabase implements db {
         }
     }
     
+    @Override
+    public boolean updateRawStock(Integer id, String name, String brand, String unit, double quantity, double unitPrice) {
+        if (id == null || id <= 0 || name == null || name.trim().isEmpty()) {
+            System.err.println("Invalid parameters for updateRawStock");
+            return false;
+        }
+        
+        // Get unit_id from unit name
+        int unitId = getUnitIdByName(unit);
+        if (unitId <= 0) {
+            System.err.println("Invalid unit name for updateRawStock: " + unit);
+            return false;
+        }
+        
+        // Calculate total cost
+        double totalCost = quantity * unitPrice;
+        
+        // Update raw stock
+        String query = "UPDATE Raw_Stock SET item_name = ?, unit_id = ?, quantity = ?, unit_price = ?, total_cost = ? " +
+                      "WHERE stock_id = ? AND brand_id = (SELECT brand_id FROM Brand WHERE brand_name = ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            pstmt.setInt(2, unitId);
+            pstmt.setDouble(3, quantity);
+            pstmt.setDouble(4, unitPrice);
+            pstmt.setDouble(5, totalCost);
+            pstmt.setInt(6, id);
+            pstmt.setString(7, brand);
+            
+            System.out.println("Attempting to update Raw_Stock with stock_id=" + id + 
+                               ": name=" + name + ", brand=" + brand + ", unit_id=" + unitId + 
+                               ", quantity=" + quantity + ", unit_price=" + unitPrice);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected == 0) {
+                System.err.println("Failed to update Raw_Stock: no rows affected for stock_id " + id);
+                return false;
+            }
+            
+            System.out.println("Successfully updated Raw_Stock with stock_id: " + id);
+            return true;
+        } catch (SQLException e) {
+            System.err.println("Error updating Raw_Stock for stock_id " + id + ": " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
 
     @Override
     public boolean insertRawPurchaseInvoice(String invoiceNumber, int supplierId, String invoiceDate, 
