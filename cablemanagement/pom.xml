@@ -15,6 +15,7 @@
     </properties>
 
     <dependencies>
+        <!-- JavaFX dependencies -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
@@ -35,30 +36,31 @@
             <artifactId>javafx-graphics</artifactId>
             <version>17.0.8</version>
         </dependency>
-        <!-- Platform-specific JavaFX dependencies for Windows -->
+        
+        <!-- Platform-specific JavaFX dependencies for Linux -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
             <version>17.0.8</version>
-            <classifier>win</classifier>
+            <classifier>linux</classifier>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
             <version>17.0.8</version>
-            <classifier>win</classifier>
+            <classifier>linux</classifier>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-base</artifactId>
             <version>17.0.8</version>
-            <classifier>win</classifier>
+            <classifier>linux</classifier>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-graphics</artifactId>
             <version>17.0.8</version>
-            <classifier>win</classifier>
+            <classifier>linux</classifier>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
