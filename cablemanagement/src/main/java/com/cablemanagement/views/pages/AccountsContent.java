@@ -479,24 +479,21 @@ public class AccountsContent {
         updateBtn.setOnAction(e -> {
             SupplierAccountData selectedSupplier = supplierTable.getSelectionModel().getSelectedItem();
             if (selectedSupplier != null) {
-                System.out.println("Update supplier: " + selectedSupplier.getSupplierName());
-                // Add your update logic here
+                showUpdateSupplierDialog(selectedSupplier, supplierData, supplierTable);
             }
         });
         
         ledgerBtn.setOnAction(e -> {
             SupplierAccountData selectedSupplier = supplierTable.getSelectionModel().getSelectedItem();
             if (selectedSupplier != null) {
-                System.out.println("View ledger for supplier: " + selectedSupplier.getSupplierName());
-                // Add your ledger logic here
+                showSupplierLedgerDialog(selectedSupplier.getSupplierName());
             }
         });
         
         paymentBtn.setOnAction(e -> {
             SupplierAccountData selectedSupplier = supplierTable.getSelectionModel().getSelectedItem();
             if (selectedSupplier != null) {
-                System.out.println("Add payment for supplier: " + selectedSupplier.getSupplierName());
-                // Add your payment logic here
+                showAddSupplierPaymentDialog(selectedSupplier.getSupplierName(), supplierData, supplierTable);
             }
         });
 
@@ -770,6 +767,294 @@ public class AccountsContent {
                     customerData.clear();
                     customerData.addAll(getAllCustomersWithLocation());
                     customerTable.refresh();
+                    
+                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                    alert.setTitle("Success");
+                    alert.setHeaderText(null);
+                    alert.setContentText(String.format("Payment of %.2f added successfully!\nNew balance: %.2f", 
+                        paymentAmount, currentBalance - paymentAmount));
+                    alert.showAndWait();
+                } else {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Error");
+                    alert.setHeaderText(null);
+                    alert.setContentText("Failed to add payment. Please try again.");
+                    alert.showAndWait();
+                }
+            } catch (NumberFormatException e) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText(null);
+                alert.setContentText("Please enter a valid payment amount.");
+                alert.showAndWait();
+            } catch (Exception e) {
+                e.printStackTrace();
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText(null);
+                alert.setContentText("An error occurred: " + e.getMessage());
+                alert.showAndWait();
+            }
+        }
+    }
+    
+    // Dialog methods for supplier operations
+    private static void showUpdateSupplierDialog(SupplierAccountData selectedSupplier, 
+                                               ObservableList<SupplierAccountData> supplierData, 
+                                               TableView<SupplierAccountData> supplierTable) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Update Supplier");
+        dialog.setHeaderText("Update supplier information");
+        
+        // Create the form
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 150, 10, 10));
+        
+        TextField nameField = new TextField(selectedSupplier.getSupplierName());
+        TextField contactField = new TextField(selectedSupplier.getContact());
+        
+        // Get all tehsils for dropdown
+        ComboBox<String> tehsilCombo = new ComboBox<>();
+        try {
+            List<String> tehsils = config.database.getAllTehsils();
+            tehsilCombo.setItems(FXCollections.observableArrayList(tehsils));
+            tehsilCombo.setValue(selectedSupplier.getTehsil());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        grid.add(new Label("Supplier Name:"), 0, 0);
+        grid.add(nameField, 1, 0);
+        grid.add(new Label("Contact:"), 0, 1);
+        grid.add(contactField, 1, 1);
+        grid.add(new Label("Tehsil:"), 0, 2);
+        grid.add(tehsilCombo, 1, 2);
+        
+        dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        
+        Optional<ButtonType> result = dialog.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            try {
+                int supplierId = config.database.getSupplierIdByName(selectedSupplier.getSupplierName());
+                boolean success = config.database.updateSupplier(supplierId, nameField.getText(), 
+                                                                contactField.getText(), tehsilCombo.getValue());
+                if (success) {
+                    // Refresh the table data
+                    supplierData.clear();
+                    supplierData.addAll(getAllSuppliersWithLocation());
+                    supplierTable.refresh();
+                    
+                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                    alert.setTitle("Success");
+                    alert.setHeaderText(null);
+                    alert.setContentText("Supplier updated successfully!");
+                    alert.showAndWait();
+                } else {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Error");
+                    alert.setHeaderText(null);
+                    alert.setContentText("Failed to update supplier. Please try again.");
+                    alert.showAndWait();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText(null);
+                alert.setContentText("An error occurred: " + e.getMessage());
+                alert.showAndWait();
+            }
+        }
+    }
+    
+    private static void showSupplierLedgerDialog(String supplierName) {
+        Stage ledgerStage = new Stage();
+        ledgerStage.setTitle("Supplier Ledger - " + supplierName);
+        ledgerStage.initModality(Modality.APPLICATION_MODAL);
+        
+        VBox mainLayout = new VBox(10);
+        mainLayout.setPadding(new Insets(20));
+        
+        // Title
+        Label titleLabel = new Label("Ledger for: " + supplierName);
+        titleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
+        titleLabel.setStyle("-fx-text-fill: #2c3e50;");
+        
+        // Date range selection
+        HBox dateRangeBox = new HBox(10);
+        dateRangeBox.setAlignment(Pos.CENTER_LEFT);
+        
+        DatePicker fromDatePicker = new DatePicker();
+        DatePicker toDatePicker = new DatePicker(LocalDate.now());
+        Button filterBtn = new Button("Filter");
+        Button showAllBtn = new Button("Show All");
+        
+        dateRangeBox.getChildren().addAll(
+            new Label("From:"), fromDatePicker,
+            new Label("To:"), toDatePicker,
+            filterBtn, showAllBtn
+        );
+        
+        // Ledger table
+        TableView<Object[]> ledgerTable = new TableView<>();
+        ledgerTable.setPrefHeight(400);
+        ledgerTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        
+        TableColumn<Object[], String> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(cellData -> 
+            new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[0]));
+        
+        TableColumn<Object[], String> typeCol = new TableColumn<>("Type");
+        typeCol.setCellValueFactory(cellData -> 
+            new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[1]));
+        
+        TableColumn<Object[], String> amountCol = new TableColumn<>("Amount");
+        amountCol.setCellValueFactory(cellData -> 
+            new javafx.beans.property.SimpleStringProperty(String.format("%.2f", (Double) cellData.getValue()[2])));
+        
+        TableColumn<Object[], String> descCol = new TableColumn<>("Description");
+        descCol.setCellValueFactory(cellData -> 
+            new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[3]));
+        
+        TableColumn<Object[], String> balanceCol = new TableColumn<>("Balance After");
+        balanceCol.setCellValueFactory(cellData -> 
+            new javafx.beans.property.SimpleStringProperty(String.format("%.2f", (Double) cellData.getValue()[4])));
+        
+        TableColumn<Object[], String> referenceCol = new TableColumn<>("Reference");
+        referenceCol.setCellValueFactory(cellData -> {
+            String ref = (String) cellData.getValue()[5];
+            return new javafx.beans.property.SimpleStringProperty(ref != null ? ref : "");
+        });
+        
+        ledgerTable.getColumns().addAll(dateCol, typeCol, amountCol, descCol, balanceCol, referenceCol);
+        
+        // Load ledger data
+        ObservableList<Object[]> ledgerData = FXCollections.observableArrayList();
+        
+        Runnable loadLedgerData = () -> {
+            try {
+                ledgerData.clear();
+                List<Object[]> transactions = config.database.getSupplierLedger(supplierName);
+                ledgerData.addAll(transactions);
+                ledgerTable.setItems(ledgerData);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        };
+        
+        Runnable filterLedgerData = () -> {
+            try {
+                ledgerData.clear();
+                if (fromDatePicker.getValue() != null && toDatePicker.getValue() != null) {
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                    String startDate = fromDatePicker.getValue().format(formatter);
+                    String endDate = toDatePicker.getValue().format(formatter);
+                    List<Object[]> transactions = config.database.getSupplierLedgerByDateRange(supplierName, startDate, endDate);
+                    ledgerData.addAll(transactions);
+                } else {
+                    List<Object[]> transactions = config.database.getSupplierLedger(supplierName);
+                    ledgerData.addAll(transactions);
+                }
+                ledgerTable.setItems(ledgerData);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        };
+        
+        // Button actions
+        filterBtn.setOnAction(e -> filterLedgerData.run());
+        showAllBtn.setOnAction(e -> loadLedgerData.run());
+        
+        // Initial load
+        loadLedgerData.run();
+        
+        // Close button
+        Button closeBtn = new Button("Close");
+        closeBtn.setOnAction(e -> ledgerStage.close());
+        
+        HBox buttonBox = new HBox(closeBtn);
+        buttonBox.setAlignment(Pos.CENTER);
+        
+        mainLayout.getChildren().addAll(titleLabel, dateRangeBox, ledgerTable, buttonBox);
+        
+        Scene scene = new Scene(mainLayout, 800, 600);
+        ledgerStage.setScene(scene);
+        ledgerStage.showAndWait();
+    }
+    
+    private static void showAddSupplierPaymentDialog(String supplierName, 
+                                                   ObservableList<SupplierAccountData> supplierData, 
+                                                   TableView<SupplierAccountData> supplierTable) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Add Supplier Payment");
+        dialog.setHeaderText("Add payment for: " + supplierName);
+        
+        // Get current balance to display
+        double currentBalance = config.database.getSupplierCurrentBalance(supplierName);
+        
+        // Create the form
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 150, 10, 10));
+        
+        Label currentBalanceLabel = new Label(String.format("Current Balance: %.2f", currentBalance));
+        currentBalanceLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
+        currentBalanceLabel.setStyle("-fx-text-fill: " + (currentBalance > 0 ? "#e74c3c" : "#27ae60") + ";");
+        
+        TextField paymentAmountField = new TextField();
+        paymentAmountField.setPromptText("Enter payment amount");
+        
+        DatePicker paymentDatePicker = new DatePicker(LocalDate.now());
+        
+        TextField descriptionField = new TextField();
+        descriptionField.setPromptText("Payment description (optional)");
+        
+        grid.add(currentBalanceLabel, 0, 0, 2, 1);
+        grid.add(new Label("Payment Amount:"), 0, 1);
+        grid.add(paymentAmountField, 1, 1);
+        grid.add(new Label("Payment Date:"), 0, 2);
+        grid.add(paymentDatePicker, 1, 2);
+        grid.add(new Label("Description:"), 0, 3);
+        grid.add(descriptionField, 1, 3);
+        
+        dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        
+        // Validate payment amount
+        Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
+        okButton.setDisable(true);
+        
+        paymentAmountField.textProperty().addListener((observable, oldValue, newValue) -> {
+            try {
+                double amount = Double.parseDouble(newValue);
+                okButton.setDisable(amount <= 0);
+            } catch (NumberFormatException e) {
+                okButton.setDisable(true);
+            }
+        });
+        
+        Optional<ButtonType> result = dialog.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            try {
+                double paymentAmount = Double.parseDouble(paymentAmountField.getText());
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                String paymentDate = paymentDatePicker.getValue().format(formatter);
+                String description = descriptionField.getText().trim();
+                if (description.isEmpty()) {
+                    description = "Payment made";
+                }
+                
+                boolean success = config.database.addSupplierPayment(supplierName, paymentAmount, paymentDate, description);
+                
+                if (success) {
+                    // Refresh the table data
+                    supplierData.clear();
+                    supplierData.addAll(getAllSuppliersWithLocation());
+                    supplierTable.refresh();
                     
                     Alert alert = new Alert(Alert.AlertType.INFORMATION);
                     alert.setTitle("Success");
