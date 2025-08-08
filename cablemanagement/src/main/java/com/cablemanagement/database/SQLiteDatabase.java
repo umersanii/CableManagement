@@ -6212,8 +6212,77 @@ public ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType
     }
 
     @Override
-    public ResultSet getReturnPurchaseReport(Date fromDate, Date toDate) {
-        String query = "SELECT " +
+    public ResultSet getReturnPurchaseReport(Date fromDate, Date toDate, String reportType) {
+        String query = "";
+        
+        // Base date filter
+        String dateFilter = " WHERE rpri.return_date BETWEEN ? AND ? ";
+        
+        switch (reportType) {
+        case "Product-wise Report":
+            query = "SELECT " +
+                    "rs.item_name AS Product, " +
+                    "b.brand_name AS Brand, " +
+                    "SUM(rprii.quantity) AS Quantity, " +
+                    "SUM(rprii.quantity * rprii.unit_price) AS TotalAmount " +
+                    "FROM Raw_Purchase_Return_Invoice rpri " +
+                    "JOIN Raw_Purchase_Return_Invoice_Item rprii " +
+                    "    ON rpri.raw_purchase_return_invoice_id = rprii.raw_purchase_return_invoice_id " +
+                    "JOIN Raw_Stock rs " +
+                    "    ON rprii.raw_stock_id = rs.stock_id " +
+                    "LEFT JOIN Brand b " +
+                    "    ON rs.brand_id = b.brand_id " +
+                    dateFilter +
+                    "GROUP BY rs.item_name, b.brand_name " +
+                    "ORDER BY TotalAmount DESC";
+            break;
+
+        case "Brand-wise Report":
+            query = "SELECT " +
+                    "b.brand_name AS Brand, " +
+                    "SUM(rprii.quantity) AS Quantity, " +
+                    "SUM(rprii.quantity * rprii.unit_price) AS TotalAmount " +
+                    "FROM Raw_Purchase_Return_Invoice rpri " +
+                    "JOIN Raw_Purchase_Return_Invoice_Item rprii " +
+                    "    ON rpri.raw_purchase_return_invoice_id = rprii.raw_purchase_return_invoice_id " +
+                    "JOIN Raw_Stock rs " +
+                    "    ON rprii.raw_stock_id = rs.stock_id " +
+                    "LEFT JOIN Brand b " +
+                    "    ON rs.brand_id = b.brand_id " +
+                    dateFilter +
+                    "GROUP BY b.brand_name " +
+                    "ORDER BY TotalAmount DESC";
+            break;
+        case "Category-wise Report":
+            query = "SELECT " +
+                "cat.category_name AS Category, " +
+                "SUM(rprii.quantity) AS Quantity, " +
+                "SUM(rprii.quantity * rprii.unit_price) AS TotalAmount " +
+                "FROM Raw_Purchase_Return_Invoice rpri " +
+                "JOIN Raw_Purchase_Return_Invoice_Item rprii ON rpri.raw_purchase_return_invoice_id = rprii.raw_purchase_return_invoice_id " +
+                "JOIN Raw_Stock rs ON rprii.raw_stock_id = rs.stock_id " +
+                "JOIN Category cat ON rs.category_id = cat.category_id " +
+                dateFilter +
+                "GROUP BY cat.category_name " +
+                "ORDER BY TotalAmount DESC";
+            break;
+
+            case "Manufacturer-wise Report":
+            query = "SELECT " +
+                "m.manufacturer_name AS Manufacturer, " +
+                "SUM(rprii.quantity) AS Quantity, " +
+                "SUM(rprii.quantity * rprii.unit_price) AS TotalAmount " +
+                "FROM Raw_Purchase_Return_Invoice rpri " +
+                "JOIN Raw_Purchase_Return_Invoice_Item rprii ON rpri.raw_purchase_return_invoice_id = rprii.raw_purchase_return_invoice_id " +
+                "JOIN Raw_Stock rs ON rprii.raw_stock_id = rs.stock_id " +
+                "JOIN Manufacturer m ON rs.manufacturer_id = m.manufacturer_id " +
+                dateFilter +
+                "GROUP BY m.manufacturer_name " +
+                "ORDER BY TotalAmount DESC";
+            break;
+
+            default: // "All Reports"
+            query = "SELECT " +
                 "rpri.return_invoice_number AS invoiceNumber, " +
                 "rpri.return_date AS invoiceDate, " +
                 "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
@@ -6222,8 +6291,11 @@ public ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType
                 "rpri.total_return_amount AS paidAmount " +
                 "FROM Raw_Purchase_Return_Invoice rpri " +
                 "LEFT JOIN Supplier s ON rpri.supplier_id = s.supplier_id " +
-                "WHERE rpri.return_date BETWEEN ? AND ? " +
+                dateFilter +
                 "ORDER BY rpri.return_date DESC";
+            break;
+        }
+        
         try {
             PreparedStatement pstmt = connection.prepareStatement(query);
             // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
@@ -6235,6 +6307,7 @@ public ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType
             System.out.println("DEBUG: getReturnPurchaseReport called with dates:");
             System.out.println("DEBUG: fromDate: " + fromDate + " -> " + fromDateStr);
             System.out.println("DEBUG: toDate: " + toDate + " -> " + toDateStr);
+            System.out.println("DEBUG: reportType: " + reportType);
             System.out.println("DEBUG: Query: " + query);
             
             pstmt.setString(1, fromDateStr);
@@ -6254,6 +6327,8 @@ public ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType
     }
 
     @Override
+    
+    
     public ResultSet getReturnSalesReport(Date fromDate, Date toDate) {
         System.out.println("DEBUG: getReturnSalesReport called with dates: " + fromDate + " to " + toDate);
         

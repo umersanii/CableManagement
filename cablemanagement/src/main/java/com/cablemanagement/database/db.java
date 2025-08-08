@@ -636,7 +636,7 @@ List<Object[]> getInvoiceItemsByID(Integer invoiceID);
     List<Object[]> getPurchaseReportList(Date fromDate, Date toDate);
     ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType);
     ResultSet getSalesReport(Date fromDate, Date toDate, String reportType);
-    ResultSet getReturnPurchaseReport(Date fromDate, Date toDate);
+    ResultSet getReturnPurchaseReport(Date fromDate, Date toDate, String reportType);
     ResultSet getReturnSalesReport(Date fromDate, Date toDate);
     ResultSet getBankTransferReport(Date fromDate, Date toDate);
     ResultSet getProfitReport(Date fromDate, Date toDate);
