@@ -218,6 +218,81 @@ public interface db {
     List<Object[]> getSupplierBalanceSummary();
 
     // --------------------------
+    // Supplier Update Operations
+    // --------------------------
+    
+    /**
+     * Update supplier details
+     * @param supplierId The ID of the supplier to update
+     * @param name New supplier name
+     * @param contact New contact number
+     * @param tehsilName New tehsil name
+     * @return true if update successful, false otherwise
+     */
+    boolean updateSupplier(int supplierId, String name, String contact, String tehsilName);
+    
+    /**
+     * Get supplier by ID
+     * @param supplierId The supplier ID
+     * @return Supplier object with current details
+     */
+    Supplier getSupplierById(int supplierId);
+    
+    /**
+     * Get supplier ID by name
+     * @param supplierName The supplier name
+     * @return Supplier ID, or -1 if not found
+     */
+    int getSupplierIdByName(String supplierName);
+
+    // --------------------------
+    // Supplier Payment and Ledger Operations
+    // --------------------------
+    
+    /**
+     * Add payment for a supplier
+     * @param supplierName Supplier name
+     * @param paymentAmount Payment amount (positive for payment made)
+     * @param paymentDate Payment date
+     * @param description Payment description
+     * @return true if payment added successfully, false otherwise
+     */
+    boolean addSupplierPayment(String supplierName, double paymentAmount, String paymentDate, String description);
+    
+    /**
+     * Add payment for a supplier by ID
+     * @param supplierId Supplier ID
+     * @param paymentAmount Payment amount (positive for payment made)
+     * @param paymentDate Payment date
+     * @param description Payment description
+     * @return true if payment added successfully, false otherwise
+     */
+    boolean addSupplierPayment(int supplierId, double paymentAmount, String paymentDate, String description);
+    
+    /**
+     * Get supplier ledger (transaction history)
+     * @param supplierName Supplier name
+     * @return List of transaction records [date, type, amount, description, balance_after, reference]
+     */
+    List<Object[]> getSupplierLedger(String supplierName);
+    
+    /**
+     * Get supplier ledger by ID
+     * @param supplierId Supplier ID
+     * @return List of transaction records [date, type, amount, description, balance_after, reference]
+     */
+    List<Object[]> getSupplierLedger(int supplierId);
+    
+    /**
+     * Get supplier ledger for date range
+     * @param supplierName Supplier name
+     * @param startDate Start date
+     * @param endDate End date
+     * @return List of transaction records [date, type, amount, description, balance_after, reference]
+     */
+    List<Object[]> getSupplierLedgerByDateRange(String supplierName, String startDate, String endDate);
+
+    // --------------------------
     // Customer Update Operations
     // --------------------------
     
@@ -348,8 +423,6 @@ public interface db {
     List<Object[]> getAllRawStocksForDropdown();
     
     List<String> getAllSupplierNames();
-    
-    int getSupplierIdByName(String supplierName);
     
     int getRawStockIdByName(String rawStockName);
     

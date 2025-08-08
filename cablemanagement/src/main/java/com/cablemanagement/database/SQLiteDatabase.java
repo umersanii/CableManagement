@@ -2190,6 +2190,244 @@ public class SQLiteDatabase implements db {
     }
 
     // --------------------------
+    // Supplier Update Operations
+    // --------------------------
+    
+    @Override
+    public boolean updateSupplier(int supplierId, String name, String contact, String tehsilName) {
+        String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
+        String updateQuery = "UPDATE Supplier SET supplier_name = ?, contact_number = ?, tehsil_id = ? WHERE supplier_id = ?";
+        
+        try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
+            getTehsilStmt.setString(1, tehsilName);
+            
+            try (ResultSet rs = getTehsilStmt.executeQuery()) {
+                if (rs.next()) {
+                    int tehsilId = rs.getInt("tehsil_id");
+                    
+                    try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
+                        updateStmt.setString(1, name);
+                        updateStmt.setString(2, contact);
+                        updateStmt.setInt(3, tehsilId);
+                        updateStmt.setInt(4, supplierId);
+                        
+                        return updateStmt.executeUpdate() > 0;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+    
+    @Override
+    public Supplier getSupplierById(int supplierId) {
+        String query = "SELECT s.supplier_name, s.contact_number, t.tehsil_name " +
+                    "FROM Supplier s " +
+                    "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                    "WHERE s.supplier_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, supplierId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String name = rs.getString("supplier_name");
+                    String contact = rs.getString("contact_number");
+                    String tehsil = rs.getString("tehsil_name");
+                    if (tehsil == null) tehsil = "";
+                    
+                    // Get current balance including invoice history
+                    double currentBalance = getSupplierCurrentBalance(name);
+                    
+                    return new Supplier(name, contact, tehsil, currentBalance);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    @Override
+    public int getSupplierIdByName(String supplierName) {
+        String query = "SELECT supplier_id FROM Supplier WHERE supplier_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, supplierName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("supplier_id");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1; // Supplier not found
+    }
+
+    // --------------------------
+    // Supplier Payment and Ledger Operations
+    // --------------------------
+    
+    @Override
+    public boolean addSupplierPayment(String supplierName, double paymentAmount, String paymentDate, String description) {
+        int supplierId = getSupplierIdByName(supplierName);
+        if (supplierId == -1) {
+            return false; // Supplier not found
+        }
+        return addSupplierPayment(supplierId, paymentAmount, paymentDate, description);
+    }
+    
+    @Override
+    public boolean addSupplierPayment(int supplierId, double paymentAmount, String paymentDate, String description) {
+        try {
+            connection.setAutoCommit(false);
+            
+            // Get current balance
+            double currentBalance = 0.0;
+            String getBalanceQuery = "SELECT balance_after_transaction FROM Supplier_Transaction " +
+                                   "WHERE supplier_id = ? ORDER BY transaction_id DESC LIMIT 1";
+            try (PreparedStatement pstmt = connection.prepareStatement(getBalanceQuery)) {
+                pstmt.setInt(1, supplierId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        currentBalance = rs.getDouble("balance_after_transaction");
+                    } else {
+                        // If no transactions exist, get initial balance from Supplier table
+                        currentBalance = getSupplierCurrentBalance(getSupplierNameById(supplierId));
+                    }
+                }
+            }
+            
+            // Calculate new balance after payment (payment reduces the balance owed to supplier)
+            double newBalance = currentBalance - paymentAmount;
+            
+            // Insert payment transaction
+            String insertQuery = "INSERT INTO Supplier_Transaction " +
+                               "(supplier_id, transaction_date, transaction_type, amount, description, balance_after_transaction) " +
+                               "VALUES (?, ?, 'payment_made', ?, ?, ?)";
+            
+            try (PreparedStatement pstmt = connection.prepareStatement(insertQuery)) {
+                pstmt.setInt(1, supplierId);
+                pstmt.setString(2, paymentDate);
+                pstmt.setDouble(3, paymentAmount);
+                pstmt.setString(4, description);
+                pstmt.setDouble(5, newBalance);
+                
+                int result = pstmt.executeUpdate();
+                if (result > 0) {
+                    connection.commit();
+                    connection.setAutoCommit(true);
+                    return true;
+                } else {
+                    connection.rollback();
+                    connection.setAutoCommit(true);
+                    return false;
+                }
+            }
+        } catch (SQLException e) {
+            try {
+                connection.rollback();
+                connection.setAutoCommit(true);
+            } catch (SQLException rollbackException) {
+                rollbackException.printStackTrace();
+            }
+            e.printStackTrace();
+        }
+        return false;
+    }
+    
+    @Override
+    public List<Object[]> getSupplierLedger(String supplierName) {
+        int supplierId = getSupplierIdByName(supplierName);
+        if (supplierId == -1) {
+            return new ArrayList<>(); // Supplier not found
+        }
+        return getSupplierLedger(supplierId);
+    }
+    
+    @Override
+    public List<Object[]> getSupplierLedger(int supplierId) {
+        List<Object[]> ledger = new ArrayList<>();
+        String query = "SELECT transaction_date, transaction_type, amount, description, balance_after_transaction, reference_invoice_number " +
+                      "FROM Supplier_Transaction " +
+                      "WHERE supplier_id = ? " +
+                      "ORDER BY transaction_date, transaction_id";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, supplierId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Object[] transaction = {
+                        rs.getString("transaction_date"),
+                        rs.getString("transaction_type"),
+                        rs.getDouble("amount"),
+                        rs.getString("description"),
+                        rs.getDouble("balance_after_transaction"),
+                        rs.getString("reference_invoice_number")
+                    };
+                    ledger.add(transaction);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ledger;
+    }
+    
+    @Override
+    public List<Object[]> getSupplierLedgerByDateRange(String supplierName, String startDate, String endDate) {
+        int supplierId = getSupplierIdByName(supplierName);
+        if (supplierId == -1) {
+            return new ArrayList<>(); // Supplier not found
+        }
+        
+        List<Object[]> ledger = new ArrayList<>();
+        String query = "SELECT transaction_date, transaction_type, amount, description, balance_after_transaction, reference_invoice_number " +
+                      "FROM Supplier_Transaction " +
+                      "WHERE supplier_id = ? AND transaction_date BETWEEN ? AND ? " +
+                      "ORDER BY transaction_date, transaction_id";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, supplierId);
+            pstmt.setString(2, startDate);
+            pstmt.setString(3, endDate);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Object[] transaction = {
+                        rs.getString("transaction_date"),
+                        rs.getString("transaction_type"),
+                        rs.getDouble("amount"),
+                        rs.getString("description"),
+                        rs.getDouble("balance_after_transaction"),
+                        rs.getString("reference_invoice_number")
+                    };
+                    ledger.add(transaction);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ledger;
+    }
+
+    // Helper method to get supplier name by ID
+    private String getSupplierNameById(int supplierId) {
+        String query = "SELECT supplier_name FROM Supplier WHERE supplier_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, supplierId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("supplier_name");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // --------------------------
     // Raw Stock Operations
     // --------------------------
     @Override
@@ -2442,24 +2680,6 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return supplierNames;
-    }
-    
-    @Override
-    public int getSupplierIdByName(String supplierName) {
-        String query = "SELECT supplier_id FROM Supplier WHERE supplier_name = ?";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, supplierName);
-            
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("supplier_id");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return -1; // Return -1 if not found
     }
     
     public int getRawStockIdByName(String itemName) {
