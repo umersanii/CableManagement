@@ -24,7 +24,6 @@ import com.cablemanagement.database.SQLiteDatabase;
 import com.cablemanagement.database.db;
 import com.cablemanagement.model.Brand;
 import com.cablemanagement.model.Customer;
-import com.cablemanagement.model.ProductionStockItem;
 import com.cablemanagement.invoice.PrintManager;
 import com.cablemanagement.invoice.InvoiceData;
 import com.cablemanagement.invoice.Item;
@@ -133,13 +132,38 @@ public class ProductionStock {
         nameField.setPrefWidth(300);
         nameField.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
 
+        // Category ComboBox
+        ComboBox<String> categoryCombo = new ComboBox<>();
+        categoryCombo.setPromptText("-- Select Category --");
+        categoryCombo.setEditable(false);
+        categoryCombo.setPrefWidth(300);
+        categoryCombo.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
+        try {
+            List<String> categories = database.getAllCategories();
+            categoryCombo.setItems(FXCollections.observableArrayList(categories));
+        } catch (Exception e) {
+            showAlert("Database Error", "Failed to load categories: " + e.getMessage());
+        }
+
+        // Manufacturer ComboBox
+        ComboBox<String> manufacturerCombo = new ComboBox<>();
+        manufacturerCombo.setPromptText("-- Select Manufacturer --");
+        manufacturerCombo.setEditable(false);
+        manufacturerCombo.setPrefWidth(300);
+        manufacturerCombo.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
+        try {
+            List<String> manufacturers = database.getAllManufacturerNames();
+            manufacturerCombo.setItems(FXCollections.observableArrayList(manufacturers));
+        } catch (Exception e) {
+            showAlert("Database Error", "Failed to load manufacturers: " + e.getMessage());
+        }
+
         // Brand ComboBox 
         ComboBox<String> brandCombo = new ComboBox<>();
         brandCombo.setPromptText("-- Select Brand --");
         brandCombo.setEditable(false);
         brandCombo.setPrefWidth(300);
         brandCombo.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
-        
         try {
             List<Brand> brands = database.getAllBrands();
             ObservableList<String> brandNames = FXCollections.observableArrayList();
@@ -157,7 +181,6 @@ public class ProductionStock {
         unitCombo.setEditable(false);
         unitCombo.setPrefWidth(300);
         unitCombo.setStyle("-fx-padding: 8; -fx-font-size: 14px;");
-        
         try {
             List<String> units = database.getAllUnits();
             unitCombo.setItems(FXCollections.observableArrayList(units));
@@ -182,11 +205,13 @@ public class ProductionStock {
 
         // Add fields to grid with labels
         inputGrid.add(createFormRow("Product Name:", nameField), 0, 0);
-        inputGrid.add(createFormRow("Brand:", brandCombo), 0, 1);
-        inputGrid.add(createFormRow("Unit:", unitCombo), 0, 2);
-        inputGrid.add(createFormRow("Quantity:", quantityField), 0, 3);
-        inputGrid.add(createFormRow("Unit Cost:", unitCostField), 0, 4);
-        inputGrid.add(createFormRow("Sale Price:", salePriceField), 0, 5);
+        inputGrid.add(createFormRow("Category:", categoryCombo), 0, 1);
+        inputGrid.add(createFormRow("Manufacturer:", manufacturerCombo), 0, 2);
+        inputGrid.add(createFormRow("Brand:", brandCombo), 0, 3);
+        inputGrid.add(createFormRow("Unit:", unitCombo), 0, 4);
+        inputGrid.add(createFormRow("Quantity:", quantityField), 0, 5);
+        inputGrid.add(createFormRow("Unit Cost:", unitCostField), 0, 6);
+        inputGrid.add(createFormRow("Sale Price:", salePriceField), 0, 7);
 
         // Action buttons for the form
         HBox buttonBox = new HBox(15);
@@ -227,8 +252,6 @@ public class ProductionStock {
         filterCombo.setPromptText("Filter by Brand");
         filterCombo.setPrefWidth(150);
         filterCombo.getItems().add("All Brands");
-        
-        // Load brands for filter
         try {
             List<Brand> brands = database.getAllBrands();
             for (Brand brand : brands) {
@@ -289,6 +312,8 @@ public class ProductionStock {
         // Clear form button
         clearBtn.setOnAction(e -> {
             nameField.clear();
+            categoryCombo.setValue(null);
+            manufacturerCombo.setValue(null);
             brandCombo.setValue(null);
             unitCombo.setValue(null);
             quantityField.clear();
@@ -298,10 +323,28 @@ public class ProductionStock {
         });
 
         // Submit button
-        submitBtn.setOnAction(e -> handleProductionStockSubmit(
-            nameField, brandCombo, unitCombo, quantityField, unitCostField, salePriceField, stockTable,
-            totalItemsLabel, totalValueLabel, lowStockLabel
-        ));
+        submitBtn.setOnAction(e -> {
+            // You need to update handleProductionStockSubmit to accept category and manufacturer
+            // and update your database accordingly.
+            String category = categoryCombo.getValue();
+            String manufacturer = manufacturerCombo.getValue();
+            if (category == null || category.isEmpty()) {
+                showAlert("Missing Information", "Please select a category.");
+                categoryCombo.requestFocus();
+                return;
+            }
+            if (manufacturer == null || manufacturer.isEmpty()) {
+                showAlert("Missing Information", "Please select a manufacturer.");
+                manufacturerCombo.requestFocus();
+                return;
+            }
+            // You may need to update your handleProductionStockSubmit method to accept these new fields.
+            handleProductionStockSubmit(
+                nameField, brandCombo, unitCombo, quantityField, unitCostField, salePriceField, stockTable,
+                totalItemsLabel, totalValueLabel, lowStockLabel,
+                category, manufacturer
+            );
+        });
 
         // Refresh button
         refreshBtn.setOnAction(e -> {
@@ -2393,94 +2436,106 @@ public class ProductionStock {
             TextField nameField, ComboBox<String> brandCombo, ComboBox<String> unitCombo,
             TextField quantityField, TextField unitCostField, TextField salePriceField,
             TableView<ProductionStockRecord> stockTable,
-            Label totalItemsLabel, Label totalValueLabel, Label lowStockLabel) {
-        
+            Label totalItemsLabel, Label totalValueLabel, Label lowStockLabel,
+            String category, String manufacturer
+            ) {
+
         String name = nameField.getText().trim();
         String brand = brandCombo.getSelectionModel().getSelectedItem();
         String unit = unitCombo.getSelectionModel().getSelectedItem();
         String quantityText = quantityField.getText().trim();
         String unitCostText = unitCostField.getText().trim();
         String salePriceText = salePriceField.getText().trim();
-        
+
         // Validation
         if (name.isEmpty()) {
             showAlert("Missing Information", "Please enter a product name.");
             nameField.requestFocus();
             return;
         }
-        
+
         if (brand == null || brand.isEmpty()) {
             showAlert("Missing Information", "Please select a brand.");
             brandCombo.requestFocus();
             return;
         }
-        
+
         if (unit == null || unit.isEmpty()) {
             showAlert("Missing Information", "Please select a unit.");
             unitCombo.requestFocus();
             return;
         }
-        
+
         if (quantityText.isEmpty()) {
             showAlert("Missing Information", "Please enter quantity.");
             quantityField.requestFocus();
             return;
         }
-        
+
         if (unitCostText.isEmpty()) {
             showAlert("Missing Information", "Please enter unit cost.");
             unitCostField.requestFocus();
             return;
         }
-        
+
         if (salePriceText.isEmpty()) {
             showAlert("Missing Information", "Please enter sale price.");
             salePriceField.requestFocus();
             return;
         }
-        
+
+        if (category == null || category.isEmpty()) {
+            showAlert("Missing Information", "Please select a category.");
+            return;
+        }
+
+        if (manufacturer == null || manufacturer.isEmpty()) {
+            showAlert("Missing Information", "Please select a manufacturer.");
+            return;
+        }
+
         try {
             int quantity = Integer.parseInt(quantityText);
             double unitCost = Double.parseDouble(unitCostText);
             double salePrice = Double.parseDouble(salePriceText);
-            
+
             if (quantity <= 0) {
                 showAlert("Invalid Input", "Quantity must be greater than 0.");
                 quantityField.requestFocus();
                 return;
             }
-            
+
             if (unitCost <= 0) {
                 showAlert("Invalid Input", "Unit cost must be greater than 0.");
                 unitCostField.requestFocus();
                 return;
             }
-            
+
             if (salePrice <= 0) {
                 showAlert("Invalid Input", "Sale price must be greater than 0.");
                 salePriceField.requestFocus();
                 return;
             }
-            
+
             if (salePrice <= unitCost) {
                 Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
                 alert.setTitle("Price Warning");
                 alert.setHeaderText("Sale price is less than or equal to unit cost");
                 alert.setContentText(String.format("Sale Price: %.2f\nUnit Cost: %.2f\n\nThis will result in no profit or a loss. Do you want to continue?", salePrice, unitCost));
-                
+
                 if (alert.showAndWait().get() != ButtonType.OK) {
                     salePriceField.requestFocus();
                     return;
                 }
             }
-            
+
             // Check if product with same name and brand already exists
             if (database.productionStockExists(name, brand)) {
                 Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
                 alert.setTitle("Product Exists");
                 alert.setHeaderText("Product already exists");
                 alert.setContentText("A product with the name '" + name + "' and brand '" + brand + "' already exists.\n\nDo you want to add this quantity to existing stock?");
-                
+
                 if (alert.showAndWait().get() == ButtonType.OK) {
                     // Add to existing stock
                     boolean success = database.addToProductionStock(name, brand, quantity, unitCost, salePrice);
@@ -2494,18 +2549,18 @@ public class ProductionStock {
                     return; // User cancelled
                 }
             } else {
-                // Insert new production stock - using the new overloaded method with unit
-                boolean success = database.insertProductionStock(name, "", brand, unit, quantity, salePrice, 0.0);
-                
+                // Insert new production stock - now with category and manufacturer
+                boolean success = database.insertProductionStock(name, category, brand, unit, quantity, salePrice, unitCost, manufacturer);
+
                 if (!success) {
                     showAlert("Error", "Failed to register production stock. Please check database connection.");
                     return;
                 }
-                
-                showAlert("Success", String.format("Production Stock registered successfully!\n\nProduct: %s\nBrand: %s\nUnit: %s\nQuantity: %d\nUnit Cost: %.2f\nSale Price: %.2f\nProfit Margin: %.1f%%", 
-                    name, brand, unit, quantity, unitCost, salePrice, ((salePrice - unitCost) / unitCost) * 100));
+
+                showAlert("Success", String.format("Production Stock registered successfully!\n\nProduct: %s\nBrand: %s\nUnit: %s\nCategory: %s\nManufacturer: %s\nQuantity: %d\nUnit Cost: %.2f\nSale Price: %.2f\nProfit Margin: %.1f%%",
+                        name, brand, unit, category, manufacturer, quantity, unitCost, salePrice, ((salePrice - unitCost) / unitCost) * 100));
             }
-            
+
             // Clear form after successful submission
             nameField.clear();
             brandCombo.getSelectionModel().clearSelection();
@@ -2514,11 +2569,11 @@ public class ProductionStock {
             unitCostField.clear();
             salePriceField.clear();
             nameField.requestFocus();
-            
+
             // Refresh table and summary
             refreshProductionStockTable(stockTable);
             updateStockSummary(stockTable, totalItemsLabel, totalValueLabel, lowStockLabel);
-            
+
         } catch (NumberFormatException ex) {
             showAlert("Invalid Input", "Please enter valid numbers for Quantity, Unit Cost, and Sale Price.\n\nQuantity should be a whole number.\nUnit Cost and Sale Price should be decimal numbers.");
         } catch (Exception ex) {

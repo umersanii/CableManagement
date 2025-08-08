@@ -119,6 +119,7 @@ public interface db {
     // Manufacturer Operations
     // --------------------------
     List<Manufacturer> getAllManufacturers();
+    List<String> getAllManufacturerNames();
 
     boolean insertManufacturer(String name, String province, String district, String tehsil);
 
@@ -251,11 +252,10 @@ public interface db {
     // --------------------------
     List<Object[]> getAllProductionStocks();
     
-    boolean insertProductionStock(String name, String category, String brand, String unit, double openingQty, double salePrice, double reorderLevel);
-    
+
     // New method with separate unit cost and sale price parameters
     boolean insertProductionStock(String name, String category, String brand, String unit, 
-                                 double openingQty, double unitCost, double salePrice, double reorderLevel);
+                                 double quantity, double salePrice, double unitCost, String manufacturer);
     
     List<Object[]> getAllRawPurchaseInvoices();
     
@@ -284,8 +284,6 @@ public interface db {
     boolean insertSimpleRawPurchaseInvoice(String invoiceNumber, String supplierName, String invoiceDate, 
                                           double totalAmount, double discountAmount, double paidAmount, 
                                           List<RawStockPurchaseItem> items);
-
-    boolean ensureBrandExists(String brandName, int tehsilId);
 
     // --------------------------
     // Raw Purchase Return Invoice Operations

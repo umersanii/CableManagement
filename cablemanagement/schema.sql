@@ -232,8 +232,12 @@ CREATE TABLE IF NOT EXISTS ProductionStock (
     total_cost REAL NOT NULL,
     production_date TEXT DEFAULT CURRENT_TIMESTAMP,
     sale_price REAL DEFAULT 0.0,
+    manufacturer TEXT NOT NULL,
+    category TEXT NOT NULL,
     FOREIGN KEY (brand_id) REFERENCES Brand(brand_id),
-    FOREIGN KEY (unit_id) REFERENCES Unit(unit_id)
+    FOREIGN KEY (unit_id) REFERENCES Unit(unit_id),
+    FOREIGN KEY (manufacturer) REFERENCES Manufacturer(manufacturer_id),
+    FOREIGN KEY (category) REFERENCES Category(category_id)
 );
 
 
@@ -395,3 +399,121 @@ CREATE TABLE IF NOT EXISTS Contract_Employee (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+
+
+---------------------------------------------------------------------
+---               Sample Data Insertion
+---------------------------------------------------------------------
+
+
+-- -- Province
+-- INSERT OR IGNORE INTO Province (province_name) VALUES ('Punjab'), ('Sindh'), ('Khyber Pakhtunkhwa'), ('Balochistan');
+
+-- -- District
+-- INSERT OR IGNORE INTO District (district_name, province_id) VALUES 
+-- ('Lahore', 1),
+-- ('Karachi', 2),
+-- ('Peshawar', 3),
+-- ('Quetta', 4);
+
+-- -- Tehsil
+-- INSERT OR IGNORE INTO Tehsil (tehsil_name, district_id) VALUES 
+-- ('Model Town', 1),
+-- ('Korangi', 2),
+-- ('Hayatabad', 3),
+-- -- Province
+-- INSERT OR IGNORE INTO Province (province_name) VALUES ('Punjab'), ('Sindh'), ('Khyber Pakhtunkhwa'), ('Balochistan');
+
+-- -- District
+-- INSERT OR IGNORE INTO District (district_name, province_id) VALUES 
+-- ('Lahore', 1),
+-- ('Karachi', 2),
+-- ('Peshawar', 3),
+-- ('Quetta', 4);
+
+-- -- Tehsil
+-- INSERT OR IGNORE INTO Tehsil (tehsil_name, district_id) VALUES 
+-- ('Model Town', 1),
+-- ('Korangi', 2),
+-- ('Hayatabad', 3),
+-- ('Sariab', 4);
+
+-- -- Category
+-- INSERT OR IGNORE INTO Category (category_name) VALUES ('Electronics'), ('Furniture'), ('Food'), ('Textile');
+
+-- -- Designation
+-- INSERT OR IGNORE INTO Designation (designation_title) VALUES ('Manager'), ('Worker'), ('Accountant'), ('Sales Executive');
+
+-- -- Manufacturer
+-- INSERT OR IGNORE INTO Manufacturer (manufacturer_name, tehsil_id) VALUES 
+-- ('ABC Industries', 1),
+-- ('XYZ Manufacturing', 2);
+
+-- -- Brand
+-- INSERT OR IGNORE INTO Brand (brand_name, manufacturer_id) VALUES 
+-- ('TechBrand', 1),
+-- ('HomeComfort', 2);
+
+-- -- Unit
+-- INSERT OR IGNORE INTO Unit (unit_name) VALUES ('Piece'), ('Kilogram'), ('Liter'), ('Meter');
+
+-- -- Customer
+-- INSERT OR IGNORE INTO Customer (customer_name, contact_number, address, tehsil_id, balance) VALUES 
+-- ('Ali Khan', '03001234567', 'Lahore, Punjab', 1, 1000.00),
+-- ('Sara Ahmed', '03111234567', 'Karachi, Sindh', 2, 500.00);
+
+-- -- Supplier
+-- INSERT OR IGNORE INTO Supplier (supplier_name, contact_number, address, tehsil_id, balance) VALUES 
+-- ('Imran Traders', '03021234567', 'Lahore', 1, 2000.00),
+-- ('Usman Suppliers', '03211234567', 'Karachi', 2, 1500.00);
+
+-- -- Bank
+-- INSERT OR IGNORE INTO Bank (bank_id, bank_name, account_number, branch_name, balance) VALUES 
+-- (1, 'HBL', '1234567890', 'Main Branch', 100000.00),
+-- (2, 'UBL', '9876543210', 'City Branch', 50000.00);
+
+-- -- Salesman
+-- INSERT OR IGNORE INTO Salesman (salesman_name, contact_number, address, commission_rate) VALUES 
+-- ('Rashid Mehmood', '03331234567', 'Lahore', 5.0),
+-- ('Kashif Iqbal', '03451234567', 'Karachi', 7.0);
+
+-- ('Sariab', 4);
+
+-- -- Category
+-- INSERT OR IGNORE INTO Category (category_name) VALUES ('Electronics'), ('Furniture'), ('Food'), ('Textile');
+
+-- -- Designation
+-- INSERT OR IGNORE INTO Designation (designation_title) VALUES ('Manager'), ('Worker'), ('Accountant'), ('Sales Executive');
+
+-- -- Manufacturer
+-- INSERT OR IGNORE INTO Manufacturer (manufacturer_name, tehsil_id) VALUES 
+-- ('ABC Industries', 1),
+-- ('XYZ Manufacturing', 2);
+
+-- -- Brand
+-- INSERT OR IGNORE INTO Brand (brand_name, manufacturer_id) VALUES 
+-- ('TechBrand', 1),
+-- ('HomeComfort', 2);
+
+-- -- Unit
+-- INSERT OR IGNORE INTO Unit (unit_name) VALUES ('Piece'), ('Kilogram'), ('Liter'), ('Meter');
+
+-- -- Customer
+-- INSERT OR IGNORE INTO Customer (customer_name, contact_number, address, tehsil_id, balance) VALUES 
+-- ('Ali Khan', '03001234567', 'Lahore, Punjab', 1, 1000.00),
+-- ('Sara Ahmed', '03111234567', 'Karachi, Sindh', 2, 500.00);
+
+-- -- Supplier
+-- INSERT OR IGNORE INTO Supplier (supplier_name, contact_number, address, tehsil_id, balance) VALUES 
+-- ('Imran Traders', '03021234567', 'Lahore', 1, 2000.00),
+-- ('Usman Suppliers', '03211234567', 'Karachi', 2, 1500.00);
+
+-- -- Bank
+-- INSERT OR IGNORE INTO Bank (bank_id, bank_name, account_number, branch_name, balance) VALUES 
+-- (1, 'HBL', '1234567890', 'Main Branch', 100000.00),
+-- (2, 'UBL', '9876543210', 'City Branch', 50000.00);
+
+-- -- Salesman
+-- INSERT OR IGNORE INTO Salesman (salesman_name, contact_number, address, commission_rate) VALUES 
+-- ('Rashid Mehmood', '03331234567', 'Lahore', 5.0),
+-- ('Kashif Iqbal', '03451234567', 'Karachi', 7.0);

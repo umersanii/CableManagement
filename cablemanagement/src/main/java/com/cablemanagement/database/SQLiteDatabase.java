@@ -900,6 +900,22 @@ public class SQLiteDatabase implements db {
         return manufacturers;
     }
 
+    /**
+     * Returns a list of all manufacturer names as Strings.
+     */
+    public List<String> getAllManufacturerNames() {
+        List<String> names = new ArrayList<>();
+        String query = "SELECT manufacturer_name FROM Manufacturer ORDER BY manufacturer_name";
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                names.add(rs.getString("manufacturer_name"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return names;
+    }
     @Override
     public boolean insertManufacturer(String name, String province, String district, String tehsil) {
         String getTehsilQuery = "SELECT t.tehsil_id FROM Tehsil t " +
@@ -2247,8 +2263,9 @@ public class SQLiteDatabase implements db {
     }
 
 
-    @Override
-    public boolean ensureBrandExists(String brandName, int tehsilId) {
+    // checked by Umer Ghfoor
+    // Helper methods to ensure existence of Brand, Category, Manufacturer
+    boolean ensureBrandExists(String brandName) {
         String checkBrandQuery = "SELECT brand_id FROM Brand WHERE brand_name = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(checkBrandQuery)) {
             pstmt.setString(1, brandName);
@@ -2274,6 +2291,38 @@ public class SQLiteDatabase implements db {
             return false;
         }
     }
+
+    boolean ensureCategoryExists(String categoryName) {
+        String checkCategoryQuery = "SELECT category_id FROM Category WHERE category_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(checkCategoryQuery)) {
+            pstmt.setString(1, categoryName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return true; // Category exists
+            }
+        } catch (SQLException e) {
+            System.err.println("Error checking category existence: " + e.getMessage());
+            return false;
+        }
+        return false;
+
+    }
+
+    boolean ensureManufacturerExists(String manufacturerName) {
+        String checkManufacturerQuery = "SELECT manufacturer_id FROM Manufacturer WHERE manufacturer_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(checkManufacturerQuery)) {
+            pstmt.setString(1, manufacturerName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return true; // Manufacturer exists
+            }
+        } catch (SQLException e) {
+            System.err.println("Error checking manufacturer existence: " + e.getMessage());
+            return false;
+        }
+        return false;
+    }
+
 
     @Override
     public boolean insertSimpleRawPurchaseInvoice(String invoiceNumber, String supplierName, String invoiceDate,
@@ -2322,7 +2371,7 @@ public class SQLiteDatabase implements db {
             }
 
             // 4. Ensure Default Brand exists
-            if (!ensureBrandExists("Default Brand", tehsilId)) {
+            if (!ensureBrandExists("Default Brand")) {
                 System.err.println("Failed to ensure Default Brand exists");
                 connection.rollback();
                 return false;
@@ -3311,83 +3360,36 @@ public class SQLiteDatabase implements db {
         }
     }
 
+    // Checked by Umer Ghafoor
+    // New overloaded method with separate unit cost and sale price parameters
     @Override
-    public boolean insertProductionStock(String name, String category, String brand, String unit, 
-                                       double openingQty, double salePrice, double reorderLevel) {
-        // For this method, we'll use salePrice as both cost and sale price
-        // In a real implementation, you'd want separate parameters for unit_cost and sale_price
-        double unitCost = salePrice * 0.8; // Assume cost is 80% of sale price
-        
+    public boolean insertProductionStock(String name, String category, String brand, String unit, double quantity, double salePrice, double unitCost, String manufacturer)
+    {
         // Get unit_id from unit name
         int unitId = getUnitIdByName(unit);
-        
-        String query = "INSERT INTO ProductionStock (product_name, brand_id, unit_id, quantity, unit_cost, total_cost, sale_price) " +
-                      "VALUES (?, (SELECT brand_id FROM Brand WHERE brand_name = ? LIMIT 1), ?, ?, ?, ?, ?)";
-        
+
+        String query = "INSERT INTO ProductionStock (product_name, brand_id, unit_id, quantity, unit_cost, total_cost, sale_price, manufacturer, category) " +
+                       "VALUES (?, (SELECT brand_id FROM Brand WHERE brand_name = ? LIMIT 1), ?, ?, ?, ?, ?, ?, ?)";
         try {
             connection.setAutoCommit(false); // Start transaction
             
             // Ensure brand exists
-            ensureBrandExists(brand, 1); // Default tehsil_id = 1
-            
+            ensureBrandExists(brand);
+            ensureCategoryExists(category);
+            ensureManufacturerExists(manufacturer);
+
             PreparedStatement pstmt = connection.prepareStatement(query);
-            double totalCost = openingQty * unitCost;
-            
+            double totalCost = quantity * unitCost;
+
             pstmt.setString(1, name);
             pstmt.setString(2, brand);
             pstmt.setInt(3, unitId);
-            pstmt.setInt(4, (int) openingQty);
+            pstmt.setInt(4, (int) quantity);
             pstmt.setDouble(5, unitCost);
             pstmt.setDouble(6, totalCost);
             pstmt.setDouble(7, salePrice);
-            
-            int result = pstmt.executeUpdate();
-            pstmt.close();
-            
-            connection.commit(); // Commit transaction
-            connection.setAutoCommit(true); // Reset auto-commit
-            
-            System.out.println("DEBUG: Inserted ProductionStock - Name: " + name + 
-                             ", Unit: " + unit + " (unit_id=" + unitId + "), Unit Cost: " + unitCost + ", Sale Price: " + salePrice);
-            
-            return result > 0;
-        } catch (SQLException e) {
-            try {
-                connection.rollback(); // Rollback on error
-                connection.setAutoCommit(true); // Reset auto-commit
-            } catch (SQLException rollbackEx) {
-                rollbackEx.printStackTrace();
-            }
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    // New overloaded method with separate unit cost and sale price parameters
-    public boolean insertProductionStock(String name, String category, String brand, String unit, 
-                                       double openingQty, double unitCost, double salePrice, double reorderLevel) {
-        // Get unit_id from unit name
-        int unitId = getUnitIdByName(unit);
-        
-        String query = "INSERT INTO ProductionStock (product_name, brand_id, unit_id, quantity, unit_cost, total_cost, sale_price) " +
-                      "VALUES (?, (SELECT brand_id FROM Brand WHERE brand_name = ? LIMIT 1), ?, ?, ?, ?, ?)";
-        
-        try {
-            connection.setAutoCommit(false); // Start transaction
-            
-            // Ensure brand exists
-            ensureBrandExists(brand, 1); // Default tehsil_id = 1
-            
-            PreparedStatement pstmt = connection.prepareStatement(query);
-            double totalCost = openingQty * unitCost;
-            
-            pstmt.setString(1, name);
-            pstmt.setString(2, brand);
-            pstmt.setInt(3, unitId);
-            pstmt.setInt(4, (int) openingQty);
-            pstmt.setDouble(5, unitCost);      // Use the actual unit cost passed
-            pstmt.setDouble(6, totalCost);
-            pstmt.setDouble(7, salePrice);     // Use the actual sale price passed
+            pstmt.setString(8, manufacturer);
+            pstmt.setString(9, category);
             
             int result = pstmt.executeUpdate();
             pstmt.close();
