@@ -244,6 +244,8 @@ public interface db {
     
     boolean insertRawStock(String name, String category, String brand, String unit, double openingQty, double purchasePrice, double reorderLevel);
     
+    boolean updateRawStock(Integer id, String name, String brand, String unit, double quantity, double unitPrice);
+    
     // --------------------------
     // Production Stock Operations
     // --------------------------

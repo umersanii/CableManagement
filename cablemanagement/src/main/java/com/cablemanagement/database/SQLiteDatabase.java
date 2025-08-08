@@ -1,7 +1,10 @@
 package com.cablemanagement.database;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
@@ -564,7 +567,46 @@ public class SQLiteDatabase implements db {
     }
 
     private String readSqlFile(String filePath) throws IOException {
-        return new String(Files.readAllBytes(Path.of(filePath)));
+        try {
+            // Try to read from the absolute path first
+            if (new File(filePath).exists()) {
+                return new String(Files.readAllBytes(Path.of(filePath)));
+            }
+            
+            // Try to find the file in the classpath resources
+            InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filePath);
+            if (inputStream != null) {
+                return new String(inputStream.readAllBytes());
+            }
+            
+            // Try to find the file relative to the project root
+            String projectRoot = System.getProperty("user.dir");
+            Path projectPath = Path.of(projectRoot, filePath);
+            if (Files.exists(projectPath)) {
+                return new String(Files.readAllBytes(projectPath));
+            }
+            
+            // As a last resort, check a few common locations
+            String[] commonLocations = {
+                projectRoot + "/schema.sql",
+                projectRoot + "/cablemanagement/schema.sql",
+                projectRoot + "/src/main/resources/schema.sql",
+                projectRoot + "/src/main/resources/db/schema.sql"
+            };
+            
+            for (String location : commonLocations) {
+                File file = new File(location);
+                if (file.exists()) {
+                    System.out.println("Found schema file at: " + location);
+                    return new String(Files.readAllBytes(file.toPath()));
+                }
+            }
+            
+            throw new IOException("Could not find schema file: " + filePath);
+        } catch (IOException e) {
+            System.err.println("Error reading SQL file: " + filePath);
+            throw e;
+        }
     }
 
     private void initializeDatabase() {
@@ -574,8 +616,17 @@ public class SQLiteDatabase implements db {
             // Enable foreign key constraints
             stmt.execute("PRAGMA foreign_keys = ON");
 
-            // Read SQL from file
-            String sql = readSqlFile("schema.sql");
+            // Read SQL from file - first try the project root location
+            String projectRoot = System.getProperty("user.dir");
+            String schemaPath = projectRoot + "/schema.sql";
+            
+            // If not found in project root, try the src/main/resources location
+            if (!new File(schemaPath).exists()) {
+                schemaPath = projectRoot + "/cablemanagement/schema.sql";
+            }
+            
+            System.out.println("Looking for schema at: " + schemaPath);
+            String sql = readSqlFile(schemaPath);
 
             // Split statements and execute them one by one
             String[] queries = sql.split(";");
@@ -1980,6 +2031,55 @@ public class SQLiteDatabase implements db {
             }
         } catch (SQLException e) {
             System.err.println("Error inserting Raw_Stock for item " + name + ": " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    @Override
+    public boolean updateRawStock(Integer id, String name, String brand, String unit, double quantity, double unitPrice) {
+        if (id == null || id <= 0 || name == null || name.trim().isEmpty()) {
+            System.err.println("Invalid parameters for updateRawStock");
+            return false;
+        }
+        
+        // Get unit_id from unit name
+        int unitId = getUnitIdByName(unit);
+        if (unitId <= 0) {
+            System.err.println("Invalid unit name for updateRawStock: " + unit);
+            return false;
+        }
+        
+        // Calculate total cost
+        double totalCost = quantity * unitPrice;
+        
+        // Update raw stock
+        String query = "UPDATE Raw_Stock SET item_name = ?, unit_id = ?, quantity = ?, unit_price = ?, total_cost = ? " +
+                      "WHERE stock_id = ? AND brand_id = (SELECT brand_id FROM Brand WHERE brand_name = ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            pstmt.setInt(2, unitId);
+            pstmt.setDouble(3, quantity);
+            pstmt.setDouble(4, unitPrice);
+            pstmt.setDouble(5, totalCost);
+            pstmt.setInt(6, id);
+            pstmt.setString(7, brand);
+            
+            System.out.println("Attempting to update Raw_Stock with stock_id=" + id + 
+                               ": name=" + name + ", brand=" + brand + ", unit_id=" + unitId + 
+                               ", quantity=" + quantity + ", unit_price=" + unitPrice);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected == 0) {
+                System.err.println("Failed to update Raw_Stock: no rows affected for stock_id " + id);
+                return false;
+            }
+            
+            System.out.println("Successfully updated Raw_Stock with stock_id: " + id);
+            return true;
+        } catch (SQLException e) {
+            System.err.println("Error updating Raw_Stock for stock_id " + id + ": " + e.getMessage());
             e.printStackTrace();
             return false;
         }
