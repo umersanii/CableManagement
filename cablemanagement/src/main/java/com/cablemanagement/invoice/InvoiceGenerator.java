@@ -236,13 +236,16 @@ public class InvoiceGenerator {
             }
 
             double total = 0;
+            double grossTotal = 0; // Total before any discounts
             List<Item> items = data.getItems();
             for (int i = 0; i < items.size(); i++) {
                 Item item = items.get(i);
                 double amount = item.getUnitPrice() * item.getQuantity();
                 double discount = amount * item.getDiscountPercent() / 100.0;
                 double net = amount - discount;
-                total += net;
+                
+                grossTotal += amount; // Add gross amount (before item discount)
+                total += net;         // Add net amount (after item discount)
 
                 table.addCell(new Phrase(String.valueOf(i + 1), regularFont));
                 table.addCell(new Phrase(item.getName(), regularFont));
@@ -261,16 +264,18 @@ public class InvoiceGenerator {
             document.add(table);
             document.add(Chunk.NEWLINE);
 
-            // Summary Table - handling different for raw stock vs other invoice types
-            double totalDiscount = items.stream().mapToDouble(i -> i.getQuantity() * i.getUnitPrice() * i.getDiscountPercent() / 100.0).sum();
+            // Summary Table - handling different discount types
+            // Calculate item-level discounts
+            double itemLevelDiscounts = items.stream().mapToDouble(i -> i.getQuantity() * i.getUnitPrice() * i.getDiscountPercent() / 100.0).sum();
             
-            // For purchase invoices that use invoice-level discount instead of item-level discounts
-            if (totalDiscount == 0.0 && data.getDiscountAmount() > 0.0) {
-                totalDiscount = data.getDiscountAmount();
-            }
+            // Get invoice-level discount (if any) 
+            double invoiceLevelDiscount = data.getDiscountAmount() > 0.0 ? data.getDiscountAmount() : 0.0;
+            double totalDiscount = itemLevelDiscounts + invoiceLevelDiscount;
             
             // Use the balance values from InvoiceData if they are set, otherwise calculate them
-            double totalBalance = data.getTotalBalance() != 0 ? data.getTotalBalance() : (total + data.getPreviousBalance());
+            // Current Net Bill = total (already after item discounts) - invoice level discount only
+            double netInvoiceAmount = total - invoiceLevelDiscount;
+            double totalBalance = data.getTotalBalance() != 0 ? data.getTotalBalance() : (netInvoiceAmount + data.getPreviousBalance());
             double netBalance = data.getNetBalance() != 0 ? data.getNetBalance() : (totalBalance - data.getPaidAmount());
             double paidAmount = data.getPaidAmount();
 
@@ -321,17 +326,17 @@ public class InvoiceGenerator {
                 // Add items in the specified order: bill, discount, current net bill, previous balance,
                 // total balance, other discount, paid, net balance
                 
-                // Bill (gross total before invoice-level discount)
+                // Bill (gross total before ANY discounts)
                 summary.addCell(new Phrase("Bill:", regularFont));
-                summary.addCell(new Phrase(String.format("%.2f", total), regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", grossTotal), regularFont));
                 
-                // Discount
+                // Discount (total of both item-level and invoice-level discounts)
                 summary.addCell(new Phrase("Discount:", regularFont));
                 summary.addCell(new Phrase(String.format("%.2f", totalDiscount), regularFont));
                 
-                // Current Net Bill (after invoice-level discount)
+                // Current Net Bill (after ALL discounts)
                 summary.addCell(new Phrase("Current Net Bill:", regularFont));
-                summary.addCell(new Phrase(String.format("%.2f", total - totalDiscount), regularFont));
+                summary.addCell(new Phrase(String.format("%.2f", netInvoiceAmount), regularFont));
                 
                 // Previous Balance
                 summary.addCell(new Phrase("Previous Balance:", regularFont));
