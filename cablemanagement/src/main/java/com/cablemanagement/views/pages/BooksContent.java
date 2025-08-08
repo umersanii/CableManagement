@@ -444,14 +444,59 @@ public class BooksContent {
 
             try {
                 // Get record details
-                String itemName = selectedRecord.getItem();
+                String reference = selectedRecord.getReference(); // This should be the invoice number
                 String date = selectedRecord.getDate();
-                double quantity = selectedRecord.getQuantity();
-                String reference = selectedRecord.getReference();
                 
-                // Create items list for invoice
+                // Try to get detailed invoice items from the database
                 List<Item> printItems = new ArrayList<>();
-                printItems.add(new Item(itemName, (int)quantity, 0.0, 0.0)); // Unit price not available in this view
+                
+                try {
+                    // Query to get raw stock use invoice items with unit information
+                    String query = "SELECT rs.item_name, u.unit_name, rsuii.quantity_used, rsuii.unit_cost " +
+                                  "FROM Raw_Stock_Use_Invoice_Item rsuii " +
+                                  "JOIN Raw_Stock_Use_Invoice rsui ON rsuii.raw_stock_use_invoice_id = rsui.raw_stock_use_invoice_id " +
+                                  "JOIN Raw_Stock rs ON rsuii.raw_stock_id = rs.stock_id " +
+                                  "LEFT JOIN Unit u ON rs.unit_id = u.unit_id " +
+                                  "WHERE rsui.use_invoice_number = ?";
+                    
+                    java.sql.PreparedStatement stmt = config.database.getConnection().prepareStatement(query);
+                    stmt.setString(1, reference);
+                    java.sql.ResultSet rs = stmt.executeQuery();
+                    
+                    while (rs.next()) {
+                        String itemName = rs.getString("item_name");
+                        String unitName = rs.getString("unit_name");
+                        double quantity = rs.getDouble("quantity_used");
+                        double unitCost = rs.getDouble("unit_cost");
+                        
+                        // Create display name in "Name - Unit" format
+                        String displayName = itemName;
+                        if (unitName != null && !unitName.isEmpty()) {
+                            displayName += " - " + unitName;
+                        }
+                        
+                        printItems.add(new Item(displayName, (int)Math.floor(quantity), unitCost, 0.0));
+                    }
+                    
+                    rs.close();
+                    stmt.close();
+                    
+                } catch (Exception ex) {
+                    System.err.println("Error fetching raw stock use invoice items: " + ex.getMessage());
+                    ex.printStackTrace();
+                    
+                    // If we couldn't get detailed items, create a generic item
+                    String itemName = selectedRecord.getItem();
+                    double quantity = selectedRecord.getQuantity();
+                    printItems.add(new Item(itemName, (int)quantity, 0.0, 0.0));
+                }
+                
+                // If no items were found, create a fallback item
+                if (printItems.isEmpty()) {
+                    String itemName = selectedRecord.getItem();
+                    double quantity = selectedRecord.getQuantity();
+                    printItems.add(new Item(itemName, (int)quantity, 0.0, 0.0));
+                }
                 
                 // Create invoice data for printing
                 InvoiceData invoiceData = new InvoiceData(

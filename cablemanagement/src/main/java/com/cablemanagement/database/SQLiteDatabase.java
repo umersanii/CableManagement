@@ -3306,9 +3306,10 @@ public class SQLiteDatabase implements db {
     public List<Object[]> getAllRawStocksWithUnitsForDropdown() {
         List<Object[]> rawStocks = new ArrayList<>();
         String query = "SELECT rs.stock_id, rs.item_name, b.brand_name, " +
-                      "'N/A' as unit_name, rs.quantity, rs.unit_price " +
+                      "u.unit_name, rs.quantity, rs.unit_price " +
                       "FROM Raw_Stock rs " +
                       "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                      "LEFT JOIN Unit u ON rs.unit_id = u.unit_id " +
                       "WHERE rs.quantity > 0 " +
                       "ORDER BY rs.item_name";
         
@@ -3321,7 +3322,7 @@ public class SQLiteDatabase implements db {
                     rs.getString("item_name"),
                     "N/A", // category_name (not available in Raw_Stock table)
                     rs.getString("brand_name"),
-                    rs.getString("unit_name"),
+                    rs.getString("unit_name") != null ? rs.getString("unit_name") : "N/A",
                     rs.getDouble("quantity"),
                     rs.getDouble("unit_price")
                 };
