@@ -218,6 +218,81 @@ public interface db {
     List<Object[]> getSupplierBalanceSummary();
 
     // --------------------------
+    // Customer Update Operations
+    // --------------------------
+    
+    /**
+     * Update customer details
+     * @param customerId The ID of the customer to update
+     * @param name New customer name
+     * @param contact New contact number
+     * @param tehsilName New tehsil name
+     * @return true if update successful, false otherwise
+     */
+    boolean updateCustomer(int customerId, String name, String contact, String tehsilName);
+    
+    /**
+     * Get customer by ID
+     * @param customerId The customer ID
+     * @return Customer object with current details
+     */
+    Customer getCustomerById(int customerId);
+    
+    /**
+     * Get customer ID by name
+     * @param customerName The customer name
+     * @return Customer ID, or -1 if not found
+     */
+    int getCustomerIdByName(String customerName);
+
+    // --------------------------
+    // Customer Payment and Ledger Operations
+    // --------------------------
+    
+    /**
+     * Add payment for a customer
+     * @param customerName Customer name
+     * @param paymentAmount Payment amount (positive for payment received)
+     * @param paymentDate Payment date
+     * @param description Payment description
+     * @return true if payment added successfully, false otherwise
+     */
+    boolean addCustomerPayment(String customerName, double paymentAmount, String paymentDate, String description);
+    
+    /**
+     * Add payment for a customer by ID
+     * @param customerId Customer ID
+     * @param paymentAmount Payment amount (positive for payment received)
+     * @param paymentDate Payment date
+     * @param description Payment description
+     * @return true if payment added successfully, false otherwise
+     */
+    boolean addCustomerPayment(int customerId, double paymentAmount, String paymentDate, String description);
+    
+    /**
+     * Get customer ledger (transaction history)
+     * @param customerName Customer name
+     * @return List of transaction records [date, type, amount, description, balance_after, reference]
+     */
+    List<Object[]> getCustomerLedger(String customerName);
+    
+    /**
+     * Get customer ledger by ID
+     * @param customerId Customer ID
+     * @return List of transaction records [date, type, amount, description, balance_after, reference]
+     */
+    List<Object[]> getCustomerLedger(int customerId);
+    
+    /**
+     * Get customer ledger for date range
+     * @param customerName Customer name
+     * @param startDate Start date
+     * @param endDate End date
+     * @return List of transaction records [date, type, amount, description, balance_after, reference]
+     */
+    List<Object[]> getCustomerLedgerByDateRange(String customerName, String startDate, String endDate);
+
+    // --------------------------
     // Unit Operations
     // --------------------------
     List<String> getAllUnits() ;
@@ -353,8 +428,6 @@ public interface db {
     String generateSalesInvoiceNumber();
     
     List<Object[]> getAllCustomersForDropdown();
-    
-    int getCustomerIdByName(String customerName);
     
     List<Object[]> getAllProductionStocksWithPriceForDropdown();
     

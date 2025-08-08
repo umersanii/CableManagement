@@ -395,3 +395,31 @@ CREATE TABLE IF NOT EXISTS Contract_Employee (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Customer Transaction table for payments and ledger tracking
+CREATE TABLE IF NOT EXISTS Customer_Transaction (
+    transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER NOT NULL,
+    transaction_date TEXT NOT NULL,
+    transaction_type TEXT NOT NULL CHECK(transaction_type IN ('payment_received', 'invoice_charge', 'adjustment', 'opening_balance')),
+    amount REAL NOT NULL,
+    description TEXT,
+    reference_invoice_number TEXT,
+    balance_after_transaction REAL NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customer(customer_id)
+);
+
+-- Supplier Transaction table for payments and ledger tracking
+CREATE TABLE IF NOT EXISTS Supplier_Transaction (
+    transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier_id INTEGER NOT NULL,
+    transaction_date TEXT NOT NULL,
+    transaction_type TEXT NOT NULL CHECK(transaction_type IN ('payment_made', 'invoice_charge', 'adjustment', 'opening_balance')),
+    amount REAL NOT NULL,
+    description TEXT,
+    reference_invoice_number TEXT,
+    balance_after_transaction REAL NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id)
+);
+

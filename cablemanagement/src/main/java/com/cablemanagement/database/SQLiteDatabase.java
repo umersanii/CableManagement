@@ -1069,13 +1069,14 @@ public class SQLiteDatabase implements db {
 
     public List<Customer> getAllCustomers() {
         List<Customer> customers = new ArrayList<>();
-        String query = "SELECT c.customer_name, c.contact_number, c.balance, t.tehsil_name " +
+        String query = "SELECT c.customer_id, c.customer_name, c.contact_number, c.balance, t.tehsil_name " +
                     "FROM Customer c " +
                     "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
                     "ORDER BY c.customer_name";
         try (Statement stmt = connection.createStatement();
             ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
+                int customerId = rs.getInt("customer_id");
                 String name = rs.getString("customer_name");
                 String contact = rs.getString("contact_number");
                 String tehsil = rs.getString("tehsil_name");
@@ -1084,7 +1085,7 @@ public class SQLiteDatabase implements db {
                 // Calculate current balance based on invoice history
                 double currentBalance = getCustomerCurrentBalance(name);
                 
-                customers.add(new Customer(name, contact, tehsil, currentBalance));
+                customers.add(new Customer(customerId, name, contact, tehsil, currentBalance));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -1759,6 +1760,245 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return summary;
+    }
+
+    // --------------------------
+    // Customer Update Operations
+    // --------------------------
+    
+    @Override
+    public boolean updateCustomer(int customerId, String name, String contact, String tehsilName) {
+        String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
+        String updateQuery = "UPDATE Customer SET customer_name = ?, contact_number = ?, tehsil_id = ? WHERE customer_id = ?";
+        
+        try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
+            getTehsilStmt.setString(1, tehsilName);
+            
+            try (ResultSet rs = getTehsilStmt.executeQuery()) {
+                if (rs.next()) {
+                    int tehsilId = rs.getInt("tehsil_id");
+                    
+                    try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
+                        updateStmt.setString(1, name);
+                        updateStmt.setString(2, contact);
+                        updateStmt.setInt(3, tehsilId);
+                        updateStmt.setInt(4, customerId);
+                        
+                        return updateStmt.executeUpdate() > 0;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+    
+    @Override
+    public Customer getCustomerById(int customerId) {
+        String query = "SELECT c.customer_name, c.contact_number, t.tehsil_name " +
+                    "FROM Customer c " +
+                    "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                    "WHERE c.customer_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, customerId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String name = rs.getString("customer_name");
+                    String contact = rs.getString("contact_number");
+                    String tehsil = rs.getString("tehsil_name");
+                    if (tehsil == null) tehsil = "";
+                    
+                    // Get current balance including invoice history
+                    double currentBalance = getCustomerCurrentBalance(name);
+                    
+                    return new Customer(name, contact, tehsil, currentBalance);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    @Override
+    public int getCustomerIdByName(String customerName) {
+        String query = "SELECT customer_id FROM Customer WHERE customer_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, customerName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("customer_id");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1; // Return -1 if customer not found
+    }
+
+    // --------------------------
+    // Customer Payment and Ledger Operations
+    // --------------------------
+    
+    @Override
+    public boolean addCustomerPayment(String customerName, double paymentAmount, String paymentDate, String description) {
+        int customerId = getCustomerIdByName(customerName);
+        if (customerId == -1) {
+            return false; // Customer not found
+        }
+        return addCustomerPayment(customerId, paymentAmount, paymentDate, description);
+    }
+    
+    @Override
+    public boolean addCustomerPayment(int customerId, double paymentAmount, String paymentDate, String description) {
+        try {
+            connection.setAutoCommit(false);
+            
+            // Get current balance
+            double currentBalance = 0.0;
+            String getBalanceQuery = "SELECT balance_after_transaction FROM Customer_Transaction " +
+                                   "WHERE customer_id = ? ORDER BY transaction_id DESC LIMIT 1";
+            try (PreparedStatement pstmt = connection.prepareStatement(getBalanceQuery)) {
+                pstmt.setInt(1, customerId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        currentBalance = rs.getDouble("balance_after_transaction");
+                    } else {
+                        // If no transactions exist, get initial balance from Customer table
+                        currentBalance = getCustomerCurrentBalance(getCustomerNameById(customerId));
+                    }
+                }
+            }
+            
+            // Calculate new balance after payment (payment reduces the balance owed)
+            double newBalance = currentBalance - paymentAmount;
+            
+            // Insert payment transaction
+            String insertQuery = "INSERT INTO Customer_Transaction " +
+                               "(customer_id, transaction_date, transaction_type, amount, description, balance_after_transaction) " +
+                               "VALUES (?, ?, 'payment_received', ?, ?, ?)";
+            try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+                insertStmt.setInt(1, customerId);
+                insertStmt.setString(2, paymentDate);
+                insertStmt.setDouble(3, paymentAmount);
+                insertStmt.setString(4, description);
+                insertStmt.setDouble(5, newBalance);
+                
+                boolean result = insertStmt.executeUpdate() > 0;
+                connection.commit();
+                return result;
+            }
+        } catch (SQLException e) {
+            try {
+                connection.rollback();
+            } catch (SQLException rollbackEx) {
+                System.err.println("Error rolling back transaction: " + rollbackEx.getMessage());
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            try {
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                System.err.println("Error resetting auto-commit: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Helper method to get customer name by ID
+     */
+    private String getCustomerNameById(int customerId) {
+        String query = "SELECT customer_name FROM Customer WHERE customer_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, customerId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("customer_name");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+    
+    @Override
+    public List<Object[]> getCustomerLedger(String customerName) {
+        int customerId = getCustomerIdByName(customerName);
+        if (customerId == -1) {
+            return new ArrayList<>(); // Return empty list if customer not found
+        }
+        return getCustomerLedger(customerId);
+    }
+    
+    @Override
+    public List<Object[]> getCustomerLedger(int customerId) {
+        List<Object[]> ledger = new ArrayList<>();
+        String query = "SELECT transaction_date, transaction_type, amount, description, " +
+                      "balance_after_transaction, reference_invoice_number " +
+                      "FROM Customer_Transaction " +
+                      "WHERE customer_id = ? " +
+                      "ORDER BY transaction_id ASC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, customerId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Object[] transaction = {
+                        rs.getString("transaction_date"),
+                        rs.getString("transaction_type"),
+                        rs.getDouble("amount"),
+                        rs.getString("description"),
+                        rs.getDouble("balance_after_transaction"),
+                        rs.getString("reference_invoice_number")
+                    };
+                    ledger.add(transaction);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ledger;
+    }
+    
+    @Override
+    public List<Object[]> getCustomerLedgerByDateRange(String customerName, String startDate, String endDate) {
+        List<Object[]> ledger = new ArrayList<>();
+        int customerId = getCustomerIdByName(customerName);
+        if (customerId == -1) {
+            return ledger; // Return empty list if customer not found
+        }
+        
+        String query = "SELECT transaction_date, transaction_type, amount, description, " +
+                      "balance_after_transaction, reference_invoice_number " +
+                      "FROM Customer_Transaction " +
+                      "WHERE customer_id = ? AND transaction_date BETWEEN ? AND ? " +
+                      "ORDER BY transaction_id ASC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, customerId);
+            pstmt.setString(2, startDate);
+            pstmt.setString(3, endDate);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Object[] transaction = {
+                        rs.getString("transaction_date"),
+                        rs.getString("transaction_type"),
+                        rs.getDouble("amount"),
+                        rs.getString("description"),
+                        rs.getDouble("balance_after_transaction"),
+                        rs.getString("reference_invoice_number")
+                    };
+                    ledger.add(transaction);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ledger;
     }
 
     @Override
@@ -3930,24 +4170,6 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return customers;
-    }
-
-    @Override
-    public int getCustomerIdByName(String customerName) {
-        String query = "SELECT customer_id FROM Customer WHERE customer_name = ?";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, customerName);
-            
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("customer_id");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return -1;
     }
 
     @Override
