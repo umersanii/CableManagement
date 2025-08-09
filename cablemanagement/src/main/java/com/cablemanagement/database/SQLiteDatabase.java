@@ -7111,18 +7111,30 @@ public ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType
     @Override
     public ResultSet getAreaWiseReport() {
         String query = "SELECT 'Customer' as party_type, c.customer_name as name, " +
-                    "t.tehsil_name, d.district_name, p.province_name " +
+                    "c.contact_number, t.tehsil_name, d.district_name, p.province_name, " +
+                    "COALESCE(SUM(si.total_amount), 0) as total_sales, " +
+                    "COALESCE(SUM(si.discount_amount), 0) as total_discount, " +
+                    "COALESCE(SUM(si.paid_amount), 0) as payment_done, " +
+                    "COALESCE(SUM(si.total_amount - si.paid_amount), 0) as balance " +
                     "FROM Customer c " +
                     "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
                     "LEFT JOIN District d ON t.district_id = d.district_id " +
                     "LEFT JOIN Province p ON d.province_id = p.province_id " +
+                    "LEFT JOIN Sales_Invoice si ON c.customer_id = si.customer_id " +
+                    "GROUP BY c.customer_id, c.customer_name, c.contact_number, t.tehsil_name, d.district_name, p.province_name " +
                     "UNION ALL " +
                     "SELECT 'Supplier' as party_type, s.supplier_name as name, " +
-                    "t.tehsil_name, d.district_name, p.province_name " +
+                    "s.contact_number, t.tehsil_name, d.district_name, p.province_name, " +
+                    "COALESCE(SUM(rpi.total_amount), 0) as total_sales, " +
+                    "COALESCE(SUM(rpi.discount_amount), 0) as total_discount, " +
+                    "COALESCE(SUM(rpi.paid_amount), 0) as payment_done, " +
+                    "COALESCE(SUM(rpi.total_amount - rpi.paid_amount), 0) as balance " +
                     "FROM Supplier s " +
                     "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
                     "LEFT JOIN District d ON t.district_id = d.district_id " +
                     "LEFT JOIN Province p ON d.province_id = p.province_id " +
+                    "LEFT JOIN Raw_Purchase_Invoice rpi ON s.supplier_id = rpi.supplier_id " +
+                    "GROUP BY s.supplier_id, s.supplier_name, s.contact_number, t.tehsil_name, d.district_name, p.province_name " +
                     "ORDER BY party_type, name";
         
         System.out.println("DEBUG: Executing area-wise report query: " + query);
@@ -7156,6 +7168,97 @@ public ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType
             return rs;
         } catch (SQLException e) {
             System.err.println("DEBUG: SQLException in getAreaWiseReport: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getAreaWiseReport(String partyType, String areaType, String areaValue) {
+        StringBuilder query = new StringBuilder();
+        
+        // Base query for customers with financial data
+        String customerQuery = "SELECT 'Customer' as party_type, c.customer_name as name, " +
+                             "c.contact_number, t.tehsil_name, d.district_name, p.province_name, " +
+                             "COALESCE(SUM(si.total_amount), 0) as total_sales, " +
+                             "COALESCE(SUM(si.discount_amount), 0) as total_discount, " +
+                             "COALESCE(SUM(si.paid_amount), 0) as payment_done, " +
+                             "COALESCE(SUM(si.total_amount - si.paid_amount), 0) as balance " +
+                             "FROM Customer c " +
+                             "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                             "LEFT JOIN District d ON t.district_id = d.district_id " +
+                             "LEFT JOIN Province p ON d.province_id = p.province_id " +
+                             "LEFT JOIN Sales_Invoice si ON c.customer_id = si.customer_id";
+        
+        // Base query for suppliers with financial data
+        String supplierQuery = "SELECT 'Supplier' as party_type, s.supplier_name as name, " +
+                             "s.contact_number, t.tehsil_name, d.district_name, p.province_name, " +
+                             "COALESCE(SUM(rpi.total_amount), 0) as total_sales, " +
+                             "COALESCE(SUM(rpi.discount_amount), 0) as total_discount, " +
+                             "COALESCE(SUM(rpi.paid_amount), 0) as payment_done, " +
+                             "COALESCE(SUM(rpi.total_amount - rpi.paid_amount), 0) as balance " +
+                             "FROM Supplier s " +
+                             "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                             "LEFT JOIN District d ON t.district_id = d.district_id " +
+                             "LEFT JOIN Province p ON d.province_id = p.province_id " +
+                             "LEFT JOIN Raw_Purchase_Invoice rpi ON s.supplier_id = rpi.supplier_id";
+        
+        // Add WHERE clause based on area type and value if specified
+        String whereClause = "";
+        String groupByCustomer = " GROUP BY c.customer_id, c.customer_name, c.contact_number, t.tehsil_name, d.district_name, p.province_name";
+        String groupBySupplier = " GROUP BY s.supplier_id, s.supplier_name, s.contact_number, t.tehsil_name, d.district_name, p.province_name";
+        
+        if (areaValue != null && !areaValue.trim().isEmpty() && !areaValue.equals("All")) {
+            switch (areaType.toLowerCase()) {
+                case "province":
+                    whereClause = " WHERE p.province_name = ?";
+                    break;
+                case "district":
+                    whereClause = " WHERE d.district_name = ?";
+                    break;
+                case "tehsil":
+                    whereClause = " WHERE t.tehsil_name = ?";
+                    break;
+            }
+        }
+        
+        // Build final query based on party type
+        if (partyType.equals("Customer")) {
+            query.append(customerQuery).append(whereClause).append(groupByCustomer);
+        } else if (partyType.equals("Supplier")) {
+            query.append(supplierQuery).append(whereClause).append(groupBySupplier);
+        } else {
+            // Both customers and suppliers
+            query.append(customerQuery).append(whereClause).append(groupByCustomer)
+                 .append(" UNION ALL ")
+                 .append(supplierQuery).append(whereClause).append(groupBySupplier);
+        }
+        
+        query.append(" ORDER BY party_type, name");
+        
+        System.out.println("DEBUG: Executing filtered area-wise report query: " + query.toString());
+        System.out.println("DEBUG: Parameters - PartyType: " + partyType + ", AreaType: " + areaType + ", AreaValue: " + areaValue);
+        
+        try {
+            PreparedStatement pstmt = connection.prepareStatement(query.toString());
+            
+            // Set parameters if needed
+            if (areaValue != null && !areaValue.trim().isEmpty() && !areaValue.equals("All")) {
+                if (partyType.equals("Both")) {
+                    // Set parameter for both queries in UNION
+                    pstmt.setString(1, areaValue);
+                    pstmt.setString(2, areaValue);
+                } else {
+                    // Set parameter for single query
+                    pstmt.setString(1, areaValue);
+                }
+            }
+            
+            ResultSet rs = pstmt.executeQuery();
+            System.out.println("DEBUG: Successfully executed filtered area-wise report query");
+            return rs;
+        } catch (SQLException e) {
+            System.err.println("DEBUG: SQLException in getAreaWiseReport (filtered): " + e.getMessage());
             e.printStackTrace();
             return null;
         }
