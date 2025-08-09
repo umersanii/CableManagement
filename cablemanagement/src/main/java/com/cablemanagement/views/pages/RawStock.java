@@ -501,14 +501,27 @@ public class RawStock {
             }
             
             // Get supplier details early to ensure we have them
-            Object[] supplierDetailsBeforeSubmit = database.getSupplierDetails(capturedSupplierName);
-            
+            Object[] supplierDetailsBeforeSubmit = database.getSupplierDetails(supplierCombo.getValue());
+            // Debug print supplier details before any database operations
+            System.out.println("DEBUG: Supplier details before submit:");
+            if (supplierDetailsBeforeSubmit != null) {
+                System.out.println("  Array length: " + supplierDetailsBeforeSubmit.length);
+                for (int i = 0; i < supplierDetailsBeforeSubmit.length; i++) {
+                    Object value = supplierDetailsBeforeSubmit[i];
+                    System.out.println("  Index " + i + ": " + (value != null ? value.toString() + " (Type: " + value.getClass().getSimpleName() + ")" : "null"));
+                }
+            } else {
+                System.out.println("  Supplier details array is null");
+            }
             // Capture item data before any clearing happens
             List<RawStockPurchaseItem> capturedItems = new ArrayList<>(itemsTable.getItems());
             
             // Also capture form field values to prevent them from being lost when form is cleared
             double capturedDiscount = discountField.getText().trim().isEmpty() ? 0.0 : Double.parseDouble(discountField.getText().trim());
             double capturedPaidAmount = paidAmountField.getText().trim().isEmpty() ? 0.0 : Double.parseDouble(paidAmountField.getText().trim());
+            
+            // CRITICAL: Capture the invoice number BEFORE calling submit method to prevent using the new number generated after form clear
+            String capturedInvoiceNumber = invoiceNumberField.getText();
             
             if (handleEnhancedPurchaseInvoiceSubmit(
                 invoiceNumberField, supplierCombo, invoiceDatePicker,
@@ -565,7 +578,7 @@ public class RawStock {
                 
                 // Get supplier balance details for PDF
                 Object[] balanceDetails = database.getSupplierInvoiceBalanceDetails(
-                    capturedSupplierName, invoiceNumberField.getText(), totalAfterDiscount, invoicePaidAmount
+                    capturedSupplierName, capturedInvoiceNumber, totalAfterDiscount, invoicePaidAmount
                 );
                 double previousBalance = (Double) balanceDetails[0];
                 double totalBalance = (Double) balanceDetails[1];
@@ -573,7 +586,7 @@ public class RawStock {
 
                 // Create invoice data object using factory method
                 InvoiceData invoiceData = InvoiceData.createPurchaseInvoice(
-                    invoiceNumberField.getText(),
+                    capturedInvoiceNumber,
                     invoiceDatePicker.getValue().format(DATE_FORMATTER),
                     capturedSupplierName,
                     "",  // Empty address as we're using metadata instead
@@ -1909,9 +1922,8 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             return false;
         }
 
-        // Generate a fresh invoice number to avoid UNIQUE constraint violations
-        String invoiceNumber = database.generateNextInvoiceNumber("RPI");
-        invoiceNumberField.setText(invoiceNumber); // Update the field to show the new number
+        // Use the invoice number already displayed in the field to maintain consistency
+        String invoiceNumber = invoiceNumberField.getText();
         
         String selectedSupplier = supplierCombo.getValue();
         String invoiceDate = invoiceDatePicker.getValue().format(DATE_FORMATTER);
@@ -1996,7 +2008,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                     double subtotal = itemsTable.getItems().stream()
                         .mapToDouble(RawStockPurchaseItem::getTotalPrice)
                         .sum();
-                    double totalAmount = subtotal - discount;
+                    double totalAmount = subtotal; // Keep gross amount before discount
                     
                     List<RawStockPurchaseItem> items = new ArrayList<>(itemsTable.getItems());
                     boolean success = database.insertSimpleRawPurchaseInvoice(
