@@ -509,25 +509,25 @@ public interface db {
     
     boolean updateSalesman(int salesmanId, String name, String contact, String address, double commissionRate);
 
-boolean updateBank(Bank bank);
+    boolean updateBank(Bank bank);
 
-boolean deleteBank(int bankId);
+    boolean deleteBank(int bankId);
 
-boolean insertBankTransaction(BankTransaction transaction);
+    boolean insertBankTransaction(BankTransaction transaction);
 
-boolean insertCashTransaction(BankTransaction transaction);
+    boolean insertCashTransaction(BankTransaction transaction);
 
-boolean updateCashTransaction(BankTransaction transaction);
+    boolean updateCashTransaction(BankTransaction transaction);
 
-boolean deleteCashTransaction(int transactionId);
+    boolean deleteCashTransaction(int transactionId);
 
-double getCashBalance();
+    double getCashBalance();
 
-boolean updateBankBalance(double newBalance);  // TODO: remove
+    boolean updateBankBalance(double newBalance);  // TODO: remove
 
-List<Object[]> getViewData(String viewName, Map<String, String> filters);
-List<Object[]> getInvoiceItemsByID(Integer invoiceID);
- List<Object[]> getAllRawStock();
+    List<Object[]> getViewData(String viewName, Map<String, String> filters);
+    List<Object[]> getInvoiceItemsByID(Integer invoiceID);
+    List<Object[]> getAllRawStock();
     List<Object[]> getAllProductionStock();
     ///////////////////////////////////////////////////////////////////////////////
     /// ///                   reports Methods
@@ -546,5 +546,9 @@ List<Object[]> getInvoiceItemsByID(Integer invoiceID);
     ResultSet getAreaWiseReport();
     ResultSet getAreaWiseReport(String partyType, String areaType, String areaValue);
     ResultSet getBrandSalesReport(Date fromDate, Date toDate);
+
+    String generateNextInvoiceNumber(String string);
+
+    int getSupplierIdByName(String supplierName);
 }
 

@@ -238,6 +238,31 @@ public class SQLiteDatabase implements db {
         return false;
     }
 
+        // New methods for enhanced invoice functionality
+    @Override
+    public String generateNextInvoiceNumber(String prefix) {
+        String query = "SELECT MAX(CAST(SUBSTR(invoice_number, LENGTH(?) + 1) AS INTEGER)) " +
+                      "FROM Raw_Purchase_Invoice WHERE invoice_number LIKE ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, prefix);
+            pstmt.setString(2, prefix + "%");
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    int maxNumber = rs.getInt(1);
+                    return prefix + String.format("%06d", maxNumber + 1);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // If no invoices found or error, start with 000001
+        return prefix + "000001";
+    }
+    
+
     public boolean insertBankTransaction(BankTransaction transaction) {
         String query = "INSERT INTO Bank_Transaction (bank_id, transaction_date, transaction_type, amount, description, related_bank_id) " +
                     "VALUES (?, ?, ?, ?, ?, ?)";
@@ -1809,7 +1834,8 @@ public class SQLiteDatabase implements db {
         return false;
     }
     
-    private int getSupplierIdByName(String supplierName) {
+    @Override
+    public int getSupplierIdByName(String supplierName) {
         String query = "SELECT supplier_id FROM Supplier WHERE supplier_name = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, supplierName);
