@@ -1931,7 +1931,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             double subtotal = itemsTable.getItems().stream()
                 .mapToDouble(RawStockPurchaseItem::getTotalPrice)
                 .sum();
-            double totalAmount = subtotal - discount;
+            double totalAmount = subtotal; // This should be the gross amount before discount
 
             if (discount < 0) {
                 showAlert(Alert.AlertType.ERROR, "Error", "Discount cannot be negative");
@@ -1959,6 +1959,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             }
 
             // Use simplified invoice insertion with validated data
+            // Pass: grossAmount, discountAmount, paidAmount
             boolean success = database.insertSimpleRawPurchaseInvoice(
                 invoiceNumber, selectedSupplier, invoiceDate, totalAmount, discount, paidAmount, items
             );

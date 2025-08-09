@@ -1402,46 +1402,8 @@ public class SQLiteDatabase implements db {
 
     @Override
     public double getSupplierCurrentBalance(String supplierName) {
-        double initialBalance = getSupplierBalance(supplierName); // Initial balance from Supplier table
-        double purchaseBalance = 0.0;
-        double returnBalance = 0.0;
-        
-        // Calculate total from raw purchase invoices (amount owed to supplier)
-        String purchaseQuery = "SELECT SUM(rpi.total_amount - rpi.paid_amount) as unpaid_amount " +
-                             "FROM Raw_Purchase_Invoice rpi " +
-                             "JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
-                             "WHERE s.supplier_name = ?";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(purchaseQuery)) {
-            pstmt.setString(1, supplierName);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    purchaseBalance = rs.getDouble("unpaid_amount");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        // Calculate total from raw purchase return invoices (amount to be deducted from what we owe)
-        String returnQuery = "SELECT SUM(rpri.total_return_amount) as return_amount " +
-                           "FROM Raw_Purchase_Return_Invoice rpri " +
-                           "JOIN Supplier s ON rpri.supplier_id = s.supplier_id " +
-                           "WHERE s.supplier_name = ?";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(returnQuery)) {
-            pstmt.setString(1, supplierName);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    returnBalance = rs.getDouble("return_amount");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        // Current balance = Initial balance + Purchase unpaid amount - Return amount
-        return initialBalance + purchaseBalance - returnBalance;
+        // Return the stored balance directly from Supplier table
+        return getSupplierBalance(supplierName);
     }
 
     /**
@@ -1522,49 +1484,69 @@ public class SQLiteDatabase implements db {
      */
     @Override
     public double getSupplierPreviousBalance(String supplierName, String excludeInvoiceNumber) {
-        double initialBalance = getSupplierBalance(supplierName); // Initial balance from Supplier table
-        double purchaseBalance = 0.0;
-        double returnBalance = 0.0;
+        // Get the current stored balance
+        double currentBalance = getSupplierBalance(supplierName);
         
-        // Calculate total from raw purchase invoices EXCLUDING the current invoice
-        String purchaseQuery = "SELECT SUM(rpi.total_amount - rpi.paid_amount) as unpaid_amount " +
-                             "FROM Raw_Purchase_Invoice rpi " +
-                             "JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
-                             "WHERE s.supplier_name = ? AND rpi.invoice_number != ? " +
-                             "AND (rpi.total_amount - rpi.paid_amount) > 0";
+        System.out.println("DEBUG: getSupplierPreviousBalance called for " + supplierName + " invoice " + excludeInvoiceNumber);
+        System.out.println("  Current stored balance: " + currentBalance);
         
-        try (PreparedStatement pstmt = connection.prepareStatement(purchaseQuery)) {
-            pstmt.setString(1, supplierName);
-            pstmt.setString(2, excludeInvoiceNumber);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    purchaseBalance = rs.getDouble("unpaid_amount");
+        // Determine if this is a return invoice by checking if the invoice number starts with "RPRI"
+        boolean isReturnInvoice = excludeInvoiceNumber != null && excludeInvoiceNumber.startsWith("RPRI");
+        
+        double currentInvoiceNetAmount = 0.0;
+        
+        if (isReturnInvoice) {
+            // For return invoices, look in Raw_Purchase_Return_Invoice table
+            String returnQuery = "SELECT total_return_amount FROM Raw_Purchase_Return_Invoice rpri " +
+                               "JOIN Supplier s ON rpri.supplier_id = s.supplier_id " +
+                               "WHERE s.supplier_name = ? AND rpri.return_invoice_number = ?";
+            
+            try (PreparedStatement pstmt = connection.prepareStatement(returnQuery)) {
+                pstmt.setString(1, supplierName);
+                pstmt.setString(2, excludeInvoiceNumber);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        currentInvoiceNetAmount = rs.getDouble("total_return_amount");
+                        // For return invoice: previous balance = current balance + return amount
+                        // (since return reduces balance, we add it back to get previous)
+                        System.out.println("  Found return invoice with amount: " + currentInvoiceNetAmount);
+                        double previousBalance = currentBalance + currentInvoiceNetAmount;
+                        System.out.println("  Calculated previous balance: " + previousBalance);
+                        return previousBalance;
+                    }
                 }
+            } catch (SQLException e) {
+                e.printStackTrace();
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } else {
+            // For regular purchase invoices, look in Raw_Purchase_Invoice table
+            String purchaseQuery = "SELECT (total_amount - discount_amount - paid_amount) as net_amount FROM Raw_Purchase_Invoice rpi " +
+                                 "JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
+                                 "WHERE s.supplier_name = ? AND rpi.invoice_number = ?";
+            
+            try (PreparedStatement pstmt = connection.prepareStatement(purchaseQuery)) {
+                pstmt.setString(1, supplierName);
+                pstmt.setString(2, excludeInvoiceNumber);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        currentInvoiceNetAmount = rs.getDouble("net_amount");
+                        // For purchase invoice: previous balance = current balance - net amount  
+                        // (since purchase increases balance, we subtract it to get previous)
+                        System.out.println("  Found purchase invoice with net amount: " + currentInvoiceNetAmount);
+                        double previousBalance = currentBalance - currentInvoiceNetAmount;
+                        System.out.println("  Calculated previous balance: " + previousBalance);
+                        return previousBalance;
+                    }
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
         
-        // Calculate total from raw purchase return invoices EXCLUDING the current invoice
-        String returnQuery = "SELECT SUM(rpri.total_return_amount) as return_amount " +
-                           "FROM Raw_Purchase_Return_Invoice rpri " +
-                           "JOIN Supplier s ON rpri.supplier_id = s.supplier_id " +
-                           "WHERE s.supplier_name = ? AND rpri.return_invoice_number != ?";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(returnQuery)) {
-            pstmt.setString(1, supplierName);
-            pstmt.setString(2, excludeInvoiceNumber);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    returnBalance = rs.getDouble("return_amount");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        // Previous balance = Initial balance + Previous unpaid amount - Return amount
-        return initialBalance + purchaseBalance - returnBalance;
+        // If invoice not found, return current balance (this means we're generating PDF before saving invoice)
+        // In this case, current balance IS the previous balance since the invoice hasn't been saved yet
+        System.out.println("  Invoice not found in database, returning current balance: " + currentBalance);
+        return currentBalance;
     }
 
     /**
@@ -1601,7 +1583,7 @@ public class SQLiteDatabase implements db {
      * Get supplier invoice balance details for PDF generation
      * @param supplierName Supplier name
      * @param invoiceNumber Current invoice number
-     * @param currentInvoiceTotal Current invoice total amount
+     * @param currentInvoiceTotal Current invoice total amount (after discount)
      * @param currentInvoicePaid Current invoice paid amount
      * @return Object array with [previousBalance, totalBalance, netBalance]
      */
@@ -1609,8 +1591,21 @@ public class SQLiteDatabase implements db {
     public Object[] getSupplierInvoiceBalanceDetails(String supplierName, String invoiceNumber, 
                                                    double currentInvoiceTotal, double currentInvoicePaid) {
         double previousBalance = getSupplierPreviousBalance(supplierName, invoiceNumber);
-        double totalBalance = previousBalance + currentInvoiceTotal;
-        double netBalance = totalBalance - currentInvoicePaid;
+        
+        // Note: currentInvoiceTotal should be the net amount (after discount)
+        // The net amount that will be added to supplier balance
+        double netInvoiceAmount = currentInvoiceTotal - currentInvoicePaid;
+        double totalBalance = previousBalance + netInvoiceAmount;
+        double netBalance = totalBalance; // For suppliers, net balance equals total balance (no additional payments in invoice)
+        
+        System.out.println("DEBUG: getSupplierInvoiceBalanceDetails for " + supplierName + " invoice " + invoiceNumber);
+        System.out.println("  currentInvoiceTotal: " + currentInvoiceTotal);
+        System.out.println("  currentInvoicePaid: " + currentInvoicePaid);
+        System.out.println("  netInvoiceAmount: " + netInvoiceAmount);
+        System.out.println("  previousBalance: " + previousBalance);
+        System.out.println("  totalBalance: " + totalBalance);
+        System.out.println("  netBalance: " + netBalance);
+        System.out.println("  Returning: [" + previousBalance + ", " + totalBalance + ", " + netBalance + "]");
         
         return new Object[]{previousBalance, totalBalance, netBalance};
     }
@@ -2277,36 +2272,39 @@ public class SQLiteDatabase implements db {
         try {
             connection.setAutoCommit(false);
             
-            // Get current balance
-            double currentBalance = 0.0;
-            String getBalanceQuery = "SELECT balance_after_transaction FROM Supplier_Transaction " +
-                                   "WHERE supplier_id = ? ORDER BY transaction_id DESC LIMIT 1";
-            try (PreparedStatement pstmt = connection.prepareStatement(getBalanceQuery)) {
-                pstmt.setInt(1, supplierId);
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        currentBalance = rs.getDouble("balance_after_transaction");
-                    } else {
-                        // If no transactions exist, get initial balance from Supplier table
-                        currentBalance = getSupplierCurrentBalance(getSupplierNameById(supplierId));
-                    }
-                }
+            // Update supplier balance directly: payment reduces the balance owed to supplier
+            String updateSupplierBalanceQuery = "UPDATE Supplier SET balance = balance - ? WHERE supplier_id = ?";
+            try (PreparedStatement balanceStmt = connection.prepareStatement(updateSupplierBalanceQuery)) {
+                balanceStmt.setDouble(1, paymentAmount);
+                balanceStmt.setInt(2, supplierId);
+                balanceStmt.executeUpdate();
+                
+                System.out.println("DEBUG: Supplier balance reduced by payment amount: " + paymentAmount);
             }
             
-            // Calculate new balance after payment (payment reduces the balance owed to supplier)
-            double newBalance = currentBalance - paymentAmount;
-            
-            // Insert payment transaction
+            // Insert payment transaction for record keeping
             String insertQuery = "INSERT INTO Supplier_Transaction " +
                                "(supplier_id, transaction_date, transaction_type, amount, description, balance_after_transaction) " +
                                "VALUES (?, ?, 'payment_made', ?, ?, ?)";
+            
+            // Get updated balance for transaction record
+            double updatedBalance = 0.0;
+            String getBalanceQuery = "SELECT balance FROM Supplier WHERE supplier_id = ?";
+            try (PreparedStatement getBalanceStmt = connection.prepareStatement(getBalanceQuery)) {
+                getBalanceStmt.setInt(1, supplierId);
+                try (ResultSet rs = getBalanceStmt.executeQuery()) {
+                    if (rs.next()) {
+                        updatedBalance = rs.getDouble("balance");
+                    }
+                }
+            }
             
             try (PreparedStatement pstmt = connection.prepareStatement(insertQuery)) {
                 pstmt.setInt(1, supplierId);
                 pstmt.setString(2, paymentDate);
                 pstmt.setDouble(3, paymentAmount);
                 pstmt.setString(4, description);
-                pstmt.setDouble(5, newBalance);
+                pstmt.setDouble(5, updatedBalance);
                 
                 int result = pstmt.executeUpdate();
                 if (result > 0) {
@@ -2930,6 +2928,20 @@ public class SQLiteDatabase implements db {
                 pstmt.executeBatch();
             }
 
+            // Update supplier balance: add net amount owed (total - discount - paid)
+            double netAmountOwed = (totalAmount - discountAmount) - paidAmount;
+            if (netAmountOwed > 0) {
+                String updateSupplierBalanceQuery = "UPDATE Supplier SET balance = balance + ? WHERE supplier_id = ?";
+                try (PreparedStatement balanceStmt = connection.prepareStatement(updateSupplierBalanceQuery)) {
+                    balanceStmt.setDouble(1, netAmountOwed);
+                    balanceStmt.setInt(2, supplierId);
+                    balanceStmt.executeUpdate();
+                    
+                    System.out.println("DEBUG: Supplier balance increased by net amount owed: " + netAmountOwed + 
+                                     " (total: " + totalAmount + ", discount: " + discountAmount + ", paid: " + paidAmount + ")");
+                }
+            }
+
             connection.commit();
             System.out.println("Successfully inserted Raw_Purchase_Invoice and items for invoice: " + invoiceNumber);
             return true;
@@ -3210,6 +3222,36 @@ public class SQLiteDatabase implements db {
                     updatePstmt.addBatch();
                 }
                 updatePstmt.executeBatch();
+            }
+            
+            // Update supplier balance: subtract return amount (we owe supplier less)
+            // First, get supplier ID from the return invoice
+            int supplierId = -1;
+            String getSupplierQuery = "SELECT supplier_id FROM Raw_Purchase_Return_Invoice WHERE raw_purchase_return_invoice_id = ?";
+            try (PreparedStatement supplierStmt = connection.prepareStatement(getSupplierQuery)) {
+                supplierStmt.setInt(1, returnInvoiceId);
+                try (ResultSet rs = supplierStmt.executeQuery()) {
+                    if (rs.next()) {
+                        supplierId = rs.getInt("supplier_id");
+                    }
+                }
+            }
+            
+            if (supplierId != -1) {
+                // Calculate total return amount
+                double totalReturnAmount = 0.0;
+                for (com.cablemanagement.model.RawStockPurchaseItem item : items) {
+                    totalReturnAmount += item.getQuantity() * item.getUnitPrice();
+                }
+                
+                String updateSupplierBalanceQuery = "UPDATE Supplier SET balance = balance - ? WHERE supplier_id = ?";
+                try (PreparedStatement balanceStmt = connection.prepareStatement(updateSupplierBalanceQuery)) {
+                    balanceStmt.setDouble(1, totalReturnAmount);
+                    balanceStmt.setInt(2, supplierId);
+                    balanceStmt.executeUpdate();
+                    
+                    System.out.println("DEBUG: Supplier balance reduced by return amount: " + totalReturnAmount);
+                }
             }
             
             // Commit transaction
