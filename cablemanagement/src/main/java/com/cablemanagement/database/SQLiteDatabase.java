@@ -150,31 +150,6 @@ public class SQLiteDatabase implements db {
     }
     
     @Override
-    public List<Object[]> getAllSalesReturnInvoicesForDropdown() {
-        List<Object[]> returnInvoices = new ArrayList<>();
-        String query = "SELECT sr.sales_return_invoice_id, sr.return_invoice_number, c.customer_name, sr.return_date " +
-                      "FROM SalesReturnInvoice sr " +
-                      "INNER JOIN Customer c ON sr.customer_id = c.customer_id " +
-                      "ORDER BY sr.sales_return_invoice_id DESC";
-                      
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
-            while (rs.next()) {
-                Object[] invoiceData = {
-                    rs.getInt("sales_return_invoice_id"),
-                    rs.getString("return_invoice_number"),
-                    rs.getString("customer_name"),
-                    rs.getString("return_date")
-                };
-                returnInvoices.add(invoiceData);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return returnInvoices;
-    }
-
-    @Override
     public boolean updateBankBalance(double newBalance) {
         // Update the balance for all banks (or you may want to specify a bank_id)
         String query = "UPDATE Bank SET balance = ?";
@@ -5423,27 +5398,6 @@ public class SQLiteDatabase implements db {
         return false;
     }
 
-
-
-    // Delete Methods
-    @Override
-    public String getSupplierAddress(String supplierName) {
-        String query = "SELECT s.contact_number || ' - ' || t.tehsil_name as address " +
-                      "FROM Supplier s " +
-                      "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
-                      "WHERE s.supplier_name = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, supplierName);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                return rs.getString("address");
-            }
-            return supplierName; // Return supplier name if no address found
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return "";
-        }
-    }
 
     public Object[] getSupplierDetails(String supplierName) {
         String query = "SELECT s.supplier_id, s.supplier_name, s.address, t.tehsil_name, s.contact_number " +
