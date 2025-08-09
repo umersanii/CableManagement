@@ -1046,6 +1046,7 @@ public class SQLiteDatabase implements db {
         }
     }
 
+    @Override
     public List<Customer> getAllCustomers() {
         List<Customer> customers = new ArrayList<>();
         String query = "SELECT c.customer_id, c.customer_name, c.contact_number, c.balance, t.tehsil_name " +
@@ -1651,6 +1652,7 @@ public class SQLiteDatabase implements db {
     /**
      * Get unit_id by unit name
      */
+    @Override
     public int getUnitIdByName(String unitName) {
         if (unitName == null || unitName.trim().isEmpty()) {
             return 1; // Default to first unit (Piece)

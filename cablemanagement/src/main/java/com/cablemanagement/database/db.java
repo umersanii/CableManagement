@@ -550,5 +550,10 @@ public interface db {
     String generateNextInvoiceNumber(String string);
 
     int getSupplierIdByName(String supplierName);
+
+    /**
+     * Get unit_id by unit name
+     */
+    int getUnitIdByName(String unitName);
 }
 
