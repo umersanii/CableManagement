@@ -7,12 +7,15 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
+import javafx.stage.Stage;
+import java.util.Optional;
 
 public class SettingsContent {
 
@@ -117,13 +120,39 @@ public class SettingsContent {
         Button logout = new Button("Confirm Logout");
 
         logout.setOnAction(e -> {
-            // Close the current window and return to login
-            Platform.exit();
-            // In a real application, you might want to:
-            // 1. Clear any session data
-            // 2. Close database connections
-            // 3. Return to login screen
-            System.out.println("User logged out successfully");
+            // Show confirmation dialog before logout
+            Alert logoutConfirmation = new Alert(Alert.AlertType.CONFIRMATION);
+            logoutConfirmation.setTitle("Logout Confirmation");
+            logoutConfirmation.setHeaderText("Are you sure you want to logout?");
+            logoutConfirmation.setContentText("You will be returned to the login screen.");
+            
+            logoutConfirmation.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
+            
+            Optional<ButtonType> result = logoutConfirmation.showAndWait();
+            if (result.isPresent() && result.get() == ButtonType.YES) {
+                // Get the current stage and close it
+                Stage currentStage = (Stage) logout.getScene().getWindow();
+                currentStage.close();
+                
+                // Create a new stage for the login page
+                Stage loginStage = new Stage();
+                com.cablemanagement.views.signin_page loginPage = new com.cablemanagement.views.signin_page();
+                try {
+                    loginPage.start(loginStage);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    // Fallback: show error message and exit if login page fails to load
+                    Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                    errorAlert.setTitle("Error");
+                    errorAlert.setHeaderText("Failed to return to login page");
+                    errorAlert.setContentText("The application will now exit.");
+                    errorAlert.showAndWait();
+                    Platform.exit();
+                }
+                
+                System.out.println("User logged out successfully - returned to login page");
+            }
+            // If NO is selected, do nothing (stay logged in)
         });
 
         box.getChildren().addAll(label, logout);
