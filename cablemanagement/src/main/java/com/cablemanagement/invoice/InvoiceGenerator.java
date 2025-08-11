@@ -290,7 +290,25 @@ public class InvoiceGenerator {
             // Use the balance values from InvoiceData if they are set, otherwise calculate them
             // Current Net Bill = total (already after item discounts) - invoice level discount only
             double netInvoiceAmount = total - invoiceLevelDiscount;
-            double totalBalance = data.getTotalBalance() != 0 ? data.getTotalBalance() : (netInvoiceAmount + data.getPreviousBalance());
+            
+            // Calculate total balance based on invoice type
+            double totalBalance;
+            if (data.getTotalBalance() != 0) {
+                // Use pre-calculated total balance if set
+                totalBalance = data.getTotalBalance();
+            } else {
+                // Calculate based on invoice type
+                if (data.getType().equals(InvoiceData.TYPE_PURCHASE_RETURN) || 
+                    data.getType().equals(InvoiceData.TYPE_SALE_RETURN) ||
+                    data.getType().equals(InvoiceData.TYPE_PRODUCTION_RETURN)) {
+                    // For return invoices: subtract the return amount from previous balance
+                    totalBalance = data.getPreviousBalance() - netInvoiceAmount;
+                } else {
+                    // For regular invoices: add the invoice amount to previous balance
+                    totalBalance = netInvoiceAmount + data.getPreviousBalance();
+                }
+            }
+            
             double netBalance = data.getNetBalance() != 0 ? data.getNetBalance() : (totalBalance - data.getPaidAmount());
             double paidAmount = data.getPaidAmount();
 
