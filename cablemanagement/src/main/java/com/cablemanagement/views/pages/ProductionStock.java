@@ -796,15 +796,17 @@ public class ProductionStock {
         TextField discountPercentageField = createTextField("0.0");
         discountPercentageField.setPromptText("Discount %");
         discountPercentageField.setPrefWidth(120);
-        discountPercentageField.setEditable(false); // Make this read-only as it will be calculated
-        discountPercentageField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
+        discountPercentageField.setEditable(true); // Make this editable for percentage input
+        discountPercentageField.setStyle("-fx-border-color: #ddd;");
         
         TextField discountPerUnitField = createTextField("");
-        discountPerUnitField.setPromptText("Discount Per Unit");
+        discountPerUnitField.setPromptText("Discount Per Unit (Auto)");
         discountPerUnitField.setPrefWidth(120);
+        discountPerUnitField.setEditable(false); // Make this read-only as it will be calculated
+        discountPerUnitField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
         
         TextField totalDiscountField = createTextField("");
-        totalDiscountField.setPromptText("Total Discount");
+        totalDiscountField.setPromptText("Total Discount (Auto)");
         totalDiscountField.setPrefWidth(120);
         totalDiscountField.setEditable(false); // Read-only, calculated automatically
         totalDiscountField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
@@ -812,45 +814,47 @@ public class ProductionStock {
         // Helper method to update discount calculations
         Runnable updateDiscountCalculations = () -> {
             try {
-                String discountPerUnitText = discountPerUnitField.getText().trim();
+                String discountPercentageText = discountPercentageField.getText().trim();
                 String quantityText = quantityField.getText().trim();
                 String priceText = priceField.getText().trim();
                 
-                if (!discountPerUnitText.isEmpty() && !quantityText.isEmpty() && !priceText.isEmpty()) {
-                    double discountPerUnit = Double.parseDouble(discountPerUnitText);
+                if (!discountPercentageText.isEmpty() && !quantityText.isEmpty() && !priceText.isEmpty()) {
+                    double discountPercentage = Double.parseDouble(discountPercentageText);
                     double quantity = Double.parseDouble(quantityText);
                     double unitPrice = Double.parseDouble(priceText);
                     
-                    // Validate discount is not greater than unit price
-                    if (discountPerUnit > unitPrice) {
-                        showAlert("Invalid Discount", "Discount per unit cannot exceed unit price");
-                        discountPerUnit = unitPrice;
-                        discountPerUnitField.setText(String.valueOf(unitPrice));
+                    // Validate discount percentage is not greater than 100%
+                    if (discountPercentage > 100.0) {
+                        showAlert("Invalid Discount", "Discount percentage cannot exceed 100%");
+                        discountPercentage = 100.0;
+                        discountPercentageField.setText("100.0");
                     }
+                    
+                    if (discountPercentage < 0.0) {
+                        showAlert("Invalid Discount", "Discount percentage cannot be negative");
+                        discountPercentage = 0.0;
+                        discountPercentageField.setText("0.0");
+                    }
+                    
+                    // Calculate discount per unit from percentage
+                    double discountPerUnit = (discountPercentage / 100.0) * unitPrice;
+                    discountPerUnitField.setText(formatNumber(discountPerUnit));
                     
                     // Calculate total discount amount
                     double totalDiscount = discountPerUnit * quantity;
                     totalDiscountField.setText(formatNumber(totalDiscount));
-                    
-                    // Calculate discount percentage based on unit price
-                    if (unitPrice > 0) {
-                        double percentage = (discountPerUnit / unitPrice) * 100.0;
-                        discountPercentageField.setText(formatNumber(percentage) + "%");
-                    } else {
-                        discountPercentageField.setText("0.0%");
-                    }
                 } else {
+                    discountPerUnitField.setText("");
                     totalDiscountField.setText("");
-                    discountPercentageField.setText("");
                 }
             } catch (NumberFormatException e) {
+                discountPerUnitField.setText("");
                 totalDiscountField.setText("");
-                discountPercentageField.setText("0.0");
             }
         };
         
         // Add listeners to recalculate when values change
-        discountPerUnitField.textProperty().addListener((obs, oldVal, newVal) -> updateDiscountCalculations.run());
+        discountPercentageField.textProperty().addListener((obs, oldVal, newVal) -> updateDiscountCalculations.run());
         quantityField.textProperty().addListener((obs, oldVal, newVal) -> updateDiscountCalculations.run());
         priceField.textProperty().addListener((obs, oldVal, newVal) -> updateDiscountCalculations.run());
         
@@ -902,9 +906,9 @@ public class ProductionStock {
         productGrid.add(createFormRow("Quantity:", quantityField), 1, 0);
         productGrid.add(createFormRow("Unit Price:", priceField), 0, 1);
         productGrid.add(createFormRow("Available Stock:", stockAvailableField), 1, 1);
-        productGrid.add(createFormRow("Discount Per Unit:", discountPerUnitField), 0, 2);
-        productGrid.add(createFormRow("Total Discount:", totalDiscountField), 1, 2);
-        productGrid.add(createFormRow("Discount %:", discountPercentageField), 0, 3);
+        productGrid.add(createFormRow("Discount %:", discountPercentageField), 0, 2);
+        productGrid.add(createFormRow("Discount Per Unit (Auto):", discountPerUnitField), 1, 2);
+        productGrid.add(createFormRow("Total Discount (Auto):", totalDiscountField), 0, 3);
         productGrid.add(itemActionButtons, 0, 4, 2, 1);
         
         productSection.getChildren().addAll(productTitle, productGrid);
@@ -1126,9 +1130,9 @@ public class ProductionStock {
             quantityField.clear();
             priceField.clear();
             stockAvailableField.clear();
+            discountPercentageField.setText("0.0");
             discountPerUnitField.clear();
             totalDiscountField.clear();
-            discountPercentageField.clear();
             stockAvailableField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
         });
         
@@ -1138,7 +1142,7 @@ public class ProductionStock {
             String quantityText = quantityField.getText().trim();
             String priceText = priceField.getText().trim();
             String stockText = stockAvailableField.getText().trim();
-            String discountPerUnitText = discountPerUnitField.getText().trim();
+            String discountPercentageText = discountPercentageField.getText().trim();
             
             // Validation
             if (selectedDisplay == null) {
@@ -1160,13 +1164,7 @@ public class ProductionStock {
                 double qty = Double.parseDouble(quantityText);
                 double price = Double.parseDouble(priceText);
                 int availableStock = stockText.isEmpty() ? 0 : Integer.parseInt(stockText);
-                double discountPerUnit = discountPerUnitText.isEmpty() ? 0.0 : Double.parseDouble(discountPerUnitText);
-                
-                // Calculate discount percentage for storage
-                double discountPercentage = 0.0;
-                if (price > 0) {
-                    discountPercentage = (discountPerUnit / price) * 100.0;
-                }
+                double discountPercentage = discountPercentageText.isEmpty() ? 0.0 : Double.parseDouble(discountPercentageText);
                 
                 if (qty <= 0) {
                     showAlert("Invalid Input", "Quantity must be greater than 0");
@@ -1178,13 +1176,13 @@ public class ProductionStock {
                     return;
                 }
                 
-                if (discountPerUnit < 0) {
-                    showAlert("Invalid Input", "Discount per unit cannot be negative");
+                if (discountPercentage < 0) {
+                    showAlert("Invalid Input", "Discount percentage cannot be negative");
                     return;
                 }
                 
-                if (discountPerUnit > price) {
-                    showAlert("Invalid Input", "Discount per unit cannot exceed unit price");
+                if (discountPercentage > 100) {
+                    showAlert("Invalid Input", "Discount percentage cannot exceed 100%");
                     return;
                 }
                 
@@ -1208,9 +1206,8 @@ public class ProductionStock {
                             return;
                         }
                         
-                        // Keep the same discount percentage but recalculate for new quantity
+                        // Update quantity and keep the same discount percentage
                         item.setQuantity(newQty);
-                        // The updateTotalPrice method will recalculate the correct discount amount
                         
                         productExists = true;
                         break;
@@ -1218,8 +1215,7 @@ public class ProductionStock {
                 }
                 
                 if (!productExists) {
-                    // Create new item with calculated discount percentage - the total discount will be 
-                    // calculated automatically in the updateTotalPrice method
+                    // Create new item with the discount percentage directly
                     SalesInvoiceItemUI newItem = new SalesInvoiceItemUI(productName, qty, price, discountPercentage, 0.0);
                     invoiceItems.add(newItem);
                 }
@@ -1233,13 +1229,13 @@ public class ProductionStock {
                 quantityField.clear();
                 priceField.clear();
                 stockAvailableField.clear();
+                discountPercentageField.setText("0.0");
                 discountPerUnitField.clear();
                 totalDiscountField.clear();
-                discountPercentageField.clear();
                 stockAvailableField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
                 
             } catch (NumberFormatException ex) {
-                showAlert("Invalid Input", "Please enter valid numbers for quantity and price");
+                showAlert("Invalid Input", "Please enter valid numbers for quantity, price, and discount percentage");
             }
         });
         
@@ -1291,6 +1287,9 @@ public class ProductionStock {
                 priceField.clear();
                 stockAvailableField.clear();
                 stockAvailableField.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #ddd;");
+                discountPercentageField.setText("0.0");
+                discountPerUnitField.clear();
+                totalDiscountField.clear();
                 discountField.setText("0.00");
                 paidAmountField.setText("0.00");
                 
