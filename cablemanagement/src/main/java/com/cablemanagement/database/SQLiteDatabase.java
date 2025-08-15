@@ -30,6 +30,7 @@ import com.cablemanagement.model.Manufacturer;
 import com.cablemanagement.model.RawStockPurchaseItem;
 import com.cablemanagement.model.RawStockUseItem;
 import com.cablemanagement.model.Supplier;
+import java.nio.file.Path;
 
 public class SQLiteDatabase implements db {
 
@@ -149,6 +150,31 @@ public class SQLiteDatabase implements db {
     }
     
     @Override
+    public List<Object[]> getAllSalesReturnInvoicesForDropdown() {
+        List<Object[]> returnInvoices = new ArrayList<>();
+        String query = "SELECT sr.sales_return_invoice_id, sr.return_invoice_number, c.customer_name, sr.return_date " +
+                      "FROM SalesReturnInvoice sr " +
+                      "INNER JOIN Customer c ON sr.customer_id = c.customer_id " +
+                      "ORDER BY sr.sales_return_invoice_id DESC";
+                      
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                Object[] invoiceData = {
+                    rs.getInt("sales_return_invoice_id"),
+                    rs.getString("return_invoice_number"),
+                    rs.getString("customer_name"),
+                    rs.getString("return_date")
+                };
+                returnInvoices.add(invoiceData);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return returnInvoices;
+    }
+
+    @Override
     public boolean updateBankBalance(double newBalance) {
         // Update the balance for all banks (or you may want to specify a bank_id)
         String query = "UPDATE Bank SET balance = ?";
@@ -237,31 +263,6 @@ public class SQLiteDatabase implements db {
         }
         return false;
     }
-
-        // New methods for enhanced invoice functionality
-    @Override
-    public String generateNextInvoiceNumber(String prefix) {
-        String query = "SELECT MAX(CAST(SUBSTR(invoice_number, LENGTH(?) + 1) AS INTEGER)) " +
-                      "FROM Raw_Purchase_Invoice WHERE invoice_number LIKE ?";
-        
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, prefix);
-            pstmt.setString(2, prefix + "%");
-            
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    int maxNumber = rs.getInt(1);
-                    return prefix + String.format("%06d", maxNumber + 1);
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        // If no invoices found or error, start with 000001
-        return prefix + "000001";
-    }
-    
 
     public boolean insertBankTransaction(BankTransaction transaction) {
         String query = "INSERT INTO Bank_Transaction (bank_id, transaction_date, transaction_type, amount, description, related_bank_id) " +
@@ -946,6 +947,23 @@ public class SQLiteDatabase implements db {
     }
 
     @Override
+    public boolean manufacturerExists(String name) {
+        String query = "SELECT COUNT(*) FROM Manufacturer WHERE manufacturer_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
     public List<Brand> getAllBrands() {
         List<Brand> brands = new ArrayList<>();
         String query = "SELECT b.brand_name, t.tehsil_name, d.district_name, p.province_name " +
@@ -1047,6 +1065,23 @@ public class SQLiteDatabase implements db {
     }
 
     @Override
+    public boolean brandExists(String name) {
+        String query = "SELECT COUNT(*) FROM Brand WHERE brand_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+
     public List<Customer> getAllCustomers() {
         List<Customer> customers = new ArrayList<>();
         String query = "SELECT c.customer_id, c.customer_name, c.contact_number, c.balance, t.tehsil_name " +
@@ -1073,6 +1108,58 @@ public class SQLiteDatabase implements db {
         return customers;
     }
 
+    @Override
+
+    public boolean insertCustomer(String name, String contact) {
+        String getTehsilQuery = "SELECT tehsil_id FROM Tehsil LIMIT 1";
+        String insertQuery = "INSERT INTO Customer (customer_name, contact_number, tehsil_id, balance) VALUES (?, ?, ?, 0.00)";
+        
+        try (Statement getStmt = connection.createStatement();
+             ResultSet rs = getStmt.executeQuery(getTehsilQuery)) {
+            
+            if (rs.next()) {
+                int tehsilId = rs.getInt("tehsil_id");
+                
+                try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+                    insertStmt.setString(1, name);
+                    insertStmt.setString(2, contact);
+                    insertStmt.setInt(3, tehsilId);
+                    
+                    return insertStmt.executeUpdate() > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean insertCustomer(String name, String contact, String tehsilName) {
+        String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
+        String insertQuery = "INSERT INTO Customer (customer_name, contact_number, tehsil_id, balance) VALUES (?, ?, ?, 0.00)";
+        
+        try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
+            getTehsilStmt.setString(1, tehsilName);
+            
+            try (ResultSet rs = getTehsilStmt.executeQuery()) {
+                if (rs.next()) {
+                    int tehsilId = rs.getInt("tehsil_id");
+                    
+                    try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+                        insertStmt.setString(1, name);
+                        insertStmt.setString(2, contact);
+                        insertStmt.setInt(3, tehsilId);
+                        
+                        return insertStmt.executeUpdate() > 0;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 
     @Override
     public boolean insertCustomer(String name, String contact, String tehsilName, double balance) {
@@ -1103,6 +1190,24 @@ public class SQLiteDatabase implements db {
     }
 
     @Override
+    public boolean customerExists(String name) {
+        String query = "SELECT COUNT(*) FROM Customer WHERE customer_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+
+    @Override
     public List<Supplier> getAllSuppliers() {
         List<Supplier> suppliers = new ArrayList<>();
         String query = "SELECT s.supplier_name, s.contact_number, s.balance, t.tehsil_name " +
@@ -1128,6 +1233,58 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return suppliers;
+    }
+
+    @Override
+    public boolean insertSupplier(String name, String contact) {
+        String getTehsilQuery = "SELECT tehsil_id FROM Tehsil LIMIT 1";
+        String insertQuery = "INSERT INTO Supplier (supplier_name, contact_number, tehsil_id, balance) VALUES (?, ?, ?, 0.00)";
+        
+        try (Statement getStmt = connection.createStatement();
+            ResultSet rs = getStmt.executeQuery(getTehsilQuery)) {
+            
+            if (rs.next()) {
+                int tehsilId = rs.getInt("tehsil_id");
+                
+                try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+                    insertStmt.setString(1, name);
+                    insertStmt.setString(2, contact);
+                    insertStmt.setInt(3, tehsilId);
+                    
+                    return insertStmt.executeUpdate() > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean insertSupplier(String name, String contact, String tehsilName) {
+        String getTehsilIdQuery = "SELECT tehsil_id FROM Tehsil WHERE tehsil_name = ?";
+        String insertQuery = "INSERT INTO Supplier (supplier_name, contact_number, tehsil_id, balance) VALUES (?, ?, ?, 0.00)";
+        
+        try (PreparedStatement getTehsilStmt = connection.prepareStatement(getTehsilIdQuery)) {
+            getTehsilStmt.setString(1, tehsilName);
+            
+            try (ResultSet rs = getTehsilStmt.executeQuery()) {
+                if (rs.next()) {
+                    int tehsilId = rs.getInt("tehsil_id");
+                    
+                    try (PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+                        insertStmt.setString(1, name);
+                        insertStmt.setString(2, contact);
+                        insertStmt.setInt(3, tehsilId);
+                        
+                        return insertStmt.executeUpdate() > 0;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     @Override
@@ -1158,6 +1315,48 @@ public class SQLiteDatabase implements db {
         return false;
     }
         
+    @Override
+    public boolean supplierExists(String name) {
+        String query = "SELECT COUNT(*) FROM Supplier WHERE supplier_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean updateCustomerBalance(String customerName, double amount) {
+        String query = "UPDATE Customer SET balance = balance + ? WHERE customer_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDouble(1, amount);
+            pstmt.setString(2, customerName);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean updateSupplierBalance(String supplierName, double amount) {
+        String query = "UPDATE Supplier SET balance = balance + ? WHERE supplier_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDouble(1, amount);
+            pstmt.setString(2, supplierName);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 
     @Override
     public double getCustomerBalance(String customerName) {
@@ -1175,7 +1374,8 @@ public class SQLiteDatabase implements db {
         return 0.0;
     }
 
-    private double getSupplierBalance(String supplierName) {
+    @Override
+    public double getSupplierBalance(String supplierName) {
         String query = "SELECT balance FROM Supplier WHERE supplier_name = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, supplierName);
@@ -1212,7 +1412,8 @@ public class SQLiteDatabase implements db {
      * @param excludeInvoiceNumber Invoice to exclude from calculation 
      * @return Previous balance before the specified invoice
      */
-    private double getCustomerPreviousBalance(String customerName, String excludeInvoiceNumber) {
+    @Override
+    public double getCustomerPreviousBalance(String customerName, String excludeInvoiceNumber) {
         // Get the current stored balance
         double currentBalance = getCustomerBalance(customerName);
         
@@ -1281,7 +1482,8 @@ public class SQLiteDatabase implements db {
      * @param excludeInvoiceNumber Invoice to exclude from calculation 
      * @return Previous balance before the specified invoice
      */
-    private double getSupplierPreviousBalance(String supplierName, String excludeInvoiceNumber) {
+    @Override
+    public double getSupplierPreviousBalance(String supplierName, String excludeInvoiceNumber) {
         // Get the current stored balance
         double currentBalance = getSupplierBalance(supplierName);
         
@@ -1408,6 +1610,134 @@ public class SQLiteDatabase implements db {
         return new Object[]{previousBalance, totalBalance, netBalance};
     }
 
+    @Override
+    public Customer getCustomerWithCurrentBalance(String customerName) {
+        String query = "SELECT c.customer_name, c.contact_number, t.tehsil_name " +
+                    "FROM Customer c " +
+                    "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                    "WHERE c.customer_name = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, customerName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String name = rs.getString("customer_name");
+                    String contact = rs.getString("contact_number");
+                    String tehsil = rs.getString("tehsil_name");
+                    if (tehsil == null) tehsil = "";
+                    
+                    // Get current balance including invoice history
+                    double currentBalance = getCustomerCurrentBalance(name);
+                    
+                    return new Customer(name, contact, tehsil, currentBalance);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    @Override
+    public Supplier getSupplierWithCurrentBalance(String supplierName) {
+        String query = "SELECT s.supplier_name, s.contact_number, t.tehsil_name " +
+                    "FROM Supplier s " +
+                    "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                    "WHERE s.supplier_name = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, supplierName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String name = rs.getString("supplier_name");
+                    String contact = rs.getString("contact_number");
+                    String tehsil = rs.getString("tehsil_name");
+                    if (tehsil == null) tehsil = "";
+                    
+                    // Get current balance including invoice history
+                    double currentBalance = getSupplierCurrentBalance(name);
+                    
+                    return new Supplier(name, contact, tehsil, currentBalance);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    @Override
+    public List<Object[]> getCustomerBalanceSummary() {
+        List<Object[]> summary = new ArrayList<>();
+        String query = "SELECT c.customer_name, c.contact_number, c.balance as initial_balance, t.tehsil_name " +
+                    "FROM Customer c " +
+                    "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                    "ORDER BY c.customer_name";
+        
+        try (Statement stmt = connection.createStatement();
+            ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                String customerName = rs.getString("customer_name");
+                String contact = rs.getString("contact_number");
+                double initialBalance = rs.getDouble("initial_balance");
+                String tehsil = rs.getString("tehsil_name");
+                if (tehsil == null) tehsil = "";
+                
+                double currentBalance = getCustomerCurrentBalance(customerName);
+                
+                Object[] row = {
+                    customerName,
+                    contact,
+                    tehsil,
+                    initialBalance,
+                    currentBalance,
+                    (currentBalance - initialBalance) // Net change from invoices
+                };
+                summary.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return summary;
+    }
+
+    @Override
+    public List<Object[]> getSupplierBalanceSummary() {
+        List<Object[]> summary = new ArrayList<>();
+        String query = "SELECT s.supplier_name, s.contact_number, s.balance as initial_balance, t.tehsil_name " +
+                    "FROM Supplier s " +
+                    "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                    "ORDER BY s.supplier_name";
+        
+        try (Statement stmt = connection.createStatement();
+            ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                String supplierName = rs.getString("supplier_name");
+                String contact = rs.getString("contact_number");
+                double initialBalance = rs.getDouble("initial_balance");
+                String tehsil = rs.getString("tehsil_name");
+                if (tehsil == null) tehsil = "";
+                
+                double currentBalance = getSupplierCurrentBalance(supplierName);
+                
+                Object[] row = {
+                    supplierName,
+                    contact,
+                    tehsil,
+                    initialBalance,
+                    currentBalance,
+                    (currentBalance - initialBalance) // Net change from invoices
+                };
+                summary.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return summary;
+    }
+
     // --------------------------
     // Customer Update Operations
     // --------------------------
@@ -1439,7 +1769,35 @@ public class SQLiteDatabase implements db {
         }
         return false;
     }
-
+    
+    @Override
+    public Customer getCustomerById(int customerId) {
+        String query = "SELECT c.customer_name, c.contact_number, t.tehsil_name " +
+                    "FROM Customer c " +
+                    "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
+                    "WHERE c.customer_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, customerId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String name = rs.getString("customer_name");
+                    String contact = rs.getString("contact_number");
+                    String tehsil = rs.getString("tehsil_name");
+                    if (tehsil == null) tehsil = "";
+                    
+                    // Get current balance including invoice history
+                    double currentBalance = getCustomerCurrentBalance(name);
+                    
+                    return new Customer(name, contact, tehsil, currentBalance);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
     @Override
     public int getCustomerIdByName(String customerName) {
         String query = "SELECT customer_id FROM Customer WHERE customer_name = ?";
@@ -1652,7 +2010,6 @@ public class SQLiteDatabase implements db {
     /**
      * Get unit_id by unit name
      */
-    @Override
     public int getUnitIdByName(String unitName) {
         if (unitName == null || unitName.trim().isEmpty()) {
             return 1; // Default to first unit (Piece)
@@ -1726,6 +2083,23 @@ public class SQLiteDatabase implements db {
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, unitName);
             return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean unitExists(String unitName) {
+        String query = "SELECT COUNT(*) FROM Unit WHERE unit_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, unitName);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -1834,6 +2208,34 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
         }
         return false;
+    }
+    
+    @Override
+    public Supplier getSupplierById(int supplierId) {
+        String query = "SELECT s.supplier_name, s.contact_number, t.tehsil_name " +
+                    "FROM Supplier s " +
+                    "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                    "WHERE s.supplier_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, supplierId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String name = rs.getString("supplier_name");
+                    String contact = rs.getString("contact_number");
+                    String tehsil = rs.getString("tehsil_name");
+                    if (tehsil == null) tehsil = "";
+                    
+                    // Get current balance including invoice history
+                    double currentBalance = getSupplierCurrentBalance(name);
+                    
+                    return new Supplier(name, contact, tehsil, currentBalance);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
     
     @Override
@@ -2001,6 +2403,22 @@ public class SQLiteDatabase implements db {
         return ledger;
     }
 
+    // Helper method to get supplier name by ID
+    private String getSupplierNameById(int supplierId) {
+        String query = "SELECT supplier_name FROM Supplier WHERE supplier_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, supplierId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("supplier_name");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     // --------------------------
     // Raw Stock Operations
     // --------------------------
@@ -2136,7 +2554,80 @@ public class SQLiteDatabase implements db {
             return false;
         }
     }
+    
 
+    @Override
+    public boolean insertRawPurchaseInvoice(String invoiceNumber, int supplierId, String invoiceDate, 
+                                           double totalAmount, double discountAmount, double paidAmount) {
+        String query = "INSERT INTO Raw_Purchase_Invoice (invoice_number, supplier_id, invoice_date, " +
+                      "total_amount, discount_amount, paid_amount) VALUES (?, ?, ?, ?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, invoiceNumber);
+            pstmt.setInt(2, supplierId);
+            pstmt.setString(3, invoiceDate);
+            pstmt.setDouble(4, totalAmount);
+            pstmt.setDouble(5, discountAmount);
+            pstmt.setDouble(6, paidAmount);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+    
+    @Override
+    public int insertRawPurchaseInvoiceAndGetId(String invoiceNumber, int supplierId, String invoiceDate, 
+                                              double totalAmount, double discountAmount, double paidAmount) {
+        String query = "INSERT INTO Raw_Purchase_Invoice (invoice_number, supplier_id, invoice_date, " +
+                      "total_amount, discount_amount, paid_amount) VALUES (?, ?, ?, ?, ?, ?)";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, invoiceNumber);
+            pstmt.setInt(2, supplierId);
+            pstmt.setString(3, invoiceDate);
+            pstmt.setDouble(4, totalAmount);
+            pstmt.setDouble(5, discountAmount);
+            pstmt.setDouble(6, paidAmount);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        return generatedKeys.getInt(1);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1; // Return -1 if failed
+    }
+
+    // New methods for enhanced invoice functionality
+    @Override
+    public String generateNextInvoiceNumber(String prefix) {
+        String query = "SELECT MAX(CAST(SUBSTR(invoice_number, LENGTH(?) + 1) AS INTEGER)) " +
+                      "FROM Raw_Purchase_Invoice WHERE invoice_number LIKE ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, prefix);
+            pstmt.setString(2, prefix + "%");
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    int maxNumber = rs.getInt(1);
+                    return prefix + String.format("%06d", maxNumber + 1);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // If no invoices found or error, start with 000001
+        return prefix + "000001";
+    }
+    
     @Override
     public List<Object[]> getAllRawStocksForDropdown() {
         List<Object[]> rawStocks = new ArrayList<>();
@@ -2207,7 +2698,9 @@ public class SQLiteDatabase implements db {
         }
     }
 
-    private boolean ensureBrandExists(String brandName, int tehsilId) {
+
+    @Override
+    public boolean ensureBrandExists(String brandName, int tehsilId) {
         String checkBrandQuery = "SELECT brand_id FROM Brand WHERE brand_name = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(checkBrandQuery)) {
             pstmt.setString(1, brandName);
@@ -2500,6 +2993,31 @@ public class SQLiteDatabase implements db {
         return invoices;
     }
 
+    @Override
+    public List<Object[]> getAllRawStockUsage() {
+        List<Object[]> usage = new ArrayList<>();
+        String query = "SELECT rsu.usage_date, rs.raw_stock_name, rsu.quantity_used, rsu.reference " +
+                      "FROM RawStock_Usage rsu " +
+                      "JOIN Raw_Stock rs ON rsu.raw_stock_id = rs.stock_id " +
+                      "ORDER BY rsu.usage_date DESC";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("usage_date"),
+                    rs.getString("raw_stock_name"),
+                    rs.getDouble("quantity_used"),
+                    rs.getString("reference")
+                };
+                usage.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return usage;
+    }
 
     // --------------------------
     // Raw Purchase Return Invoice Operations
@@ -2551,7 +3069,42 @@ public class SQLiteDatabase implements db {
         }
         return invoices;
     }
-
+    
+    /**
+     * Get raw stock items from a specific purchase invoice
+     */
+    public List<Object[]> getRawStockItemsByInvoiceId(int invoiceId) {
+        List<Object[]> items = new ArrayList<>();
+        String query = "SELECT rpii.raw_stock_id, rs.item_name, c.category_name, " +
+                      "b.brand_name, u.unit_name, rpii.quantity, rpii.unit_price " +
+                      "FROM Raw_Purchase_Invoice_Item rpii " +
+                      "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                      "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                      "JOIN Unit u ON rs.unit_id = u.unit_id " +
+                      "WHERE rpii.raw_purchase_invoice_id = ?";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, invoiceId);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("raw_stock_id"),
+                    rs.getString("raw_stock_name"),
+                    rs.getString("category_name"),
+                    rs.getString("brand_name"),
+                    rs.getString("unit_name"),
+                    rs.getDouble("quantity"),
+                    rs.getDouble("unit_price")
+                };
+                items.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return items;
+    }
+    
     /**
      * Insert raw purchase return invoice and return the generated ID
      */
@@ -2716,6 +3269,37 @@ public class SQLiteDatabase implements db {
             e.printStackTrace();
             return false;
         }
+    }
+    
+    /**
+     * Get all raw purchase return invoices
+     */
+    public List<Object[]> getAllRawPurchaseReturnInvoices() {
+        List<Object[]> returnInvoices = new ArrayList<>();
+        String query = "SELECT rpri.return_invoice_number, rpri.return_date, s.supplier_name, " +
+                      "rpi.invoice_number as original_invoice, rpri.total_return_amount " +
+                      "FROM Raw_Purchase_Return_Invoice rpri " +
+                      "JOIN Supplier s ON rpri.supplier_id = s.supplier_id " +
+                      "JOIN Raw_Purchase_Invoice rpi ON rpri.original_invoice_id = rpi.raw_purchase_invoice_id " +
+                      "ORDER BY rpri.return_date DESC";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("return_invoice_number"),
+                    rs.getString("return_date"),
+                    rs.getString("supplier_name"),
+                    rs.getString("original_invoice"),
+                    rs.getDouble("total_return_amount")
+                };
+                returnInvoices.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return returnInvoices;
     }
 
     // --------------------------
@@ -3155,6 +3739,23 @@ public class SQLiteDatabase implements db {
         }
     }
 
+    /**
+     * Get current production stock quantity for validation
+     */
+    public double getCurrentProductionStockQuantity(int productionId) {
+        String query = "SELECT quantity FROM ProductionStock WHERE production_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, productionId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("quantity");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0.0;
+    }
 
     @Override
     public boolean insertProductionStockRawUsage(int productionInvoiceId, List<Object[]> rawMaterialsUsed) {
@@ -3631,7 +4232,7 @@ public class SQLiteDatabase implements db {
     }
 
     // Method to decrease production stock when items are sold
-    private boolean decreaseProductionStock(int productionId, double soldQuantity) {
+    public boolean decreaseProductionStock(int productionId, double soldQuantity) {
         String query = "UPDATE ProductionStock SET quantity = quantity - ? WHERE production_id = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setDouble(1, soldQuantity);
@@ -3878,7 +4479,8 @@ public class SQLiteDatabase implements db {
         return -1;
     }
 
-    private int insertSalesInvoiceAndGetId(String invoiceNumber, int customerId, String salesDate, 
+    @Override
+    public int insertSalesInvoiceAndGetId(String invoiceNumber, int customerId, String salesDate, 
                                          double totalAmount, double discountAmount, double paidAmount) {
         String query = "INSERT INTO Sales_Invoice (sales_invoice_number, customer_id, sales_date, " +
                       "total_amount, discount_amount, paid_amount) VALUES (?, ?, ?, ?, ?, ?)";
@@ -4146,7 +4748,8 @@ public class SQLiteDatabase implements db {
         return null;
     }
 
-    private int insertSalesReturnInvoiceAndGetId(String returnInvoiceNumber, int originalSalesInvoiceId, 
+    @Override
+    public int insertSalesReturnInvoiceAndGetId(String returnInvoiceNumber, int originalSalesInvoiceId, 
                                                int customerId, String returnDate, double totalReturnAmount) {
         String query = "INSERT INTO Sales_Return_Invoice (return_invoice_number, original_sales_invoice_id, " +
                       "customer_id, return_date, total_return_amount) VALUES (?, ?, ?, ?, ?)";
@@ -4172,7 +4775,8 @@ public class SQLiteDatabase implements db {
         return -1;
     }
 
-    private boolean insertSalesReturnInvoiceItems(int salesReturnInvoiceId, List<Object[]> items) {
+    @Override
+    public boolean insertSalesReturnInvoiceItems(int salesReturnInvoiceId, List<Object[]> items) {
         String insertQuery = "INSERT INTO Sales_Return_Invoice_Item (sales_return_invoice_id, production_stock_id, quantity, unit_price, total_price) " +
                            "VALUES (?, ?, ?, ?, ?)";
         
@@ -4551,6 +5155,31 @@ public class SQLiteDatabase implements db {
         return attendance;
     }
 
+    @Override
+    public List<Object[]> getAllEmployeeSalaryPayments() {
+        List<Object[]> payments = new ArrayList<>();
+        String query = "SELECT e.employee_name, esp.payment_date, esp.salary_amount, esp.description " +
+                      "FROM Employee_Salary_Payment esp " +
+                      "JOIN Employee e ON esp.employee_id = e.employee_id " +
+                      "ORDER BY esp.payment_date DESC";
+        
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getString("payment_date"),
+                    rs.getDouble("salary_amount"),
+                    rs.getString("description")
+                };
+                payments.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return payments;
+    }
 
     @Override
     public List<Object[]> getAllEmployeeLoans() {
@@ -4692,6 +5321,34 @@ public class SQLiteDatabase implements db {
     }
 
     @Override
+    public List<Object[]> getEmployeeAttendanceByEmployee(int employeeId) {
+        List<Object[]> attendance = new ArrayList<>();
+        String query = "SELECT e.employee_name, ea.attendance_date, ea.status, ea.working_hours " +
+                      "FROM Employee_Attendance ea " +
+                      "JOIN Employee e ON ea.employee_id = e.employee_id " +
+                      "WHERE ea.employee_id = ? " +
+                      "ORDER BY ea.attendance_date DESC";
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, employeeId);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("employee_name"),
+                    rs.getString("attendance_date"),
+                    rs.getString("status"),
+                    rs.getDouble("working_hours")
+                };
+                attendance.add(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return attendance;
+    }
+
+    @Override
     public int getEmployeeIdByName(String employeeName) {
         String query = "SELECT employee_id FROM Employee WHERE employee_name = ? AND is_active = 1";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
@@ -4766,6 +5423,27 @@ public class SQLiteDatabase implements db {
         return false;
     }
 
+
+
+    // Delete Methods
+    @Override
+    public String getSupplierAddress(String supplierName) {
+        String query = "SELECT s.contact_number || ' - ' || t.tehsil_name as address " +
+                      "FROM Supplier s " +
+                      "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
+                      "WHERE s.supplier_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, supplierName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("address");
+            }
+            return supplierName; // Return supplier name if no address found
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "";
+        }
+    }
 
     public Object[] getSupplierDetails(String supplierName) {
         String query = "SELECT s.supplier_id, s.supplier_name, s.address, t.tehsil_name, s.contact_number " +
@@ -5337,105 +6015,154 @@ public class SQLiteDatabase implements db {
     ///                       reports                                        ////
     //////////////////////////////////////////////////////////////////////////////
 
-
-    public ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType) {
-        String baseQuery =
-            "SELECT " +
-            "rpi.invoice_number AS invoiceNumber, " +
-            "rpi.invoice_date AS invoiceDate, " +
-            "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
-            "rpi.total_amount AS totalAmount, " +
-            "rpi.discount_amount AS discountAmount, " +
-            "rpi.paid_amount AS paidAmount " +
-            "FROM Raw_Purchase_Invoice rpi " +
-            "LEFT JOIN Supplier s ON rpi.supplier_id = s.supplier_id ";
-
-        String whereClause = "WHERE rpi.invoice_date BETWEEN ? AND ? ";
-        String orderBy = "ORDER BY rpi.invoice_date DESC";
-
-        try {
-            String finalQuery;
-
-            switch (reportType.trim()) {
-                case "Product-wise Report":
-                    finalQuery =
-                        "SELECT " +
-                        "rpi.invoice_number AS invoiceNumber, " +
-                        "rpi.invoice_date AS invoiceDate, " +
-                        "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
-                        "rs.item_name AS productName, " +
-                        "rpii.quantity AS quantity, " +
-                        "rpii.unit_price AS unitPrice, " +
-                        "(rpii.quantity * rpii.unit_price) AS totalCost " +
-                        "FROM Raw_Purchase_Invoice rpi " +
-                        "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
-                        "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
-                        "LEFT JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
-                        whereClause + orderBy;
-                    break;
-
-                case "Category-wise Report":
-                    finalQuery =
-                        "SELECT " +
-                        "c.category_name AS categoryName, " +
-                        "SUM(rpii.quantity * rpii.unit_price) AS totalCost " +
-                        "FROM Raw_Purchase_Invoice rpi " +
-                        "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
-                        "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
-                        "JOIN Category c ON rs.category_id = c.category_id " +
-                        "WHERE rpi.invoice_date BETWEEN ? AND ? " +
-                        "GROUP BY c.category_name " +
-                        "ORDER BY totalCost DESC";
-                    break;
-
-                case "Brand-wise Report":
-                    finalQuery =
-                        "SELECT " +
-                        "b.brand_name AS brandName, " +
-                        "SUM(rpii.quantity * rpii.unit_price) AS totalCost " +
-                        "FROM Raw_Purchase_Invoice rpi " +
-                        "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
-                        "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
-                        "JOIN Brand b ON rs.brand_id = b.brand_id " +
-                        "WHERE rpi.invoice_date BETWEEN ? AND ? " +
-                        "GROUP BY b.brand_name " +
-                        "ORDER BY totalCost DESC";
-                    break;
-
-                case "Manufacturer-wise Report":
-                    finalQuery =
-                        "SELECT " +
-                        "m.manufacturer_name AS manufacturerName, " +
-                        "SUM(rpii.quantity * rpii.unit_price) AS totalCost " +
-                        "FROM Raw_Purchase_Invoice rpi " +
-                        "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
-                        "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
-                        "JOIN Manufacturer m ON rs.manufacturer_id = m.manufacturer_id " +
-                        "WHERE rpi.invoice_date BETWEEN ? AND ? " +
-                        "GROUP BY m.manufacturer_name " +
-                        "ORDER BY totalCost DESC";
-                    break;
-
-                default: // "All Reports"
-                    finalQuery = baseQuery + whereClause + orderBy;
-                    break;
-            }
-
-            System.out.println("DEBUG: Final Query: " + finalQuery);
-
-            PreparedStatement pstmt = connection.prepareStatement(finalQuery);
+    public List<Object[]> getPurchaseReportList(Date fromDate, Date toDate) {
+        List<Object[]> reports = new ArrayList<>();
+        String query = "SELECT " +
+                "rpi.invoice_number AS invoiceNumber, " +
+                "rpi.invoice_date AS invoiceDate, " +
+                "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
+                "rpi.total_amount AS totalAmount, " +
+                "rpi.discount_amount AS discountAmount, " +
+                "rpi.paid_amount AS paidAmount " +
+                "FROM Raw_Purchase_Invoice rpi " +
+                "LEFT JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
+                "WHERE rpi.invoice_date BETWEEN ? AND ? " +
+                "ORDER BY rpi.invoice_date DESC";
+                
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            // Convert Date to String format (YYYY-MM-DD) for SQLite comparison
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            pstmt.setString(1, sdf.format(fromDate));
-            pstmt.setString(2, sdf.format(toDate));
-
-            return pstmt.executeQuery();
-
+            String fromDateStr = sdf.format(fromDate);
+            String toDateStr = sdf.format(toDate);
+            
+            // Debug logging
+            System.out.println("DEBUG: getPurchaseReportList called with dates:");
+            System.out.println("DEBUG: fromDate: " + fromDate + " -> " + fromDateStr);
+            System.out.println("DEBUG: toDate: " + toDate + " -> " + toDateStr);
+            System.out.println("DEBUG: Query: " + query);
+            
+            pstmt.setString(1, fromDateStr);
+            pstmt.setString(2, toDateStr);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Object[] row = {
+                        rs.getString("invoiceNumber"),
+                        rs.getString("invoiceDate"),
+                        rs.getString("supplierName"),
+                        rs.getDouble("totalAmount"),
+                        rs.getDouble("discountAmount"),
+                        rs.getDouble("paidAmount")
+                    };
+                    reports.add(row);
+                }
+                System.out.println("DEBUG: Loaded " + reports.size() + " purchase report rows");
+            }
         } catch (SQLException e) {
-            System.err.println("DEBUG: SQLException in getPurchaseReport: " + e.getMessage());
+            System.err.println("DEBUG: SQLException in getPurchaseReportList: " + e.getMessage());
             e.printStackTrace();
-            return null;
         }
+        return reports;
     }
+
+public ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType) {
+    String baseQuery =
+        "SELECT " +
+        "rpi.invoice_number AS invoiceNumber, " +
+        "rpi.invoice_date AS invoiceDate, " +
+        "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
+        "rpi.total_amount AS totalAmount, " +
+        "rpi.discount_amount AS discountAmount, " +
+        "rpi.paid_amount AS paidAmount " +
+        "FROM Raw_Purchase_Invoice rpi " +
+        "LEFT JOIN Supplier s ON rpi.supplier_id = s.supplier_id ";
+
+    String whereClause = "WHERE rpi.invoice_date BETWEEN ? AND ? ";
+    String orderBy = "ORDER BY rpi.invoice_date DESC";
+
+    try {
+        String finalQuery;
+
+        switch (reportType.trim()) {
+            case "Product-wise Report":
+                finalQuery =
+                    "SELECT " +
+                    "rpi.invoice_number AS invoiceNumber, " +
+                    "rpi.invoice_date AS invoiceDate, " +
+                    "COALESCE(s.supplier_name, 'Unknown Supplier') AS supplierName, " +
+                    "rs.item_name AS productName, " +
+                    "rpii.quantity AS quantity, " +
+                    "rpii.unit_price AS unitPrice, " +
+                    "(rpii.quantity * rpii.unit_price) AS totalCost " +
+                    "FROM Raw_Purchase_Invoice rpi " +
+                    "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
+                    "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                    "LEFT JOIN Supplier s ON rpi.supplier_id = s.supplier_id " +
+                    whereClause + orderBy;
+                break;
+
+            case "Category-wise Report":
+                finalQuery =
+                    "SELECT " +
+                    "c.category_name AS categoryName, " +
+                    "SUM(rpii.quantity * rpii.unit_price) AS totalCost " +
+                    "FROM Raw_Purchase_Invoice rpi " +
+                    "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
+                    "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                    "JOIN Category c ON rs.category_id = c.category_id " +
+                    "WHERE rpi.invoice_date BETWEEN ? AND ? " +
+                    "GROUP BY c.category_name " +
+                    "ORDER BY totalCost DESC";
+                break;
+
+            case "Brand-wise Report":
+                finalQuery =
+                    "SELECT " +
+                    "b.brand_name AS brandName, " +
+                    "SUM(rpii.quantity * rpii.unit_price) AS totalCost " +
+                    "FROM Raw_Purchase_Invoice rpi " +
+                    "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
+                    "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                    "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                    "WHERE rpi.invoice_date BETWEEN ? AND ? " +
+                    "GROUP BY b.brand_name " +
+                    "ORDER BY totalCost DESC";
+                break;
+
+            case "Manufacturer-wise Report":
+                finalQuery =
+                    "SELECT " +
+                    "m.manufacturer_name AS manufacturerName, " +
+                    "SUM(rpii.quantity * rpii.unit_price) AS totalCost " +
+                    "FROM Raw_Purchase_Invoice rpi " +
+                    "JOIN Raw_Purchase_Invoice_Item rpii ON rpi.raw_purchase_invoice_id = rpii.raw_purchase_invoice_id " +
+                    "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                    "JOIN Manufacturer m ON rs.manufacturer_id = m.manufacturer_id " +
+                    "WHERE rpi.invoice_date BETWEEN ? AND ? " +
+                    "GROUP BY m.manufacturer_name " +
+                    "ORDER BY totalCost DESC";
+                break;
+
+            default: // "All Reports"
+                finalQuery = baseQuery + whereClause + orderBy;
+                break;
+        }
+
+        System.out.println("DEBUG: Final Query: " + finalQuery);
+
+        PreparedStatement pstmt = connection.prepareStatement(finalQuery);
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        pstmt.setString(1, sdf.format(fromDate));
+        pstmt.setString(2, sdf.format(toDate));
+
+        return pstmt.executeQuery();
+
+    } catch (SQLException e) {
+        System.err.println("DEBUG: SQLException in getPurchaseReport: " + e.getMessage());
+        e.printStackTrace();
+        return null;
+    }
+}
 
 
     // Checked by Umer Ghafoor
@@ -6324,32 +7051,78 @@ public class SQLiteDatabase implements db {
     }
 
     @Override
+    public ResultSet getBrandProfitReport(Date fromDate, Date toDate) {
+        String query = "SELECT b.brand_name, SUM(s.quantity * s.unit_price - r.unit_cost) AS profit " +
+                    "FROM Brand b JOIN Sales_Invoice_Item s ON b.brand_id = s.brand_id " +
+                    "JOIN Raw_Stock r ON s.raw_stock_id = r.stock_id " +
+                    "WHERE s.invoice_date BETWEEN ? AND ? GROUP BY b.brand_name";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setDate(1, fromDate);
+            pstmt.setDate(2, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getCustomerSalesReport(int customerId, Date fromDate, Date toDate) {
+        String query = "SELECT * FROM Sales_Invoice WHERE customer_id = ? AND invoice_date BETWEEN ? AND ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, customerId);
+            pstmt.setDate(2, fromDate);
+            pstmt.setDate(3, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getSupplierSalesReport(int supplierId, Date fromDate, Date toDate) {
+        String query = "SELECT * FROM Raw_Purchase_Invoice WHERE supplier_id = ? AND invoice_date BETWEEN ? AND ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, supplierId);
+            pstmt.setDate(2, fromDate);
+            pstmt.setDate(3, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public ResultSet getAttendanceReport(int employeeId, Date fromDate, Date toDate) {
+        String query = "SELECT * FROM Employee_Attendance WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, employeeId);
+            pstmt.setDate(2, fromDate);
+            pstmt.setDate(3, toDate);
+            return pstmt.executeQuery();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
     public ResultSet getAreaWiseReport() {
         String query = "SELECT 'Customer' as party_type, c.customer_name as name, " +
-                    "c.contact_number, t.tehsil_name, d.district_name, p.province_name, " +
-                    "COALESCE(SUM(si.total_amount), 0) as total_sales, " +
-                    "COALESCE(SUM(si.discount_amount), 0) as total_discount, " +
-                    "COALESCE(SUM(si.paid_amount), 0) as payment_done, " +
-                    "COALESCE(SUM(si.total_amount - si.paid_amount), 0) as balance " +
+                    "c.contact_number, t.tehsil_name, d.district_name, p.province_name " +
                     "FROM Customer c " +
                     "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
                     "LEFT JOIN District d ON t.district_id = d.district_id " +
                     "LEFT JOIN Province p ON d.province_id = p.province_id " +
-                    "LEFT JOIN Sales_Invoice si ON c.customer_id = si.customer_id " +
-                    "GROUP BY c.customer_id, c.customer_name, c.contact_number, t.tehsil_name, d.district_name, p.province_name " +
                     "UNION ALL " +
                     "SELECT 'Supplier' as party_type, s.supplier_name as name, " +
-                    "s.contact_number, t.tehsil_name, d.district_name, p.province_name, " +
-                    "COALESCE(SUM(rpi.total_amount), 0) as total_sales, " +
-                    "COALESCE(SUM(rpi.discount_amount), 0) as total_discount, " +
-                    "COALESCE(SUM(rpi.paid_amount), 0) as payment_done, " +
-                    "COALESCE(SUM(rpi.total_amount - rpi.paid_amount), 0) as balance " +
+                    "s.contact_number, t.tehsil_name, d.district_name, p.province_name " +
                     "FROM Supplier s " +
                     "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
                     "LEFT JOIN District d ON t.district_id = d.district_id " +
                     "LEFT JOIN Province p ON d.province_id = p.province_id " +
-                    "LEFT JOIN Raw_Purchase_Invoice rpi ON s.supplier_id = rpi.supplier_id " +
-                    "GROUP BY s.supplier_id, s.supplier_name, s.contact_number, t.tehsil_name, d.district_name, p.province_name " +
                     "ORDER BY party_type, name";
         
         System.out.println("DEBUG: Executing area-wise report query: " + query);
@@ -6392,37 +7165,24 @@ public class SQLiteDatabase implements db {
     public ResultSet getAreaWiseReport(String partyType, String areaType, String areaValue) {
         StringBuilder query = new StringBuilder();
         
-        // Base query for customers with financial data
+        // Base query for customers
         String customerQuery = "SELECT 'Customer' as party_type, c.customer_name as name, " +
-                             "c.contact_number, t.tehsil_name, d.district_name, p.province_name, " +
-                             "COALESCE(SUM(si.total_amount), 0) as total_sales, " +
-                             "COALESCE(SUM(si.discount_amount), 0) as total_discount, " +
-                             "COALESCE(SUM(si.paid_amount), 0) as payment_done, " +
-                             "COALESCE(SUM(si.total_amount - si.paid_amount), 0) as balance " +
+                             "c.contact_number, t.tehsil_name, d.district_name, p.province_name " +
                              "FROM Customer c " +
                              "LEFT JOIN Tehsil t ON c.tehsil_id = t.tehsil_id " +
                              "LEFT JOIN District d ON t.district_id = d.district_id " +
-                             "LEFT JOIN Province p ON d.province_id = p.province_id " +
-                             "LEFT JOIN Sales_Invoice si ON c.customer_id = si.customer_id";
+                             "LEFT JOIN Province p ON d.province_id = p.province_id";
         
-        // Base query for suppliers with financial data
+        // Base query for suppliers
         String supplierQuery = "SELECT 'Supplier' as party_type, s.supplier_name as name, " +
-                             "s.contact_number, t.tehsil_name, d.district_name, p.province_name, " +
-                             "COALESCE(SUM(rpi.total_amount), 0) as total_sales, " +
-                             "COALESCE(SUM(rpi.discount_amount), 0) as total_discount, " +
-                             "COALESCE(SUM(rpi.paid_amount), 0) as payment_done, " +
-                             "COALESCE(SUM(rpi.total_amount - rpi.paid_amount), 0) as balance " +
+                             "s.contact_number, t.tehsil_name, d.district_name, p.province_name " +
                              "FROM Supplier s " +
                              "LEFT JOIN Tehsil t ON s.tehsil_id = t.tehsil_id " +
                              "LEFT JOIN District d ON t.district_id = d.district_id " +
-                             "LEFT JOIN Province p ON d.province_id = p.province_id " +
-                             "LEFT JOIN Raw_Purchase_Invoice rpi ON s.supplier_id = rpi.supplier_id";
+                             "LEFT JOIN Province p ON d.province_id = p.province_id";
         
         // Add WHERE clause based on area type and value if specified
         String whereClause = "";
-        String groupByCustomer = " GROUP BY c.customer_id, c.customer_name, c.contact_number, t.tehsil_name, d.district_name, p.province_name";
-        String groupBySupplier = " GROUP BY s.supplier_id, s.supplier_name, s.contact_number, t.tehsil_name, d.district_name, p.province_name";
-        
         if (areaValue != null && !areaValue.trim().isEmpty() && !areaValue.equals("All")) {
             switch (areaType.toLowerCase()) {
                 case "province":
@@ -6439,14 +7199,14 @@ public class SQLiteDatabase implements db {
         
         // Build final query based on party type
         if (partyType.equals("Customer")) {
-            query.append(customerQuery).append(whereClause).append(groupByCustomer);
+            query.append(customerQuery).append(whereClause);
         } else if (partyType.equals("Supplier")) {
-            query.append(supplierQuery).append(whereClause).append(groupBySupplier);
+            query.append(supplierQuery).append(whereClause);
         } else {
             // Both customers and suppliers
-            query.append(customerQuery).append(whereClause).append(groupByCustomer)
+            query.append(customerQuery).append(whereClause)
                  .append(" UNION ALL ")
-                 .append(supplierQuery).append(whereClause).append(groupBySupplier);
+                 .append(supplierQuery).append(whereClause);
         }
         
         query.append(" ORDER BY party_type, name");
