@@ -47,6 +47,14 @@ public interface db {
      * Get all sales return invoices for dropdown selection
      * @return A list of Object arrays containing invoice data
      */
+    List<Object[]> getAllSalesReturnInvoicesForDropdown(); // TODO: remove
+
+    
+
+
+    // Supplier address method
+    String getSupplierAddress(String supplierName);  // TODO: remove
+
 
     // Add this method to support category deletion
     public boolean deleteCategory(String categoryName);
@@ -115,6 +123,8 @@ public interface db {
 
     boolean insertManufacturer(String name, String province, String district, String tehsil);
 
+    boolean manufacturerExists(String name);
+
     // --------------------------
     // Brand Operations
     // --------------------------
@@ -122,17 +132,34 @@ public interface db {
 
     boolean insertBrand(String name, String province, String district, String tehsil);
 
+    boolean brandExists(String name);
+
     // --------------------------
     // Customer Operations
     // --------------------------
     List<Customer> getAllCustomers();
 
+    boolean insertCustomer(String name, String contact);
+    
+    boolean insertCustomer(String name, String contact, String tehsil);
+
     boolean insertCustomer(String name, String contact, String tehsil, double balance);
 
+    boolean customerExists(String name);
+
+    boolean updateCustomerBalance(String customerName, double amount);
 
     double getCustomerBalance(String customerName);
 
     double getCustomerCurrentBalance(String customerName);
+
+    /**
+     * Get customer's balance BEFORE a specific invoice (for PDF generation)
+     * @param customerName Customer name
+     * @param excludeInvoiceNumber Invoice to exclude from calculation 
+     * @return Previous balance before the specified invoice
+     */
+    double getCustomerPreviousBalance(String customerName, String excludeInvoiceNumber);
 
     /**
      * Get invoice balance details for PDF generation
@@ -145,15 +172,36 @@ public interface db {
     Object[] getCustomerInvoiceBalanceDetails(String customerName, String invoiceNumber, 
                                            double currentInvoiceTotal, double currentInvoicePaid);
 
+    Customer getCustomerWithCurrentBalance(String customerName);
+
+    List<Object[]> getCustomerBalanceSummary();
+
     // --------------------------
     // Supplier Operations
     // --------------------------
     List<Supplier> getAllSuppliers();
 
+    boolean insertSupplier(String name, String contact) ;
+    
+    boolean insertSupplier(String name, String contact, String tehsil);
 
     boolean insertSupplier(String name, String contact, String tehsil, double balance);
 
+    boolean supplierExists(String name) ;
+
+    boolean updateSupplierBalance(String supplierName, double amount);
+
+    double getSupplierBalance(String supplierName);
+
     double getSupplierCurrentBalance(String supplierName);
+
+    /**
+     * Get supplier's balance BEFORE a specific invoice (for PDF generation)
+     * @param supplierName Supplier name
+     * @param excludeInvoiceNumber Invoice to exclude from calculation 
+     * @return Previous balance before the specified invoice
+     */
+    double getSupplierPreviousBalance(String supplierName, String excludeInvoiceNumber);
 
     /**
      * Get supplier invoice balance details for PDF generation
@@ -165,6 +213,10 @@ public interface db {
      */
     Object[] getSupplierInvoiceBalanceDetails(String supplierName, String invoiceNumber, 
                                            double currentInvoiceTotal, double currentInvoicePaid);
+
+    Supplier getSupplierWithCurrentBalance(String supplierName);
+
+    List<Object[]> getSupplierBalanceSummary();
 
     // --------------------------
     // Supplier Update Operations
@@ -180,6 +232,19 @@ public interface db {
      */
     boolean updateSupplier(int supplierId, String name, String contact, String tehsilName);
     
+    /**
+     * Get supplier by ID
+     * @param supplierId The supplier ID
+     * @return Supplier object with current details
+     */
+    Supplier getSupplierById(int supplierId);
+    
+    /**
+     * Get supplier ID by name
+     * @param supplierName The supplier name
+     * @return Supplier ID, or -1 if not found
+     */
+    int getSupplierIdByName(String supplierName);
 
     // --------------------------
     // Supplier Payment and Ledger Operations
@@ -242,7 +307,13 @@ public interface db {
      */
     boolean updateCustomer(int customerId, String name, String contact, String tehsilName);
     
-
+    /**
+     * Get customer by ID
+     * @param customerId The customer ID
+     * @return Customer object with current details
+     */
+    Customer getCustomerById(int customerId);
+    
     /**
      * Get customer ID by name
      * @param customerName The customer name
@@ -304,6 +375,8 @@ public interface db {
 
     boolean insertUnit(String unitName) ;
 
+    boolean unitExists(String unitName) ;
+
     // --------------------------
     // User Management Operations
     // --------------------------
@@ -313,7 +386,7 @@ public interface db {
     
     boolean changePassword(String username, String oldPassword, String newPassword);
     
-    List<String> getAllUsers(); 
+    List<String> getAllUsers();
 
     // --------------------------
     // Raw Stock Operations
@@ -337,6 +410,17 @@ public interface db {
     
     List<Object[]> getAllRawPurchaseInvoices();
     
+    boolean insertRawPurchaseInvoice(String invoiceNumber, int supplierId, String invoiceDate, 
+                                   double totalAmount, double discountAmount, double paidAmount);
+    
+    int insertRawPurchaseInvoiceAndGetId(String invoiceNumber, int supplierId, String invoiceDate, 
+                                       double totalAmount, double discountAmount, double paidAmount);
+    
+    List<Object[]> getAllRawStockUsage();
+    
+    // New methods for enhanced invoice functionality
+    String generateNextInvoiceNumber(String prefix);
+    
     List<Object[]> getAllRawStocksForDropdown();
     
     List<String> getAllSupplierNames();
@@ -350,19 +434,25 @@ public interface db {
                                           double totalAmount, double discountAmount, double paidAmount, 
                                           List<RawStockPurchaseItem> items);
 
+    boolean ensureBrandExists(String brandName, int tehsilId);
+
     // --------------------------
     // Raw Purchase Return Invoice Operations
     // --------------------------
     String generateReturnInvoiceNumber();
     
     List<Object[]> getAllRawPurchaseInvoicesForDropdown();
-
+    
+    List<Object[]> getRawStockItemsByInvoiceId(int invoiceId);
+    
     int insertRawPurchaseReturnInvoiceAndGetId(String returnInvoiceNumber, int originalInvoiceId, 
                                              int supplierId, String returnDate, double totalReturnAmount);
     
     boolean insertRawPurchaseReturnInvoiceItems(int returnInvoiceId, List<RawStockPurchaseItem> items);
     
     double getCurrentRawStockQuantity(int stockId);
+    
+    List<Object[]> getAllRawPurchaseReturnInvoices();
 
     // --------------------------
     // Raw Stock Use Invoice Operations
@@ -394,7 +484,9 @@ public interface db {
     int insertProductionInvoiceAndGetId(String productionDate, String notes);
     
     boolean insertProductionInvoiceItems(int productionInvoiceId, List<Object[]> productionItems);
-
+    
+    double getCurrentProductionStockQuantity(int productionId);
+    
     boolean insertProductionStockRawUsage(int productionInvoiceId, List<Object[]> rawMaterialsUsed);
 
     // --------------------------
@@ -421,7 +513,12 @@ public interface db {
     // Add quantity to existing production stock
     boolean addToProductionStock(String productName, String brandName, int addedQuantity, double unitCost, double salePrice);
     
-
+    // Decrease production stock when items are sold
+    boolean decreaseProductionStock(int productionId, double soldQuantity);
+    
+    int insertSalesInvoiceAndGetId(String invoiceNumber, int customerId, String salesDate, 
+                                  double totalAmount, double discountAmount, double paidAmount);
+    
     boolean insertSalesInvoiceItems(int salesInvoiceId, List<Object[]> items);
     
     boolean insertSalesInvoice(String invoiceNumber, int customerId, String salesDate, 
@@ -439,7 +536,11 @@ public interface db {
     
     Object[] getSalesInvoiceById(int salesInvoiceId);
     
-
+    int insertSalesReturnInvoiceAndGetId(String returnInvoiceNumber, int originalSalesInvoiceId, 
+                                        int customerId, String returnDate, double totalReturnAmount);
+    
+    boolean insertSalesReturnInvoiceItems(int salesReturnInvoiceId, List<Object[]> items);
+    
     boolean insertSalesReturnInvoice(String returnInvoiceNumber, int originalSalesInvoiceId, 
                                     int customerId, String returnDate, double totalReturnAmount, 
                                     List<Object[]> items, boolean updateBalance);
@@ -483,10 +584,16 @@ public interface db {
     List<Object[]> getAllEmployeeAttendance();
     
     List<Object[]> getEmployeeAttendanceByDateRange(String startDate, String endDate);
-
+    
+    List<Object[]> getEmployeeAttendanceByEmployee(int employeeId);
+    
     int getEmployeeIdByName(String employeeName);
     
-
+    // --------------------------
+    // Employee Salary Payment Operations
+    // --------------------------
+    List<Object[]> getAllEmployeeSalaryPayments();  // TODO: remove
+    
     List<Object[]> getAllEmployeeLoans();
 
     // --------------------------
@@ -509,29 +616,30 @@ public interface db {
     
     boolean updateSalesman(int salesmanId, String name, String contact, String address, double commissionRate);
 
-    boolean updateBank(Bank bank);
+boolean updateBank(Bank bank);
 
-    boolean deleteBank(int bankId);
+boolean deleteBank(int bankId);
 
-    boolean insertBankTransaction(BankTransaction transaction);
+boolean insertBankTransaction(BankTransaction transaction);
 
-    boolean insertCashTransaction(BankTransaction transaction);
+boolean insertCashTransaction(BankTransaction transaction);
 
-    boolean updateCashTransaction(BankTransaction transaction);
+boolean updateCashTransaction(BankTransaction transaction);
 
-    boolean deleteCashTransaction(int transactionId);
+boolean deleteCashTransaction(int transactionId);
 
-    double getCashBalance();
+double getCashBalance();
 
-    boolean updateBankBalance(double newBalance);  // TODO: remove
+boolean updateBankBalance(double newBalance);  // TODO: remove
 
-    List<Object[]> getViewData(String viewName, Map<String, String> filters);
-    List<Object[]> getInvoiceItemsByID(Integer invoiceID);
-    List<Object[]> getAllRawStock();
+List<Object[]> getViewData(String viewName, Map<String, String> filters);
+List<Object[]> getInvoiceItemsByID(Integer invoiceID);
+ List<Object[]> getAllRawStock();
     List<Object[]> getAllProductionStock();
     ///////////////////////////////////////////////////////////////////////////////
     /// ///                   reports Methods
     ///////////////////////////////////////////////////////////////////////////////
+    List<Object[]> getPurchaseReportList(Date fromDate, Date toDate);  // TODO: remove
     ResultSet getPurchaseReport(Date fromDate, Date toDate, String reportType); //checked by Umer Ghafoor
     ResultSet getSalesReport(Date fromDate, Date toDate, String reportType); //checked by Umer Ghafoor
     ResultSet getReturnPurchaseReport(Date fromDate, Date toDate, String reportType);//checked by Umer Ghafoor
@@ -546,14 +654,10 @@ public interface db {
     ResultSet getAreaWiseReport();
     ResultSet getAreaWiseReport(String partyType, String areaType, String areaValue);
     ResultSet getBrandSalesReport(Date fromDate, Date toDate);
+    ResultSet getBrandProfitReport(Date fromDate, Date toDate);  // TODO: remove
+    ResultSet getCustomerSalesReport(int customerId, Date fromDate, Date toDate);  // TODO: remove
+    ResultSet getSupplierSalesReport(int supplierId, Date fromDate, Date toDate);  // TODO: remove
+    ResultSet getAttendanceReport(int employeeId, Date fromDate, Date toDate);  // TODO: remove
 
-    String generateNextInvoiceNumber(String string);
-
-    int getSupplierIdByName(String supplierName);
-
-    /**
-     * Get unit_id by unit name
-     */
-    int getUnitIdByName(String unitName);
 }
 

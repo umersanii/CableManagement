@@ -1457,51 +1457,34 @@ public class ReportsContent {
         // Action buttons (for export, etc.)
         HBox buttons = createReportActionButtons();
 
-        // Area-wise report table with contact information and financial data
+        // Area-wise report table with contact information
         TableView<AreaWiseReport> table = new TableView<>();
         
         TableColumn<AreaWiseReport, String> typeCol = new TableColumn<>("Type");
         typeCol.setCellValueFactory(new PropertyValueFactory<>("partyType"));
-        typeCol.setPrefWidth(80);
+        typeCol.setPrefWidth(100);
         
         TableColumn<AreaWiseReport, String> nameCol = new TableColumn<>("Name");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
-        nameCol.setPrefWidth(150);
+        nameCol.setPrefWidth(200);
         
         TableColumn<AreaWiseReport, String> contactCol = new TableColumn<>("Contact");
         contactCol.setCellValueFactory(new PropertyValueFactory<>("contact"));
-        contactCol.setPrefWidth(100);
+        contactCol.setPrefWidth(120);
         
         TableColumn<AreaWiseReport, String> tehsilCol = new TableColumn<>("Tehsil");
         tehsilCol.setCellValueFactory(new PropertyValueFactory<>("tehsilName"));
-        tehsilCol.setPrefWidth(100);
+        tehsilCol.setPrefWidth(120);
         
         TableColumn<AreaWiseReport, String> districtCol = new TableColumn<>("District");
         districtCol.setCellValueFactory(new PropertyValueFactory<>("districtName"));
-        districtCol.setPrefWidth(100);
+        districtCol.setPrefWidth(120);
         
         TableColumn<AreaWiseReport, String> provinceCol = new TableColumn<>("Province");
         provinceCol.setCellValueFactory(new PropertyValueFactory<>("provinceName"));
-        provinceCol.setPrefWidth(100);
+        provinceCol.setPrefWidth(120);
         
-        TableColumn<AreaWiseReport, String> totalSalesCol = new TableColumn<>("Total Sales");
-        totalSalesCol.setCellValueFactory(new PropertyValueFactory<>("totalSales"));
-        totalSalesCol.setPrefWidth(100);
-        
-        TableColumn<AreaWiseReport, String> totalDiscountCol = new TableColumn<>("Total Discount");
-        totalDiscountCol.setCellValueFactory(new PropertyValueFactory<>("totalDiscount"));
-        totalDiscountCol.setPrefWidth(100);
-        
-        TableColumn<AreaWiseReport, String> paymentDoneCol = new TableColumn<>("Payment Done");
-        paymentDoneCol.setCellValueFactory(new PropertyValueFactory<>("paymentDone"));
-        paymentDoneCol.setPrefWidth(100);
-        
-        TableColumn<AreaWiseReport, String> balanceCol = new TableColumn<>("Balance");
-        balanceCol.setCellValueFactory(new PropertyValueFactory<>("balance"));
-        balanceCol.setPrefWidth(100);
-        
-        table.getColumns().addAll(typeCol, nameCol, contactCol, tehsilCol, districtCol, 
-                                 provinceCol, totalSalesCol, totalDiscountCol, paymentDoneCol, balanceCol);
+        table.getColumns().addAll(typeCol, nameCol, contactCol, tehsilCol, districtCol, provinceCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         // Error label for feedback
@@ -1561,10 +1544,6 @@ public class ReportsContent {
                         String tehsilName = rs.getString("tehsil_name");
                         String districtName = rs.getString("district_name");
                         String provinceName = rs.getString("province_name");
-                        String totalSales = String.format("%.2f", rs.getDouble("total_sales"));
-                        String totalDiscount = String.format("%.2f", rs.getDouble("total_discount"));
-                        String paymentDone = String.format("%.2f", rs.getDouble("payment_done"));
-                        String balance = String.format("%.2f", rs.getDouble("balance"));
                         
                         // Handle null values
                         if (partyTypeResult == null) partyTypeResult = "Unknown";
@@ -1575,8 +1554,7 @@ public class ReportsContent {
                         if (provinceName == null) provinceName = "Unknown";
                         
                         table.getItems().add(new AreaWiseReport(partyTypeResult, name, contact, 
-                                                              tehsilName, districtName, provinceName,
-                                                              totalSales, totalDiscount, paymentDone, balance));
+                                                              tehsilName, districtName, provinceName));
                         count++;
                     }
                     
@@ -2175,24 +2153,15 @@ public class ReportsContent {
         private final String tehsilName;
         private final String districtName;
         private final String provinceName;
-        private final String totalSales;
-        private final String totalDiscount;
-        private final String paymentDone;
-        private final String balance;
 
         public AreaWiseReport(String partyType, String name, String contact,
-                            String tehsilName, String districtName, String provinceName,
-                            String totalSales, String totalDiscount, String paymentDone, String balance) {
+                            String tehsilName, String districtName, String provinceName) {
             this.partyType = partyType;
             this.name = name;
             this.contact = contact;
             this.tehsilName = tehsilName;
             this.districtName = districtName;
             this.provinceName = provinceName;
-            this.totalSales = totalSales;
-            this.totalDiscount = totalDiscount;
-            this.paymentDone = paymentDone;
-            this.balance = balance;
         }
 
         public String getPartyType() { return partyType; }
@@ -2201,10 +2170,6 @@ public class ReportsContent {
         public String getTehsilName() { return tehsilName; }
         public String getDistrictName() { return districtName; }
         public String getProvinceName() { return provinceName; }
-        public String getTotalSales() { return totalSales; }
-        public String getTotalDiscount() { return totalDiscount; }
-        public String getPaymentDone() { return paymentDone; }
-        public String getBalance() { return balance; }
     }
 
     public static class BrandSalesReport {
