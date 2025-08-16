@@ -98,6 +98,7 @@ public class RawStock {
     private static TextField rawStockQuantityField;
     private static TextField rawStockUnitPriceField;
     private static ComboBox<String> rawStockBrandCombo;
+    private static ComboBox<String> rawStockCategoryCombo;
     private static ComboBox<String> rawStockUnitCombo;
     private static ComboBox<String> rawStockSupplierCombo;
     private static TableView<RawStockRecord> rawStockTable;
@@ -121,6 +122,12 @@ public class RawStock {
             rawStockBrandCombo.getItems().add(b.nameProperty().get());
         }
         rawStockBrandCombo.setPrefWidth(200);
+        
+        // Category ComboBox for selecting category
+        rawStockCategoryCombo = new ComboBox<>();
+        rawStockCategoryCombo.setPromptText("Select Category");
+        rawStockCategoryCombo.getItems().addAll(database.getAllCategories());
+        rawStockCategoryCombo.setPrefWidth(200);
         
         // Unit ComboBox for selecting units
         rawStockUnitCombo = new ComboBox<>();
@@ -155,7 +162,7 @@ public class RawStock {
         });
 
         submitBtn.setOnAction(e -> handleRawStockSubmit(
-            rawStockNameField, rawStockBrandCombo, rawStockUnitCombo, rawStockSupplierCombo,
+            rawStockNameField, rawStockBrandCombo, rawStockCategoryCombo, rawStockUnitCombo, rawStockSupplierCombo,
             rawStockQuantityField, rawStockUnitPriceField,
             rawStockTable
         ));
@@ -167,6 +174,7 @@ public class RawStock {
             heading, 
             createFormRow("Stock Name:", rawStockNameField),
             createFormRow("Brand:", rawStockBrandCombo),
+            createFormRow("Category:", rawStockCategoryCombo),
             createFormRow("Unit:", rawStockUnitCombo),
             createFormRow("Supplier:", rawStockSupplierCombo),
             createFormRow("Quantity:", rawStockQuantityField),
@@ -2055,19 +2063,20 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
 
     // Form submission handlers
     private static void handleRawStockSubmit(
-        TextField nameField, ComboBox<String> brandCombo, ComboBox<String> unitCombo, ComboBox<String> supplierCombo,
+        TextField nameField, ComboBox<String> brandCombo, ComboBox<String> categoryCombo, ComboBox<String> unitCombo, ComboBox<String> supplierCombo,
         TextField quantityField, TextField unitPriceField,
         TableView<RawStockRecord> stockTable
     ) {
         String name = nameField.getText().trim();
         String brand = brandCombo.getValue();
+        String category = categoryCombo.getValue();
         String unit = unitCombo.getValue();
         String supplier = supplierCombo.getValue(); // Optional
         String quantityText = quantityField.getText().trim();
         String unitPriceText = unitPriceField.getText().trim();
 
-        if (name.isEmpty() || brand == null || unit == null || unitPriceText.isEmpty() || quantityText.isEmpty()) {
-            showAlert(Alert.AlertType.ERROR, "Error", "Name, Brand, Unit, Quantity, and Unit Price are required");
+        if (name.isEmpty() || brand == null || category == null || unit == null || unitPriceText.isEmpty() || quantityText.isEmpty()) {
+            showAlert(Alert.AlertType.ERROR, "Error", "Name, Brand, Category, Unit, Quantity, and Unit Price are required");
             return;
         }
 
@@ -2075,8 +2084,8 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             int quantity = Integer.parseInt(quantityText);
             double unitPrice = Double.parseDouble(unitPriceText);
             
-            // Insert into RawStock table using the updated database method with unit
-            boolean success = database.insertRawStock(name, "", brand, unit, quantity, unitPrice, 0.0);
+            // Insert into RawStock table using the updated database method with category
+            boolean success = database.insertRawStock(name, category, brand, unit, quantity, unitPrice, 0.0);
             
             if (success) {
                 showAlert(Alert.AlertType.INFORMATION, "Success", "Raw stock registered successfully!");
@@ -2084,6 +2093,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                 // Clear fields
                 nameField.clear();
                 brandCombo.setValue(null);
+                categoryCombo.setValue(null);
                 unitCombo.setValue(null);
                 supplierCombo.setValue(null);
                 quantityField.clear();
