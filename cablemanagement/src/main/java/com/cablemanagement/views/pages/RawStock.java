@@ -481,11 +481,15 @@ public class RawStock {
 
         itemsSection.getChildren().addAll(itemsHeading, addItemControls, itemsTable, totalsSection);
 
+        HBox optionsContainer = new HBox(10);
+        optionsContainer.setAlignment(Pos.CENTER);
+        optionsContainer.getChildren().addAll(createFormRow("Invoice Number:", invoiceNumberField),
+            createFormRow("Supplier:", supplierCombo), createFormRow("Invoice Date:", invoiceDatePicker));
+
         form.getChildren().addAll(
             headingContainer,
-            createFormRow("Invoice Number:", invoiceNumberField),
-            createFormRow("Supplier:", supplierCombo),
-            createFormRow("Invoice Date:", invoiceDatePicker),
+            optionsContainer,
+            
             itemsSection,
             actionButtons
         );
