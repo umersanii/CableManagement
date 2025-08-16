@@ -4,23 +4,21 @@ public class RawStockPurchaseItem {
     private Integer rawStockId;
     private String rawStockName;
     private String categoryName;
+    private String manufacturerName; // New field for manufacturer
     private String brandName;
     private String unitName;
     private Double quantity;
     private Double unitPrice;
 
-    public RawStockPurchaseItem() {
-        // Default constructor
-    }
-
-    public RawStockPurchaseItem(Integer rawStockId, String rawStockName, String brandName, Double quantity, Double unitPrice) {
+    public RawStockPurchaseItem(Integer rawStockId, String rawStockName, String brandName, Double quantity, Double unitPrice, String manufacturerName, String categoryName, String unitName) {
         this.rawStockId = rawStockId;
         this.rawStockName = rawStockName;
         this.brandName = brandName;
         this.quantity = quantity;
         this.unitPrice = unitPrice;
-        this.categoryName = ""; // Default value
-        this.unitName = "";     // Default value
+        this.categoryName = categoryName;
+        this.unitName = unitName;
+        this.manufacturerName = manufacturerName;
     }
 
     // Getters
@@ -31,6 +29,7 @@ public class RawStockPurchaseItem {
     public String getUnitName() { return unitName; }
     public Double getQuantity() { return quantity; }
     public Double getUnitPrice() { return unitPrice; }
+    public String getManufacturerName() { return manufacturerName; }
 
     // Setters
     public void setRawStockId(Integer rawStockId) { this.rawStockId = rawStockId; }
@@ -40,7 +39,8 @@ public class RawStockPurchaseItem {
     public void setUnitName(String unitName) { this.unitName = unitName; }
     public void setQuantity(Double quantity) { this.quantity = quantity; }
     public void setUnitPrice(Double unitPrice) { this.unitPrice = unitPrice; }
-        public double getTotalPrice() {
+    public void setManufacturerName(String manufacturerName) { this.manufacturerName = manufacturerName; }
+    public double getTotalPrice() {
         // Replace with actual calculation or field
         if (quantity != null && unitPrice != null) {
             return quantity * unitPrice;

@@ -527,15 +527,15 @@ public class RawStock {
             // Validate that we have at least one item in the table
             if (itemsTable.getItems().isEmpty()) {
                 // For testing purposes, add a sample item if there are none
-                RawStockPurchaseItem sampleItem = new RawStockPurchaseItem(
-                    1, // Sample ID
-                    "Sample Raw Stock", 
-                    "Sample Brand", 
-                    1.0, // quantity 
-                    100.0 // unit price
-                );
-                sampleItem.setUnitName("Unit");
-                itemsTable.getItems().add(sampleItem);
+                // RawStockPurchaseItem sampleItem = new RawStockPurchaseItem(
+                //     1, // Sample ID
+                //     "Sample Raw Stock", 
+                //     "Sample Brand", 
+                //     1.0, // quantity 
+                //     100.0 // unit price
+                // );
+                // sampleItem.setUnitName("Unit");
+                // itemsTable.getItems().add(sampleItem);
                 // Update the total
                 updateTotalLabel(itemsTable, discountField, totalLabel);
             }
@@ -756,11 +756,15 @@ private static ScrollPane createRawStockReturnPurchaseInvoiceForm() {
                 ObservableList<RawStockPurchaseItem> itemsList = FXCollections.observableArrayList();
                 for (Object[] item : items) {
                     RawStockPurchaseItem purchaseItem = new RawStockPurchaseItem(
-                        (Integer) item[0], (String) item[1], (String) item[2],
-                        (Double) item[3], (Double) item[4]
+                        (Integer) item[0],    // rawStockId
+                        (String) item[1],     // rawStockName
+                        (String) item[2],     // brandName
+                        (Double) item[3],     // quantity
+                        (Double) item[4],     // unitPrice
+                        (String) item[6],     // manufacturerName
+                        (String) item[7],     // categoryName
+                        (String) item[5]      // unitName
                     );
-                    // Set the unit name from the database
-                    purchaseItem.setUnitName((String) item[5]);
                     itemsList.add(purchaseItem);
                 }
                 availableItemsTable.setItems(itemsList);
@@ -991,9 +995,12 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                     return new RawStockPurchaseItem(
                         originalItem.getRawStockId(),
                         originalItem.getRawStockName(),
-                        originalItem.getUnitName(),
+                        originalItem.getBrandName(),
                         returnQty,
-                        unitPrice
+                        unitPrice,
+                        originalItem.getManufacturerName(),
+                        originalItem.getCategoryName(),
+                        originalItem.getUnitName()
                     );
                 } catch (NumberFormatException e) {
                     showAlert("Invalid Input", "Please enter valid numbers");
@@ -1801,7 +1808,6 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
 
     private static TableView<RawStockPurchaseItem> createInvoiceItemsTable() {
         TableView<RawStockPurchaseItem> table = new TableView<>();
-        table.setPrefHeight(200);
         table.getStyleClass().add("form-table");
 
         TableColumn<RawStockPurchaseItem, String> nameCol = new TableColumn<>("Raw Stock");
@@ -1811,6 +1817,10 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         TableColumn<RawStockPurchaseItem, String> categoryCol = new TableColumn<>("Category");
         categoryCol.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
         categoryCol.setPrefWidth(100);
+
+        TableColumn<RawStockPurchaseItem, String> manufacturerCol = new TableColumn<>("Manufacturer");
+        manufacturerCol.setCellValueFactory(new PropertyValueFactory<>("manufacturerName"));
+        manufacturerCol.setPrefWidth(120);
 
         TableColumn<RawStockPurchaseItem, String> brandCol = new TableColumn<>("Brand");
         brandCol.setCellValueFactory(new PropertyValueFactory<>("brandName"));
@@ -1858,7 +1868,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             }
         });
 
-        table.getColumns().addAll(nameCol, categoryCol, brandCol, unitCol, qtyCol, priceCol, totalCol, deleteCol);
+        table.getColumns().addAll(nameCol, categoryCol, manufacturerCol, brandCol, unitCol, qtyCol, priceCol, totalCol, deleteCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         return table;
@@ -1909,12 +1919,11 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
                     (String) selectedStock[1],   // rawStockName
                     (String) selectedStock[3],   // brandName
                     quantity,                    // quantity
-                    unitPrice                    // unitPrice
+                    unitPrice,                   // unitPrice
+                    (String) selectedStock[6],   // manufacturerName
+                    (String) selectedStock[2],   // categoryName
+                    (String) selectedStock[4]    // unitName
                 );
-                
-                // Set the missing fields
-                item.setCategoryName((String) selectedStock[2]); // categoryName
-                item.setUnitName((String) selectedStock[4]);     // unitName
 
                 itemsTable.getItems().add(item);
                 updateTotalLabel(itemsTable, null, totalLabel);

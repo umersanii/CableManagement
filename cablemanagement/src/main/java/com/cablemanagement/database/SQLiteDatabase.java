@@ -2689,10 +2689,12 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllRawStocksForDropdown() {
         List<Object[]> rawStocks = new ArrayList<>();
-        String query = "SELECT rs.stock_id, rs.item_name, 'General' as category_name, b.brand_name, " +
-                      "u.unit_name, rs.unit_price FROM Raw_Stock rs " +
+        String query = "SELECT rs.stock_id, rs.item_name, c.category_name, b.brand_name, " +
+                      "u.unit_name, rs.unit_price, m.manufacturer_name FROM Raw_Stock rs " +
                       "JOIN Brand b ON rs.brand_id = b.brand_id " +
                       "LEFT JOIN Unit u ON rs.unit_id = u.unit_id " +
+                      "LEFT JOIN Category c ON rs.category_id = c.category_id " +
+                      "LEFT JOIN Manufacturer m ON rs.manufacturer_id = m.manufacturer_id " +
                       "ORDER BY rs.item_name";
         
         try (Statement stmt = connection.createStatement();
@@ -2700,12 +2702,13 @@ public class SQLiteDatabase implements db {
             
             while (rs.next()) {
                 Object[] row = {
-                    rs.getInt("stock_id"),
-                    rs.getString("item_name"),
-                    rs.getString("category_name"),
-                    rs.getString("brand_name"),
-                    rs.getString("unit_name") != null ? rs.getString("unit_name") : "Piece",
-                    rs.getDouble("unit_price")
+                    rs.getInt("stock_id"),          // row[0]
+                    rs.getString("item_name"),      // row[1]
+                    rs.getString("category_name") != null ? rs.getString("category_name") : "General", // row[2]
+                    rs.getString("brand_name"),     // row[3]
+                    rs.getString("unit_name") != null ? rs.getString("unit_name") : "Piece", // row[4]
+                    rs.getDouble("unit_price"),     // row[5]
+                    rs.getString("manufacturer_name") != null ? rs.getString("manufacturer_name") : "N/A" // row[6]
                 };
                 rawStocks.add(row);
             }
@@ -6035,14 +6038,18 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getInvoiceItemsByID(Integer invoiceID) {
         List<Object[]> items = new ArrayList<>();
-        String query = "SELECT rpii.raw_stock_id, rs.item_name, b.brand_name, rpii.quantity, rpii.unit_price, " +
-                      "COALESCE(u.unit_name, 'Piece') as unit_name " +
-                      "FROM Raw_Purchase_Invoice_Item rpii " +
-                      "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
-                      "JOIN Brand b ON rs.brand_id = b.brand_id " +
-                      "LEFT JOIN Unit u ON rs.unit_id = u.unit_id " +
-                      "JOIN Raw_Purchase_Invoice rpi ON rpii.raw_purchase_invoice_id = rpi.raw_purchase_invoice_id " +
-                      "WHERE rpi.raw_purchase_invoice_id = ?";
+        String query = "SELECT rpii.raw_stock_id, rs.item_name, c.category_name, m.manufacturer_name, " +
+                    "b.brand_name, rpii.quantity, rpii.unit_price, " +
+                    "COALESCE(u.unit_name, 'Piece') as unit_name " +
+                    "FROM Raw_Purchase_Invoice_Item rpii " +
+                    "JOIN Raw_Stock rs ON rpii.raw_stock_id = rs.stock_id " +
+                    "JOIN Category c ON rs.category_id = c.category_id " +
+                    "JOIN Manufacturer m ON rs.manufacturer_id = m.manufacturer_id " +
+                    "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                    "LEFT JOIN Unit u ON rs.unit_id = u.unit_id " +
+                    "JOIN Raw_Purchase_Invoice rpi ON rpii.raw_purchase_invoice_id = rpi.raw_purchase_invoice_id " +
+                    "WHERE rpi.raw_purchase_invoice_id = ?";
+
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setInt(1, invoiceID);
             System.out.println("Executing query: " + query + " with invoiceID: " + invoiceID);
