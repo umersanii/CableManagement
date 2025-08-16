@@ -104,9 +104,10 @@ public class RawStock {
     private static TableView<RawStockRecord> rawStockTable;
     
     private static VBox createRawStockForm() {
-        VBox form = new VBox(15);
-        form.setPadding(new Insets(20));
+        VBox form = new VBox();
+        // form.setPadding(new Insets(20));
         form.getStyleClass().add("form-container");
+
 
         Label heading = createHeading("Register Raw Stock");
 
@@ -167,19 +168,41 @@ public class RawStock {
             rawStockTable
         ));
 
+        GridPane registrationOptions = new GridPane();
+        registrationOptions.setHgap(15);
+        registrationOptions.setVgap(12);
+        registrationOptions.setPadding(new Insets(10));
+        registrationOptions.setAlignment(Pos.CENTER_LEFT);
+
+        // Add fields in two columns for responsiveness
+        registrationOptions.add(createFormRow("Stock Name:", rawStockNameField), 0, 0);
+        registrationOptions.add(createFormRow("Brand:", rawStockBrandCombo), 1, 0);
+        registrationOptions.add(createFormRow("Category:", rawStockCategoryCombo), 0, 1);
+        registrationOptions.add(createFormRow("Unit:", rawStockUnitCombo), 1, 1);
+        registrationOptions.add(createFormRow("Supplier:", rawStockSupplierCombo), 0, 2);
+        registrationOptions.add(createFormRow("Quantity:", rawStockQuantityField), 1, 2);
+        registrationOptions.add(createFormRow("Unit Price:", rawStockUnitPriceField), 0, 3);
+
+        // Place submit button spanning both columns
+        HBox submitBox = new HBox(submitBtn);
+        submitBox.setAlignment(Pos.CENTER_RIGHT);
+        registrationOptions.add(submitBox, 1, 3);
+
+        // Make columns grow with window size
+        ColumnConstraints col1 = new ColumnConstraints();
+        col1.setPercentWidth(50);
+        col1.setHgrow(Priority.ALWAYS);
+        ColumnConstraints col2 = new ColumnConstraints();
+        col2.setPercentWidth(50);
+        col2.setHgrow(Priority.ALWAYS);
+        registrationOptions.getColumnConstraints().addAll(col1, col2);
+
         // Create form content in a compact layout
-        VBox formContent = new VBox(15);
+        VBox formContent = new VBox();
         formContent.setStyle("-fx-text-fill: black;");
         formContent.getChildren().addAll(
-            heading, 
-            createFormRow("Stock Name:", rawStockNameField),
-            createFormRow("Brand:", rawStockBrandCombo),
-            createFormRow("Category:", rawStockCategoryCombo),
-            createFormRow("Unit:", rawStockUnitCombo),
-            createFormRow("Supplier:", rawStockSupplierCombo),
-            createFormRow("Quantity:", rawStockQuantityField),
-            createFormRow("Unit Price:", rawStockUnitPriceField),
-            submitBtn, tableHeading, rawStockTable
+            heading,registrationOptions,
+             tableHeading, rawStockTable
         );
 
         // Wrap form in ScrollPane for responsiveness

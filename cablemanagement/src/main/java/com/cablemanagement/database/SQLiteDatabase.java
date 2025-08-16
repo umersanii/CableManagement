@@ -888,6 +888,54 @@ public class SQLiteDatabase implements db {
         return false;
     }
 
+    /**
+     * Get category_id by category name
+     */
+    public int getCategoryIdByName(String categoryName) {
+        if (categoryName == null || categoryName.trim().isEmpty()) {
+            return 1; // Default to first category
+        }
+        
+        String query = "SELECT category_id FROM Category WHERE category_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, categoryName.trim());
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("category_id");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        // If category not found, try to insert it and return the ID
+        return insertCategoryAndGetId(categoryName.trim());
+    }
+    
+    /**
+     * Insert new category and return its ID
+     */
+    private int insertCategoryAndGetId(String categoryName) {
+        String query = "INSERT INTO Category (category_name) VALUES (?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, categoryName);
+            
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        return generatedKeys.getInt(1);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        
+        return 1; // Return default category ID if insertion fails
+    }
+
     @Override
     public List<Manufacturer> getAllManufacturers() {
         List<Manufacturer> manufacturers = new ArrayList<>();
@@ -2464,22 +2512,27 @@ public class SQLiteDatabase implements db {
         // Get unit_id from unit name
         int unitId = getUnitIdByName(unit);
         
+        // Get category_id from category name
+        int categoryId = getCategoryIdByName(category);
+        
         double totalCost = openingQty * purchasePrice;
         int quantity = (int) Math.round(openingQty);
         
-        String query = "INSERT INTO Raw_Stock (item_name, brand_id, unit_id, quantity, unit_price, total_cost, supplier_id) " +
-                    "SELECT ?, b.brand_id, ?, ?, ?, ?, ? FROM Brand b WHERE b.brand_name = ?";
+        String query = "INSERT INTO Raw_Stock (item_name, category_id, manufacturer_id, brand_id, unit_id, quantity, unit_price, total_cost, supplier_id) " +
+                    "SELECT ?, ?, b.manufacturer_id, b.brand_id, ?, ?, ?, ?, ? FROM Brand b WHERE b.brand_name = ?";
         
         try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setString(1, name);
-            pstmt.setInt(2, unitId);
-            pstmt.setInt(3, quantity);
-            pstmt.setDouble(4, purchasePrice);
-            pstmt.setDouble(5, totalCost);
-            pstmt.setInt(6, 1); // Use supplier_id = 1 (matches 'rewf')
-            pstmt.setString(7, brand);
+            pstmt.setInt(2, categoryId);
+            pstmt.setInt(3, unitId);
+            pstmt.setInt(4, quantity);
+            pstmt.setDouble(5, purchasePrice);
+            pstmt.setDouble(6, totalCost);
+            pstmt.setInt(7, 1); // Use supplier_id = 1 (matches 'rewf')
+            pstmt.setString(8, brand);
             
-            System.out.println("Attempting to insert Raw_Stock: item_name=" + name + ", brand=" + brand + 
+            System.out.println("Attempting to insert Raw_Stock: item_name=" + name + ", category=" + category + 
+                            " (category_id=" + categoryId + "), brand=" + brand + 
                             ", unit=" + unit + " (unit_id=" + unitId + "), quantity=" + quantity + 
                             ", unit_price=" + purchasePrice + ", supplier_id=1");
             
