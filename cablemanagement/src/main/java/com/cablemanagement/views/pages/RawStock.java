@@ -716,16 +716,20 @@ private static ScrollPane createRawStockReturnPurchaseInvoiceForm() {
     formGrid.setHgap(15);
     formGrid.setVgap(15);
     formGrid.setPadding(new Insets(10));
+
+    // First row
     formGrid.add(new Label("Return Invoice Number:"), 0, 0);
     formGrid.add(returnInvoiceNumberField, 1, 0);
-    formGrid.add(new Label("Original Invoice:"), 0, 1);
-    formGrid.add(originalInvoiceComboBox, 1, 1);
-    formGrid.add(new Label("Supplier:"), 0, 2);
-    formGrid.add(supplierComboBox, 1, 2);
-    formGrid.add(new Label("Return Date:"), 0, 3);
-    formGrid.add(returnDatePicker, 1, 3);
-    formGrid.add(new Label("Total Return Amount:"), 0, 4);
-    formGrid.add(totalReturnAmountField, 1, 4);
+    formGrid.add(new Label("Original Invoice:"), 2, 0);
+    formGrid.add(originalInvoiceComboBox, 3, 0);
+    formGrid.add(new Label("Supplier:"), 4, 0);
+    formGrid.add(supplierComboBox, 5, 0);
+
+    // Second row
+    formGrid.add(new Label("Return Date:"), 0, 1);
+    formGrid.add(returnDatePicker, 1, 1);
+    formGrid.add(new Label("Total Return Amount:"), 2, 1);
+    formGrid.add(totalReturnAmountField, 3, 1);
 
     // === Tables Section ===
     VBox tablesSection = new VBox(15,
@@ -826,7 +830,7 @@ private static ScrollPane createRawStockReturnPurchaseInvoiceForm() {
 
 private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
     TableView<RawStockPurchaseItem> table = new TableView<>();
-    table.setPrefHeight(200);
+    // table.setPrefHeight(200);
     
     TableColumn<RawStockPurchaseItem, String> nameCol = new TableColumn<>("Item Name");
     nameCol.setCellValueFactory(new PropertyValueFactory<>("rawStockName"));
@@ -878,7 +882,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
 }
     private static TableView<RawStockPurchaseItem> createSelectedReturnItemsTable() {
         TableView<RawStockPurchaseItem> table = new TableView<>();
-        table.setPrefHeight(200);
+        // table.setPrefHeight(200);
         
         TableColumn<RawStockPurchaseItem, String> nameCol = new TableColumn<>("Item Name");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("rawStockName"));
@@ -1363,17 +1367,17 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         // Tables for Available and Selected Items (reduced heights)
         Label availableItemsLabel = createSubheading("Available Raw Stock Items:");
         TableView<RawStockUseItem> availableItemsTable = createRawStockItemsTable();
-        availableItemsTable.setPrefHeight(240); // Increased from 150
-        availableItemsTable.setMinHeight(240);
-        availableItemsTable.setMaxHeight(240);
+        // availableItemsTable.setPrefHeight(240); // Increased from 150
+        // availableItemsTable.setMinHeight(240);
+        // availableItemsTable.setMaxHeight(240);
  
 
 
         
         Label selectedItemsLabel = createSubheading("Selected Items for Use:");
         TableView<RawStockUseItem> selectedItemsTable = createSelectedUsageItemsTable();
-        selectedItemsTable.setPrefHeight(150); // Reduced from 200
-        selectedItemsTable.setMaxHeight(150);
+        // selectedItemsTable.setPrefHeight(150); // Reduced from 200
+        // selectedItemsTable.setMaxHeight(150);
 
         // Buttons for item selection
         HBox itemButtonsBox = new HBox(10);
@@ -1523,7 +1527,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         scrollPane.setFitToHeight(false);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scrollPane.setPrefViewportHeight(600); // Set a reasonable height
+        // scrollPane.setPrefViewportHeight(600); // Set a reasonable height
         scrollPane.getStyleClass().add("scroll-pane");
         
         return scrollPane;
@@ -1562,7 +1566,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
 
         // Report display area
         ScrollPane reportScrollPane = new ScrollPane();
-        reportScrollPane.setPrefHeight(400);
+        // reportScrollPane.setPrefHeight(400);
         reportScrollPane.setFitToWidth(true);
         VBox reportContent = new VBox(10);
         reportScrollPane.setContent(reportContent);
@@ -1631,7 +1635,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             
             // Create table for summary data
             TableView<Object[]> table = new TableView<>();
-            table.setPrefHeight(300);
+            // table.setPrefHeight(300);
             
             TableColumn<Object[], String> itemCol = new TableColumn<>("Item Name");
             itemCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[0]));
@@ -1678,7 +1682,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
             
             // Create table for detailed data
             TableView<Object[]> table = new TableView<>();
-            table.setPrefHeight(350);
+            // table.setPrefHeight(350);
             
             TableColumn<Object[], String> invoiceCol = new TableColumn<>("Invoice #");
             invoiceCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty((String) cellData.getValue()[0]));
@@ -1783,7 +1787,7 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
 
     private static ListView<String> createListView() {
         ListView<String> listView = new ListView<>();
-        listView.setPrefHeight(200);
+        // listView.setPrefHeight(200);
         listView.getStyleClass().add("category-list");
         return listView;
     }
