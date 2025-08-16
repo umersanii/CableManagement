@@ -208,10 +208,9 @@ public class RawStock {
         // Wrap form in ScrollPane for responsiveness
         ScrollPane scrollPane = new ScrollPane(formContent);
         scrollPane.setFitToWidth(true);
-        scrollPane.setFitToHeight(false);
+        scrollPane.setFitToHeight(true);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scrollPane.setPrefViewportHeight(600);
         scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
 
         form.getChildren().add(scrollPane);
@@ -221,8 +220,6 @@ public class RawStock {
 
     private static TableView<RawStockRecord> createRawStockTable() {
         TableView<RawStockRecord> table = new TableView<>();
-        table.setPrefHeight(200);
-        table.setMaxHeight(200);
         
         TableColumn<RawStockRecord, Integer> idCol = new TableColumn<>("ID");
         idCol.setCellValueFactory(new PropertyValueFactory<>("id"));
@@ -232,7 +229,15 @@ public class RawStock {
         TableColumn<RawStockRecord, String> nameCol = new TableColumn<>("Stock Name");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
         nameCol.setPrefWidth(200);
-        
+
+        TableColumn<RawStockRecord, String> categoryCol = new TableColumn<>("Category");
+        categoryCol.setCellValueFactory(new PropertyValueFactory<>("category"));
+        categoryCol.setPrefWidth(120);
+
+        TableColumn<RawStockRecord, String> manufacturerCol = new TableColumn<>("Manufacturer");
+        manufacturerCol.setCellValueFactory(new PropertyValueFactory<>("manufacturer"));
+        manufacturerCol.setPrefWidth(120);
+
         TableColumn<RawStockRecord, String> brandCol = new TableColumn<>("Brand");
         brandCol.setCellValueFactory(new PropertyValueFactory<>("brand"));
         brandCol.setPrefWidth(120);
@@ -320,7 +325,7 @@ public class RawStock {
             }
         });
         
-        table.getColumns().addAll(idCol, nameCol, brandCol, unitCol, qtyCol, priceCol, totalCol, actionCol);
+        table.getColumns().addAll(idCol, nameCol, categoryCol, manufacturerCol, brandCol, unitCol, qtyCol, priceCol, totalCol, actionCol);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         
         // Apply CSS class for proper header styling (defined in style.css)
@@ -332,16 +337,20 @@ public class RawStock {
     private static void refreshRawStockTable(TableView<RawStockRecord> table) {
         ObservableList<RawStockRecord> data = FXCollections.observableArrayList();
         List<Object[]> rawStocks = database.getAllRawStocks();
+
         
         for (Object[] row : rawStocks) {
+            System.out.println("Raw stock data: " + row[0] + ", " + row[1] + ", " + row[2] + ", " + row[3] + ", " + row[4] + ", " + row[5] + ", " + row[6] + ", " + row[7] + ", " + row[8]);
             data.add(new RawStockRecord(
                 (Integer) row[0],  // stock_id
                 (String) row[1],   // item_name
+                (String) row[3],   // category_name
+                (String) row[4],   // manufacturer_name
                 (String) row[2],   // brand_name
-                (String) row[3],   // unit_name
-                (Double) row[4],   // quantity
-                (Double) row[5],   // unit_price
-                (Double) row[6]    // total_cost
+                (String) row[5],   // unit_name
+                (Double) row[6],   // quantity
+                (Double) row[7],   // unit_price
+                (Double) row[8]    // total_cost
             ));
         }
         
@@ -2773,16 +2782,20 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
     public static class RawStockRecord {
         private final Integer id;
         private final String name;
+        private final String category;
+        private final String manufacturer;
         private final String brand;
         private final String unit;
         private final Double quantity;
         private final Double unitPrice;
         private final Double totalCost;
 
-        public RawStockRecord(Integer id, String name, String brand, String unit,
+        public RawStockRecord(Integer id, String name, String category, String manufacturer, String brand, String unit,
                              Double quantity, Double unitPrice, Double totalCost) {
             this.id = id;
             this.name = name;
+            this.category = category;
+            this.manufacturer = manufacturer;
             this.brand = brand;
             this.unit = unit;
             this.quantity = quantity;
@@ -2797,6 +2810,8 @@ private static TableView<RawStockPurchaseItem> createAvailableItemsTable() {
         public Double getQuantity() { return quantity; }
         public Double getUnitPrice() { return unitPrice; }
         public Double getTotalCost() { return totalCost; }
+        public String getCategory() { return category; }
+        public String getManufacturer() { return manufacturer; }
     }
 }
 

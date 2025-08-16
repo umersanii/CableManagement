@@ -2473,25 +2473,30 @@ public class SQLiteDatabase implements db {
     @Override
     public List<Object[]> getAllRawStocks() {
         List<Object[]> rawStocks = new ArrayList<>();
-        String query = "SELECT rs.stock_id, rs.item_name, b.brand_name, u.unit_name, " +
-                      "rs.quantity, rs.unit_price, rs.total_cost " +
-                      "FROM Raw_Stock rs " +
-                      "JOIN Brand b ON rs.brand_id = b.brand_id " +
-                      "LEFT JOIN Unit u ON rs.unit_id = u.unit_id " +
-                      "ORDER BY rs.item_name";
+    String query = "SELECT rs.stock_id, rs.item_name, c.category_name, m.manufacturer_name, " +
+                "b.brand_name, u.unit_name, rs.quantity, rs.unit_price, rs.total_cost " +
+                "FROM Raw_Stock rs " +
+                "JOIN Category c ON rs.category_id = c.category_id " +
+                "JOIN Manufacturer m ON rs.manufacturer_id = m.manufacturer_id " +
+                "JOIN Brand b ON rs.brand_id = b.brand_id " +
+                "LEFT JOIN Unit u ON rs.unit_id = u.unit_id " +
+                "ORDER BY rs.item_name";
+
         
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             
             while (rs.next()) {
                 Object[] row = {
-                    rs.getInt("stock_id"),
-                    rs.getString("item_name"),
-                    rs.getString("brand_name"),
-                    rs.getString("unit_name") != null ? rs.getString("unit_name") : "N/A",
-                    (double) rs.getInt("quantity"),  // Convert int to double for consistency
-                    rs.getDouble("unit_price"),
-                    rs.getDouble("total_cost")
+                    rs.getInt("stock_id"),          // row[0]
+                    rs.getString("item_name"),      // row[1]
+                    rs.getString("brand_name"),     // row[2]
+                    rs.getString("category_name"),  // row[3]
+                    rs.getString("manufacturer_name"), // row[4]
+                    rs.getString("unit_name") != null ? rs.getString("unit_name") : "N/A", // row[5]
+                    (double) rs.getInt("quantity"), // row[6] - Convert int to double for consistency
+                    rs.getDouble("unit_price"),     // row[7]
+                    rs.getDouble("total_cost")      // row[8]
                 };
                 rawStocks.add(row);
             }
